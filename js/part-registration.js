@@ -1,5 +1,5 @@
 // Part Registration JavaScript
-// 간단한 파트 등록/수정/목록 기능
+// config.js와 supabase-client.js를 참조하여 parts DB에서 데이터 로드
 
 class PartRegistration {
     constructor() {
@@ -9,35 +9,38 @@ class PartRegistration {
         this.itemsPerPage = 10;
         this.editingPart = null;
         this.deletingPart = null;
-        this.initializeSupabase();
         this.init();
-    }
-
-    initializeSupabase() {
-        try {
-            if (typeof supabase !== 'undefined') {
-                this.supabase = supabase.createClient(
-                    'https://vzemucykhxlxgjuldibf.supabase.co',
-                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
-                );
-                console.log('Supabase 클라이언트 초기화 성공');
-            } else {
-                console.error('Supabase 라이브러리가 로드되지 않았습니다.');
-            }
-        } catch (error) {
-            console.error('Supabase 클라이언트 초기화 실패:', error);
-        }
     }
 
     async init() {
         try {
             console.log('PartRegistration 초기화 시작...');
+            
+            // config.js와 supabase-client.js가 로드되었는지 확인
+            if (typeof window.getCurrentConfig === 'undefined') {
+                console.error('config.js가 로드되지 않았습니다.');
+                this.showNotification('설정 파일을 불러올 수 없습니다.', 'error');
+                return;
+            }
+
+            if (typeof window.partService === 'undefined') {
+                console.error('supabase-client.js가 로드되지 않았습니다.');
+                this.showNotification('데이터베이스 클라이언트를 불러올 수 없습니다.', 'error');
+                return;
+            }
+
+            console.log('설정 확인 완료:', {
+                config: window.getCurrentConfig(),
+                partService: window.partService
+            });
+
             await this.loadParts();
             this.bindEvents();
             this.updateStats();
             console.log('PartRegistration 초기화 완료');
         } catch (error) {
             console.error('PartRegistration 초기화 오류:', error);
+            this.showNotification('초기화 중 오류가 발생했습니다.', 'error');
         }
     }
 
@@ -45,46 +48,24 @@ class PartRegistration {
         try {
             console.log('파트 데이터 로드 시작...');
             
-            if (!this.supabase) {
-                console.warn('Supabase 클라이언트가 없습니다. Mock 데이터를 사용합니다.');
-                this.loadMockData();
+            if (!window.partService) {
+                console.error('partService가 로드되지 않았습니다.');
+                this.showNotification('데이터베이스 서비스를 사용할 수 없습니다.', 'error');
                 return;
             }
 
-            const { data, error } = await this.supabase
-                .from('parts')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('파트 데이터 로드 오류:', error);
-                this.loadMockData();
-                return;
-            }
-
-            console.log('로드된 파트 데이터:', data);
-            this.parts = data || [];
+            console.log('partService 사용하여 데이터 로드...');
+            this.parts = await window.partService.getAllParts();
+            console.log('로드된 파트 데이터:', this.parts);
+            
             this.filteredParts = [...this.parts];
             this.renderParts();
             this.updateStats();
             
         } catch (error) {
-            console.error('파트 데이터 로드 중 예외 발생:', error);
-            this.loadMockData();
+            console.error('파트 데이터 로드 중 오류:', error);
+            this.showNotification('파트 목록을 불러오는데 실패했습니다.', 'error');
         }
-    }
-
-    loadMockData() {
-        console.log('Mock 데이터 로드 중...');
-        this.parts = [
-            { id: 1, part_number: 'ABC123', category: '전자부품', status: 'active', created_at: '2024-01-15T10:00:00Z' },
-            { id: 2, part_number: 'DEF456', category: '기계부품', status: 'active', created_at: '2024-01-14T15:30:00Z' },
-            { id: 3, part_number: 'GHI789', category: '소모품', status: 'inactive', created_at: '2024-01-13T09:15:00Z' }
-        ];
-        this.filteredParts = [...this.parts];
-        this.renderParts();
-        this.updateStats();
-        console.log('Mock 데이터 로드 완료');
     }
 
     bindEvents() {
@@ -202,41 +183,22 @@ class PartRegistration {
             if (this.editingPart) {
                 // Update existing part
                 console.log('파트 수정 시도:', this.editingPart, partData);
-                const { data, error } = await this.supabase
-                    .from('parts')
-                    .update(partData)
-                    .eq('id', this.editingPart)
-                    .select();
+                const updatedPart = await window.partService.updatePart(this.editingPart, partData);
                 
-                if (error) {
-                    console.error('Error updating part:', error);
-                    this.showNotification('파트 수정에 실패했습니다.', 'error');
-                    return;
-                }
-
                 // Update local array
                 const index = this.parts.findIndex(p => p.id === this.editingPart);
                 if (index !== -1) {
-                    this.parts[index] = { ...this.parts[index], ...data[0] };
+                    this.parts[index] = updatedPart;
                 }
                 
                 this.showNotification('파트가 성공적으로 수정되었습니다.', 'success');
             } else {
                 // Insert new part
                 console.log('새 파트 등록 시도:', partData);
-                const { data, error } = await this.supabase
-                    .from('parts')
-                    .insert(partData)
-                    .select();
+                const newPart = await window.partService.createPart(partData);
                 
-                if (error) {
-                    console.error('Error inserting part:', error);
-                    this.showNotification('파트 등록에 실패했습니다.', 'error');
-                    return;
-                }
-
                 // Add to local array
-                this.parts.unshift(data[0]);
+                this.parts.unshift(newPart);
                 
                 this.showNotification('파트가 성공적으로 등록되었습니다.', 'success');
             }
@@ -289,27 +251,13 @@ class PartRegistration {
             
             console.log('파트 삭제 시도:', id);
             
-            if (!this.supabase) {
-                console.warn('Supabase 클라이언트가 없습니다. Mock 데이터를 사용합니다.');
-                // Mock 데이터에서 삭제
-                this.parts = this.parts.filter(p => p.id !== id);
-                this.filteredParts = [...this.parts];
-                this.renderParts();
-                this.updateStats();
-                this.showNotification('파트가 삭제되었습니다.', 'success');
+            if (!window.partService) {
+                console.error('partService가 로드되지 않았습니다.');
+                this.showNotification('데이터베이스 서비스를 사용할 수 없습니다.', 'error');
                 return;
             }
 
-            const { error } = await this.supabase
-                .from('parts')
-                .delete()
-                .eq('id', id);
-            
-            if (error) {
-                console.error('Error deleting part:', error);
-                this.showNotification('파트 삭제에 실패했습니다.', 'error');
-                return;
-            }
+            await window.partService.deletePart(id);
 
             // Remove from local array
             this.parts = this.parts.filter(p => p.id !== id);
@@ -391,8 +339,7 @@ class PartRegistration {
                         part.status === 'inactive' ? 'bg-orange-100/20 text-orange-300' :
                         'bg-red-100/20 text-red-300'
                     }">
-                        ${part.status === 'active' ? '활성' : 
-                          part.status === 'inactive' ? '비활성' : '단종'}
+                        ${this.getStatusText(part.status)}
                     </span>
                 </td>
                 <td class="py-3 px-4">
@@ -413,6 +360,15 @@ class PartRegistration {
         console.log('파트 목록 HTML 생성 완료');
         this.renderPagination();
         console.log('=== 파트 목록 렌더링 완료 ===');
+    }
+
+    getStatusText(status) {
+        switch(status.toLowerCase()) {
+            case 'active': return '활성';
+            case 'inactive': return '비활성';
+            case 'discontinued': return '단종';
+            default: return status;
+        }
     }
 
     renderPagination() {
