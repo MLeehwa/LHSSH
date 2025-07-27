@@ -149,6 +149,24 @@ class OutboundStatus {
         }
     }
 
+    updateCurrentTime() {
+        const now = new Date();
+        const timeString = now.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'America/Chicago'
+        });
+        
+        const currentTimeElement = document.getElementById('currentTime');
+        if (currentTimeElement) {
+            currentTimeElement.textContent = timeString;
+        }
+    }
+
     scheduleTimeUpdate() {
         const updateTime = () => {
             this.updateCurrentTime();
