@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출고 요약 - 바코드 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- ExcelJS 라이브러리로 변경 (더 나은 스타일링 지원) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6B7280',
+                        'gray-25': '#fafafa',
+                        'blue-25': '#f0f8ff'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .bg-gray-25 { background-color: #fafafa; }
+        .bg-blue-25 { background-color: #f0f8ff; }
+        .hover\:bg-blue-25:hover { background-color: #f0f8ff; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-white shadow-lg">
+            <!-- Logo -->
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-barcode mr-2 text-blue-600"></i>
+                    바코드 시스템
+                </h1>
+                <p class="text-sm text-gray-500 mt-1">관리자 패널</p>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="mt-6">
+                <div class="px-4">
+                    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">메뉴</h3>
+                </div>
+                
+                <div class="space-y-1">
+                    <!-- Dashboard -->
+                    <a href="index.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
+                        <span>대시보드</span>
+                    </a>
+
+                    <!-- Part Registration -->
+                    <a href="part-registration.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-plus w-5 h-5 mr-3"></i>
+                        <span>파트 등록</span>
+                    </a>
+
+                    <!-- Inbound Status -->
+                    <a href="inbound-status.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
+                        <span>입고 현황</span>
+                    </a>
+
+                    <!-- Outbound Status -->
+                    <a href="outbound-status.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
+                        <span>출고 현황</span>
+                    </a>
+
+                    <!-- Inventory Status -->
+                    <a href="inventory-status.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-boxes w-5 h-5 mr-3"></i>
+                        <span>재고 현황</span>
+                    </a>
+
+                    <!-- Outbound Summary -->
+                    <a href="outbound-summary.html" class="flex items-center px-4 py-3 text-gray-700 bg-blue-50 border-r-2 border-blue-600">
+                        <i class="fas fa-chart-bar w-5 h-5 mr-3 text-blue-600"></i>
+                        <span class="font-medium">출하 현황</span>
+                    </a>
+
+                    <!-- Physical Inventory -->
+                    <a href="physical-inventory.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
+                        <span>실사 관리</span>
+                    </a>
+                </div>
+            </nav>
+
+            <!-- User Info & Current Time -->
+            <div class="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-user text-blue-600 text-sm"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">관리자</p>
+                            <p class="text-xs text-gray-500">Admin</p>
+                        </div>
+                    </div>
+                    <button onclick="logout()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600">현재 시간</div>
+                <div id="currentTime" class="text-lg font-mono text-gray-900"></div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900">출하 현황</h1>
+                            <p class="text-sm text-gray-600">출하 요약 및 통계</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                                <i class="fas fa-calendar-week text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">이번 주 출고</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="weeklyOutbound">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-green-100 text-green-600">
+                                <i class="fas fa-calendar-alt text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">이번 달 출고</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="monthlyOutbound">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                                <i class="fas fa-check-circle text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">확정 완료</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="confirmedCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-orange-100 text-orange-600">
+                                <i class="fas fa-boxes text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">총 파트 수</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="totalParts">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="bg-white rounded-lg shadow mb-6">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div class="flex items-center space-x-4">
+                                <button id="refreshDataBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                                    <i class="fas fa-sync-alt mr-2"></i>새로고침
+                                </button>
+                                
+                                <!-- View Mode Toggle -->
+                                <div class="flex items-center space-x-2">
+                                    <label class="text-sm font-medium text-gray-700">보기 모드:</label>
+                                    <select id="viewModeToggle" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="monthly">월별 보기</option>
+                                        <option value="weekly">주별 보기</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <!-- Month Selector for Excel Export -->
+                                <div class="flex items-center space-x-2">
+                                    <label class="text-sm font-medium text-gray-700">엑셀 다운로드 월:</label>
+                                    <input type="month" id="monthSelector" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                
+                                <div class="relative">
+                                    <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200">
+                                        <i class="fas fa-download mr-2"></i>내보내기
+                                    </button>
+                                    <div id="exportDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                                        <div class="py-1">
+                                            <button id="exportExcelBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                <i class="fas fa-file-excel mr-2"></i>Excel 내보내기
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="bg-white rounded-lg shadow mb-6">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">필터</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            
+                            <!-- 월별 보기용 드롭다운들 -->
+                            <div id="monthlyDropdowns" class="hidden">
+                                <label for="yearFilter" class="block text-sm font-medium text-gray-700 mb-1">년도 선택</label>
+                                <select id="yearFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <!-- JavaScript로 동적 생성 -->
+                                </select>
+                            </div>
+                            
+                            <div id="monthlyDropdowns2" class="hidden">
+                                <label for="monthFilter" class="block text-sm font-medium text-gray-700 mb-1">월 선택</label>
+                                <select id="monthFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="1">1월</option>
+                                    <option value="2">2월</option>
+                                    <option value="3">3월</option>
+                                    <option value="4">4월</option>
+                                    <option value="5">5월</option>
+                                    <option value="6">6월</option>
+                                    <option value="7">7월</option>
+                                    <option value="8">8월</option>
+                                    <option value="9">9월</option>
+                                    <option value="10">10월</option>
+                                    <option value="11">11월</option>
+                                    <option value="12">12월</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 주별 보기용 드롭다운 -->
+                            <div id="weeklyDropdown" class="hidden">
+                                <label for="weekFilter" class="block text-sm font-medium text-gray-700 mb-1">주 선택</label>
+                                <select id="weekFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <!-- JavaScript로 동적 생성 -->
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="partNumberFilter" class="block text-sm font-medium text-gray-700 mb-1">파트 번호</label>
+                                <input type="text" id="partNumberFilter" placeholder="파트 번호 입력" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                                <select id="statusFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">전체</option>
+                                    <option value="PENDING">확정전</option>
+                                    <option value="CONFIRMED">확정 완료</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end space-x-2">
+                                <button id="applyFilter" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
+                                    적용
+                                </button>
+                                <button id="resetFilter" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
+                                    초기화
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Table -->
+                <div class="bg-white rounded-lg shadow border-2 border-gray-300">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900">출고 요약</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 border-2 border-gray-400">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-300">파트 번호</th>
+                                    <!-- 동적으로 생성되는 날짜/차수 컬럼들 -->
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="summaryTableBody">
+                                <!-- Summary data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../js/config.js"></script>
+    <script src="../js/supabase-client.js"></script>
+    <script src="../js/outbound-summary.js"></script>
+    <script>
+        // DOM이 로드된 후에 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                console.log('Outbound Summary 페이지 초기화 시작...');
+                
+                // 기본 설정
+                const today = new Date();
+                const monthSelectorEl = document.getElementById('monthSelector');
+                
+                if (monthSelectorEl) {
+                    monthSelectorEl.value = today.toISOString().slice(0, 7);
+                    console.log('월 선택기 설정:', monthSelectorEl.value);
+                }
+                
+                // OutboundSummary 인스턴스가 이미 생성되었는지 확인
+                if (!window.outboundSummary) {
+                    console.log('OutboundSummary 인스턴스 생성 중...');
+                    window.outboundSummary = new OutboundSummary();
+                }
+                
+                // 인스턴스 초기화
+                if (window.outboundSummary && typeof window.outboundSummary.init === 'function') {
+                    window.outboundSummary.init().catch(error => {
+                        console.error('OutboundSummary 초기화 중 오류:', error);
+                    });
+                }
+                
+                console.log('Outbound Summary 페이지 초기화 완료');
+                
+            } catch (error) {
+                console.error('페이지 초기화 중 오류:', error);
+                // 사용자에게 오류 알림
+                if (typeof alert !== 'undefined') {
+                    alert('페이지 초기화 중 오류가 발생했습니다: ' + error.message);
+                }
+            }
+        });
+        
+        // 페이지 로드 완료 후 추가 초기화
+        window.addEventListener('load', () => {
+            try {
+                console.log('페이지 로드 완료');
+                
+                // 현재 시간 업데이트 시작
+                const timeElement = document.getElementById('currentTime');
+                if (timeElement && window.outboundSummary) {
+                    window.outboundSummary.updateCurrentTime();
+                }
+                
+            } catch (error) {
+                console.error('페이지 로드 후 초기화 중 오류:', error);
+            }
+        });
+    </script>
+</body>
+</html> 

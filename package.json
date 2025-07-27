@@ -1,0 +1,30 @@
+{
+  "name": "barcode-system",
+  "version": "1.0.0",
+  "description": "바코드 관리 시스템 with Supabase",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx http-server -p 8000",
+    "build": "echo 'Build process for production'",
+    "start": "npx http-server -p 8000"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "keywords": [
+    "barcode",
+    "inventory",
+    "management",
+    "supabase"
+  ],
+  "author": "Barcode System Team",
+  "license": "MIT",
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+} 

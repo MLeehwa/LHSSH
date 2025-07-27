@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이화 - 서한 샤프트 관리 시스템</title>
+    
+    <!-- 개발 환경에서만 Tailwind CDN 사용 -->
+    <script>
+        // 개발 환경 확인
+        const isDevelopment = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' || 
+                            window.location.protocol === 'file:';
+        
+        if (isDevelopment) {
+            // 개발 환경에서는 CDN 사용
+            const script = document.createElement('script');
+            script.src = 'https://cdn.tailwindcss.com';
+            document.head.appendChild(script);
+        } else {
+            // 프로덕션 환경에서는 로컬 CSS 사용
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '../css/tailwind.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        // Tailwind 설정은 CDN 로드 후에 실행
+        function configureTailwind() {
+            if (window.tailwind) {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#3B82F6',
+                                secondary: '#64748B',
+                                success: '#10B981',
+                                warning: '#F59E0B',
+                                danger: '#EF4444'
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-in-out',
+                                'slide-up': 'slideUp 0.5s ease-out',
+                                'bounce-in': 'bounceIn 0.6s ease-out',
+                                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0' },
+                                    '100%': { opacity: '1' }
+                                },
+                                slideUp: {
+                                    '0%': { transform: 'translateY(20px)', opacity: '0' },
+                                    '100%': { transform: 'translateY(0)', opacity: '1' }
+                                },
+                                bounceIn: {
+                                    '0%': { transform: 'scale(0.3)', opacity: '0' },
+                                    '50%': { transform: 'scale(1.05)' },
+                                    '70%': { transform: 'scale(0.9)' },
+                                    '100%': { transform: 'scale(1)', opacity: '1' }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // CDN이 아직 로드되지 않았다면 잠시 후 다시 시도
+                setTimeout(configureTailwind, 100);
+            }
+        }
+        
+        // 페이지 로드 시 Tailwind 설정
+        document.addEventListener('DOMContentLoaded', configureTailwind);
+        
+        // 개발 환경 플래그 설정
+        window.NODE_ENV = 'development';
+    </script>
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .nav-item {
+            transition: all 0.3s ease;
+        }
+        .nav-item:hover {
+            transform: translateX(5px);
+        }
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-right: 3px solid white;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 glass-sidebar">
+            <!-- Logo -->
+            <div class="p-6 border-b border-white/20">
+                <h1 class="text-xl font-bold text-white flex items-center animate-bounce-in">
+                    <i class="fas fa-barcode mr-2 text-white"></i>
+                    이화 - 샤프트 관리
+                </h1>
+                <p class="text-sm text-white/80 mt-1">관리자 패널</p>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="mt-6">
+                <div class="px-4">
+                    <h3 class="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">메뉴</h3>
+                </div>
+                
+                <div class="space-y-1">
+                    <!-- Dashboard -->
+                    <a href="#" class="nav-item active flex items-center px-4 py-3 text-white hover:bg-white/20 transition-all duration-200">
+                        <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
+                        <span class="font-medium">대시보드</span>
+                    </a>
+
+                    <!-- Part Registration -->
+                    <a href="part-registration.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-plus w-5 h-5 mr-3"></i>
+                        <span>파트 등록</span>
+                    </a>
+
+                    <!-- Inbound Status -->
+                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
+                        <span>입고 현황</span>
+                    </a>
+
+                    <!-- Inventory Status -->
+                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-boxes w-5 h-5 mr-3"></i>
+                        <span>재고 현황</span>
+                    </a>
+
+                    <!-- Outbound Status -->
+                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
+                        <span>출고 현황</span>
+                    </a>
+
+                    <!-- Outbound Summary -->
+                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
+                        <span>출하 현황</span>
+                    </a>
+
+                    <!-- Physical Inventory -->
+                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
+                        <span>실사재고</span>
+                    </a>
+
+                    <!-- Daily Inventory Tracking -->
+                    <a href="daily-inventory.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-calendar-day w-5 h-5 mr-3"></i>
+                        <span>일일 재고 추적</span>
+                    </a>
+
+                </div>
+            </nav>
+
+            <!-- User Info & Current Time -->
+            <div class="absolute bottom-0 w-64 p-4 border-t border-white/20">
+                <div class="flex items-center mb-3">
+                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-white text-sm"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-white">관리자</p>
+                        <button onclick="logout()" class="text-xs text-white/80 hover:text-white transition-colors">
+                            <i class="fas fa-sign-out-alt mr-1"></i>로그아웃
+                        </button>
+                    </div>
+                </div>
+                <div class="glass-effect rounded-lg p-3">
+                    <div class="text-sm text-white/80">현재 시간</div>
+                    <div id="currentTime" class="text-lg font-mono text-white"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Header -->
+            <header class="glass-effect border-b border-white/20">
+                <div class="flex items-center justify-between px-6 py-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">대시보드</h2>
+                        <p class="text-sm text-white/80">바코드 시스템 관리 및 모니터링</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <button class="p-2 text-white/60 hover:text-white transition-colors">
+                                <i class="fas fa-bell text-lg"></i>
+                            </button>
+                            <span class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 animate-pulse-slow"></span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="stat-card glass-effect rounded-xl p-6 animate-slide-up">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-12 h-12 bg-blue-100/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-box text-blue-300 text-xl"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">총 파트 수</p>
+                                <p class="text-2xl font-semibold text-white" id="totalParts">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.1s;">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-12 h-12 bg-green-100/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-arrow-down text-green-300 text-xl"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">오늘 입고</p>
+                                <p class="text-2xl font-semibold text-white" id="todayInbound">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.2s;">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-12 h-12 bg-orange-100/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-arrow-up text-orange-300 text-xl"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">오늘 출고</p>
+                                <p class="text-2xl font-semibold text-white" id="todayOutbound">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.3s;">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-12 h-12 bg-red-100/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-red-300 text-xl"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">부족 재고</p>
+                                <p class="text-2xl font-semibold text-white" id="lowStock">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity & Quick Actions -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Recent Activity -->
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.4s;">
+                        <h3 class="text-lg font-semibold text-white mb-4">최근 활동</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center p-3 bg-white/10 rounded-lg">
+                                <div class="w-8 h-8 bg-green-100/20 rounded-full flex items-center justify-center mr-3">
+                                    <i class="fas fa-arrow-down text-green-300 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">새로운 입고 완료</p>
+                                    <p class="text-xs text-white/60">파트 A-1234가 입고되었습니다.</p>
+                                </div>
+                                <span class="text-xs text-white/60">2분 전</span>
+                            </div>
+                            
+                            <div class="flex items-center p-3 bg-white/10 rounded-lg">
+                                <div class="w-8 h-8 bg-orange-100/20 rounded-full flex items-center justify-center mr-3">
+                                    <i class="fas fa-arrow-up text-orange-300 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">출고 처리 완료</p>
+                                    <p class="text-xs text-white/60">파트 B-5678이 출고되었습니다.</p>
+                                </div>
+                                <span class="text-xs text-white/60">15분 전</span>
+                            </div>
+                            
+                            <div class="flex items-center p-3 bg-white/10 rounded-lg">
+                                <div class="w-8 h-8 bg-blue-100/20 rounded-full flex items-center justify-center mr-3">
+                                    <i class="fas fa-plus text-blue-300 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">새 파트 등록</p>
+                                    <p class="text-xs text-white/60">파트 C-9012가 등록되었습니다.</p>
+                                </div>
+                                <span class="text-xs text-white/60">1시간 전</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.5s;">
+                        <h3 class="text-lg font-semibold text-white mb-4">빠른 작업</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button onclick="window.location.href='part-registration.html'" 
+                                    class="flex flex-col items-center p-4 bg-white/10 rounded-lg hover:bg-white/20 transition-all duration-200 group">
+                                <div class="w-12 h-12 bg-blue-100/20 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-plus text-blue-300 text-xl"></i>
+                                </div>
+                                <span class="text-sm font-medium text-white">파트 등록</span>
+                            </button>
+                            
+                            <button onclick="window.location.href='inbound-status.html'" 
+                                    class="flex flex-col items-center p-4 bg-white/10 rounded-lg hover:bg-white/20 transition-all duration-200 group">
+                                <div class="w-12 h-12 bg-green-100/20 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-arrow-down text-green-300 text-xl"></i>
+                                </div>
+                                <span class="text-sm font-medium text-white">입고 관리</span>
+                            </button>
+                            
+                            <button onclick="window.location.href='outbound-status.html'" 
+                                    class="flex flex-col items-center p-4 bg-white/10 rounded-lg hover:bg-white/20 transition-all duration-200 group">
+                                <div class="w-12 h-12 bg-orange-100/20 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-arrow-up text-orange-300 text-xl"></i>
+                                </div>
+                                <span class="text-sm font-medium text-white">출고 관리</span>
+                            </button>
+                            
+                            <button onclick="window.location.href='inventory-status.html'" 
+                                    class="flex flex-col items-center p-4 bg-white/10 rounded-lg hover:bg-white/20 transition-all duration-200 group">
+                                <div class="w-12 h-12 bg-purple-100/20 rounded-lg flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-boxes text-purple-300 text-xl"></i>
+                                </div>
+                                <span class="text-sm font-medium text-white">재고 확인</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/supabase-client.js"></script>
+    <script src="../js/admin.js"></script>
+    <script>
+        // 현재 시간 업데이트
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        // 1초마다 시간 업데이트
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // 로그아웃 함수
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userInfo');
+            localStorage.removeItem('userMode');
+            window.location.href = '../login.html';
+        }
+
+        // 페이지 로드 시 애니메이션
+        document.addEventListener('DOMContentLoaded', function() {
+            // 통계 카드들에 순차 애니메이션 적용
+            const statCards = document.querySelectorAll('.stat-card');
+            statCards.forEach((card, index) => {
+                card.style.animationDelay = `${index * 0.1}s`;
+            });
+        });
+
+        // 데모 데이터 (실제로는 서버에서 가져올 데이터)
+        function loadDashboardData() {
+            // 실제 구현에서는 API 호출
+            document.getElementById('totalParts').textContent = '1,234';
+            document.getElementById('todayInbound').textContent = '45';
+            document.getElementById('todayOutbound').textContent = '32';
+            document.getElementById('lowStock').textContent = '8';
+        }
+
+        // 페이지 로드 시 데이터 로드
+        loadDashboardData();
+    </script>
+</body>
+</html> 

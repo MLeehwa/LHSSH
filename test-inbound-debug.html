@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>입고 현황 디버그 - 바코드 관리 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0"></script>
+    <style>
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .log { background-color: #f8f9fa; border-color: #dee2e6; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body class="bg-gray-50 p-6">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">입고 현황 디버그 페이지</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Connection Test -->
+            <div class="debug-section info">
+                <h2 class="text-xl font-semibold mb-4">연결 테스트</h2>
+                <button id="testConnection" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Supabase 연결 테스트
+                </button>
+                <div id="connectionResult" class="mt-4"></div>
+            </div>
+
+            <!-- Table Structure Test -->
+            <div class="debug-section info">
+                <h2 class="text-xl font-semibold mb-4">테이블 구조 테스트</h2>
+                <button id="testTables" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    테이블 구조 확인
+                </button>
+                <div id="tableResult" class="mt-4"></div>
+            </div>
+
+            <!-- Data Test -->
+            <div class="debug-section info">
+                <h2 class="text-xl font-semibold mb-4">데이터 테스트</h2>
+                <button id="testData" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                    데이터 로드 테스트
+                </button>
+                <div id="dataResult" class="mt-4"></div>
+            </div>
+
+            <!-- Performance Test -->
+            <div class="debug-section info">
+                <h2 class="text-xl font-semibold mb-4">성능 테스트</h2>
+                <button id="testPerformance" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                    성능 테스트
+                </button>
+                <div id="performanceResult" class="mt-4"></div>
+            </div>
+        </div>
+
+        <!-- Log Section -->
+        <div class="debug-section log mt-6">
+            <h2 class="text-xl font-semibold mb-4">디버그 로그</h2>
+            <div id="debugLog" class="max-h-96 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        class InboundDebugger {
+            constructor() {
+                this.supabase = null;
+                this.logElement = document.getElementById('debugLog');
+                this.initializeSupabase();
+                this.bindEvents();
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.className = `mb-2 p-2 rounded ${type === 'error' ? 'bg-red-100' : type === 'success' ? 'bg-green-100' : 'bg-blue-100'}`;
+                logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+                this.logElement.appendChild(logEntry);
+                this.logElement.scrollTop = this.logElement.scrollHeight;
+            }
+
+            initializeSupabase() {
+                try {
+                    this.supabase = supabase.createClient(
+                        'https://vzemucykhxlxgjuldibf.supabase.co',
+                        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
+                    );
+                    this.log('Supabase 클라이언트 초기화 성공', 'success');
+                } catch (error) {
+                    this.log(`Supabase 클라이언트 초기화 실패: ${error.message}`, 'error');
+                }
+            }
+
+            bindEvents() {
+                document.getElementById('testConnection').addEventListener('click', () => this.testConnection());
+                document.getElementById('testTables').addEventListener('click', () => this.testTables());
+                document.getElementById('testData').addEventListener('click', () => this.testData());
+                document.getElementById('testPerformance').addEventListener('click', () => this.testPerformance());
+            }
+
+            async testConnection() {
+                const resultElement = document.getElementById('connectionResult');
+                resultElement.innerHTML = '<div class="text-blue-600">연결 테스트 중...</div>';
+                
+                try {
+                    this.log('연결 테스트 시작...');
+                    
+                    const { data, error } = await this.supabase
+                        .from('arn_containers')
+                        .select('*')
+                        .limit(1);
+                    
+                    if (error) {
+                        this.log(`연결 테스트 실패: ${error.message} (코드: ${error.code})`, 'error');
+                        resultElement.innerHTML = `<div class="text-red-600">연결 실패: ${error.message}</div>`;
+                    } else {
+                        this.log('연결 테스트 성공', 'success');
+                        resultElement.innerHTML = '<div class="text-green-600">연결 성공!</div>';
+                    }
+                } catch (error) {
+                    this.log(`연결 테스트 중 예외 발생: ${error.message}`, 'error');
+                    resultElement.innerHTML = `<div class="text-red-600">예외 발생: ${error.message}</div>`;
+                }
+            }
+
+            async testTables() {
+                const resultElement = document.getElementById('tableResult');
+                resultElement.innerHTML = '<div class="text-blue-600">테이블 구조 확인 중...</div>';
+                
+                try {
+                    this.log('테이블 구조 테스트 시작...');
+                    
+                    const tables = ['arn_containers', 'arn_parts', 'parts', 'inventory'];
+                    const results = {};
+                    
+                    for (const table of tables) {
+                        try {
+                            const { data, error } = await this.supabase
+                                .from(table)
+                                .select('*')
+                                .limit(1);
+                            
+                            if (error) {
+                                results[table] = { success: false, error: error.message };
+                                this.log(`테이블 ${table} 접근 실패: ${error.message}`, 'error');
+                            } else {
+                                results[table] = { success: true, count: data ? data.length : 0 };
+                                this.log(`테이블 ${table} 접근 성공`, 'success');
+                            }
+                        } catch (error) {
+                            results[table] = { success: false, error: error.message };
+                            this.log(`테이블 ${table} 예외 발생: ${error.message}`, 'error');
+                        }
+                    }
+                    
+                    let html = '<div class="space-y-2">';
+                    for (const [table, result] of Object.entries(results)) {
+                        if (result.success) {
+                            html += `<div class="text-green-600">✓ ${table}: 접근 가능</div>`;
+                        } else {
+                            html += `<div class="text-red-600">✗ ${table}: ${result.error}</div>`;
+                        }
+                    }
+                    html += '</div>';
+                    resultElement.innerHTML = html;
+                    
+                } catch (error) {
+                    this.log(`테이블 구조 테스트 중 예외 발생: ${error.message}`, 'error');
+                    resultElement.innerHTML = `<div class="text-red-600">예외 발생: ${error.message}</div>`;
+                }
+            }
+
+            async testData() {
+                const resultElement = document.getElementById('dataResult');
+                resultElement.innerHTML = '<div class="text-blue-600">데이터 로드 테스트 중...</div>';
+                
+                try {
+                    this.log('데이터 로드 테스트 시작...');
+                    
+                    // Test container data
+                    const { data: containers, error: containerError } = await this.supabase
+                        .from('arn_containers')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    
+                    if (containerError) {
+                        this.log(`컨테이너 데이터 로드 실패: ${containerError.message}`, 'error');
+                    } else {
+                        this.log(`컨테이너 데이터 로드 성공: ${containers.length}개`, 'success');
+                    }
+                    
+                    // Test parts data
+                    const { data: parts, error: partsError } = await this.supabase
+                        .from('parts')
+                        .select('*')
+                        .eq('status', 'ACTIVE');
+                    
+                    if (partsError) {
+                        this.log(`파트 데이터 로드 실패: ${partsError.message}`, 'error');
+                    } else {
+                        this.log(`파트 데이터 로드 성공: ${parts.length}개`, 'success');
+                    }
+                    
+                    let html = '<div class="space-y-2">';
+                    html += `<div class="${containerError ? 'text-red-600' : 'text-green-600'}">컨테이너: ${containerError ? containerError.message : `${containers.length}개 로드됨`}</div>`;
+                    html += `<div class="${partsError ? 'text-red-600' : 'text-green-600'}">파트: ${partsError ? partsError.message : `${parts.length}개 로드됨`}</div>`;
+                    html += '</div>';
+                    resultElement.innerHTML = html;
+                    
+                } catch (error) {
+                    this.log(`데이터 로드 테스트 중 예외 발생: ${error.message}`, 'error');
+                    resultElement.innerHTML = `<div class="text-red-600">예외 발생: ${error.message}</div>`;
+                }
+            }
+
+            async testPerformance() {
+                const resultElement = document.getElementById('performanceResult');
+                resultElement.innerHTML = '<div class="text-blue-600">성능 테스트 중...</div>';
+                
+                try {
+                    this.log('성능 테스트 시작...');
+                    
+                    const startTime = performance.now();
+                    
+                    // Test parallel data loading
+                    const [containersResult, partsResult] = await Promise.all([
+                        this.supabase.from('arn_containers').select('*').limit(10),
+                        this.supabase.from('parts').select('*').limit(10)
+                    ]);
+                    
+                    const endTime = performance.now();
+                    const duration = endTime - startTime;
+                    
+                    this.log(`병렬 데이터 로드 완료: ${duration.toFixed(2)}ms`, 'success');
+                    
+                    let html = '<div class="space-y-2">';
+                    html += `<div class="text-green-600">병렬 로드 시간: ${duration.toFixed(2)}ms</div>`;
+                    html += `<div class="text-blue-600">컨테이너: ${containersResult.data ? containersResult.data.length : 0}개</div>`;
+                    html += `<div class="text-blue-600">파트: ${partsResult.data ? partsResult.data.length : 0}개</div>`;
+                    html += '</div>';
+                    resultElement.innerHTML = html;
+                    
+                } catch (error) {
+                    this.log(`성능 테스트 중 예외 발생: ${error.message}`, 'error');
+                    resultElement.innerHTML = `<div class="text-red-600">예외 발생: ${error.message}</div>`;
+                }
+            }
+        }
+
+        // Initialize debugger when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new InboundDebugger();
+        });
+    </script>
+</body>
+</html> 

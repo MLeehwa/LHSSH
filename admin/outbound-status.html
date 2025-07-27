@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출고 현황 - 바코드 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6B7280'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-white shadow-lg">
+            <!-- Logo -->
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-barcode mr-2 text-blue-600"></i>
+                    바코드 시스템
+                </h1>
+                <p class="text-sm text-gray-500 mt-1">관리자 패널</p>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="mt-6">
+                <div class="px-4">
+                    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">메뉴</h3>
+                </div>
+                
+                <div class="space-y-1">
+                    <!-- Dashboard -->
+                    <a href="index.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
+                        <span>대시보드</span>
+                    </a>
+
+                    <!-- Part Registration -->
+                    <a href="part-registration.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-plus w-5 h-5 mr-3"></i>
+                        <span>파트 등록</span>
+                    </a>
+
+                    <!-- Inbound Status -->
+                    <a href="inbound-status.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
+                        <span>입고 현황</span>
+                    </a>
+
+                    <!-- Outbound Status -->
+                    <a href="outbound-status.html" class="flex items-center px-4 py-3 text-gray-700 bg-blue-50 border-r-2 border-blue-600">
+                        <i class="fas fa-arrow-up w-5 h-5 mr-3 text-blue-600"></i>
+                        <span class="font-medium">출고 현황</span>
+                    </a>
+
+                    <!-- Inventory Status -->
+                    <a href="inventory-status.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-boxes w-5 h-5 mr-3"></i>
+                        <span>재고 현황</span>
+                    </a>
+
+                    <!-- Outbound Summary -->
+                    <a href="outbound-summary.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
+                        <span>출하 현황</span>
+                    </a>
+
+                    <!-- Physical Inventory -->
+                    <a href="physical-inventory.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
+                        <span>실사 관리</span>
+                    </a>
+                </div>
+            </nav>
+
+            <!-- User Info & Current Time -->
+            <div class="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-user text-blue-600 text-sm"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900">관리자</p>
+                            <p class="text-xs text-gray-500">Admin</p>
+                        </div>
+                    </div>
+                    <button onclick="logout()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600">현재 시간</div>
+                <div id="currentTime" class="text-lg font-mono text-gray-900"></div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900">출고 현황</h1>
+                            <p class="text-sm text-gray-600">출고 요청 및 확정 관리</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                                <i class="fas fa-truck text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">총 출고</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="totalOutbound">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-green-100 text-green-600">
+                                <i class="fas fa-check-circle text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">확정 완료</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="confirmedOutbound">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                                <i class="fas fa-clock text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">확정 대기</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="pendingOutbound">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                                <i class="fas fa-calendar-day text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">오늘 날짜</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="todayDate">2024-01-15</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="bg-white rounded-lg shadow mb-6">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div class="flex items-center space-x-4">
+                                <button id="registerOutboundBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                                    <i class="fas fa-plus mr-2"></i>출고 등록
+                                </button>
+                                <button id="addPartBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    <i class="fas fa-plus mr-2"></i>파트 추가
+                                </button>
+                                <button id="refreshDataBtn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                                    <i class="fas fa-sync-alt mr-2"></i>새로고침
+                                </button>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <button id="confirmAllBtn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    <i class="fas fa-check-double mr-2"></i>전체 확정
+                                </button>
+                                <button id="confirmOutboundBtn" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    <i class="fas fa-check mr-2"></i>선택 확정
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="bg-white rounded-lg shadow mb-6">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">필터</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div>
+                                <label for="dateFilter" class="block text-sm font-medium text-gray-700 mb-1">날짜</label>
+                                <input type="date" id="dateFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="seqFilter" class="block text-sm font-medium text-gray-700 mb-1">차수</label>
+                                <select id="seqFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">전체</option>
+                                    <option value="1">1차</option>
+                                    <option value="2">2차</option>
+                                    <option value="AS">AS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="partNumberFilter" class="block text-sm font-medium text-gray-700 mb-1">파트 번호</label>
+                                <input type="text" id="partNumberFilter" placeholder="파트 번호 입력" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                                <select id="statusFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">전체</option>
+                                    <option value="PENDING">확정전</option>
+                                    <option value="CONFIRMED">확정 완료</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end space-x-2">
+                                <button id="applyFilter" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
+                                    적용
+                                </button>
+                                <button id="resetFilter" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
+                                    초기화
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Left Panel: Outbound Sequences -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-lg shadow">
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <h3 class="text-lg font-medium text-gray-900">출고 차수 목록</h3>
+                            </div>
+                            <div class="max-h-96 overflow-y-auto" id="outboundSequenceList">
+                                <!-- Sequences will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Panel: Parts Details -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-lg shadow">
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <h3 class="text-lg font-medium text-gray-900">
+                                    파트 상세 <span id="selectedSequence" class="text-sm font-normal text-gray-500"></span>
+                                </h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <input type="checkbox" id="selectAllParts" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">파트 번호</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">스캔 수량</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">실제 출고</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200" id="partsTableBody">
+                                        <!-- Parts will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Add Part Row (Hidden by default) -->
+    <div id="addPartRow" class="hidden bg-yellow-50 border-t border-yellow-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-900 mb-4">새 파트 추가</h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label for="newPartNumber" class="block text-sm font-medium text-gray-700 mb-1">파트 번호</label>
+                        <input type="text" id="newPartNumber" placeholder="파트 번호 입력" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="newScannedQty" class="block text-sm font-medium text-gray-700 mb-1">스캔 수량</label>
+                        <input type="number" id="newScannedQty" placeholder="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
+                    </div>
+                    <div>
+                        <label for="newActualQty" class="block text-sm font-medium text-gray-700 mb-1">실제 출고</label>
+                        <input type="number" id="newActualQty" placeholder="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex items-end space-x-2">
+                        <button id="savePartBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors duration-200">
+                            저장
+                        </button>
+                        <button id="cancelPartBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
+                            취소
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto bg-orange-100 rounded-full">
+                    <i class="fas fa-exclamation-triangle text-orange-600 text-xl"></i>
+                </div>
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg font-medium text-gray-900">출하 확정 확인</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500 mb-4">
+                            선택한 출하를 확정하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                        </p>
+                        <div id="confirmationDetails" class="text-left bg-gray-50 p-4 rounded-lg">
+                            <!-- Details will be populated here -->
+                        </div>
+                    </div>
+                    <div class="flex justify-center space-x-4">
+                        <button id="cancelConfirmation" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors duration-200">
+                            취소
+                        </button>
+                        <button id="confirmOutboundAction" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition-colors duration-200">
+                            확정
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Outbound Registration Modal -->
+    <div id="outboundRegistrationModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">출고 등록</h3>
+                    <button id="closeRegistrationModal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="registrationDate" class="block text-sm font-medium text-gray-700 mb-1">날짜</label>
+                            <input type="date" id="registrationDate" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="registrationSequence" class="block text-sm font-medium text-gray-700 mb-1">차수</label>
+                            <select id="registrationSequence" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">차수 선택</option>
+                                <option value="1">1차</option>
+                                <option value="2">2차</option>
+                                <option value="AS">AS</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="partNumberSelect" class="block text-sm font-medium text-gray-700 mb-1">파트 번호</label>
+                            <select id="partNumberSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">파트 선택</option>
+                                <option value="49560-12345">49560-12345</option>
+                                <option value="49560-67890">49560-67890</option>
+                                <option value="49600-11111">49600-11111</option>
+                                <option value="49560-22222">49560-22222</option>
+                                <option value="49601-33333">49601-33333</option>
+                                <option value="49560-44444">49560-44444</option>
+                                <option value="49600-55555">49600-55555</option>
+                                <option value="49560-66666">49560-66666</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="partQuantity" class="block text-sm font-medium text-gray-700 mb-1">수량</label>
+                            <input type="number" id="partQuantity" placeholder="수량 입력" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="addPartToRegistration" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
+                                추가
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">등록된 파트</label>
+                        <div id="registeredPartsList" class="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded-md p-4">
+                            <p class="text-gray-500 text-sm">등록된 파트가 없습니다.</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button id="cancelRegistration" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors duration-200">
+                            취소
+                        </button>
+                        <button id="saveRegistration" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors duration-200">
+                            저장
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabase-client.js"></script>
+    <script src="../js/outbound-status.js"></script>
+    <script>
+        // Set today's date
+        document.getElementById('todayDate').textContent = new Date().toISOString().split('T')[0];
+    </script>
+</body>
+</html> 

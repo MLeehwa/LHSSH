@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>파트 등록 - 바코드 시스템</title>
+    
+    <!-- 개발 환경에서만 Tailwind CDN 사용 -->
+    <script>
+        // 개발 환경 확인
+        const isDevelopment = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' || 
+                            window.location.protocol === 'file:';
+        
+        if (isDevelopment) {
+            // 개발 환경에서는 CDN 사용
+            const script = document.createElement('script');
+            script.src = 'https://cdn.tailwindcss.com';
+            document.head.appendChild(script);
+        } else {
+            // 프로덕션 환경에서는 로컬 CSS 사용
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '../css/tailwind.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Tailwind 설정은 CDN 로드 후에 실행
+        function configureTailwind() {
+            if (window.tailwind) {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#3B82F6',
+                                secondary: '#6B7280',
+                                success: '#10B981',
+                                warning: '#F59E0B',
+                                danger: '#EF4444'
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-in-out',
+                                'slide-up': 'slideUp 0.5s ease-out',
+                                'bounce-in': 'bounceIn 0.6s ease-out'
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0' },
+                                    '100%': { opacity: '1' }
+                                },
+                                slideUp: {
+                                    '0%': { transform: 'translateY(20px)', opacity: '0' },
+                                    '100%': { transform: 'translateY(0)', opacity: '1' }
+                                },
+                                bounceIn: {
+                                    '0%': { transform: 'scale(0.3)', opacity: '0' },
+                                    '50%': { transform: 'scale(1.05)' },
+                                    '70%': { transform: 'scale(0.9)' },
+                                    '100%': { transform: 'scale(1)', opacity: '1' }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // CDN이 아직 로드되지 않았다면 잠시 후 다시 시도
+                setTimeout(configureTailwind, 100);
+            }
+        }
+        
+        // 페이지 로드 시 Tailwind 설정
+        document.addEventListener('DOMContentLoaded', configureTailwind);
+        
+        // 개발 환경 플래그 설정
+        window.NODE_ENV = 'development';
+    </script>
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .nav-item {
+            transition: all 0.3s ease;
+        }
+        .nav-item:hover {
+            transform: translateX(5px);
+        }
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-right: 3px solid white;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 glass-sidebar">
+            <!-- Logo -->
+            <div class="p-6 border-b border-white/20">
+                <h1 class="text-xl font-bold text-white flex items-center animate-bounce-in">
+                    <i class="fas fa-barcode mr-2 text-white"></i>
+                    바코드 시스템
+                </h1>
+                <p class="text-sm text-white/80 mt-1">관리자 패널</p>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="mt-6">
+                <div class="px-4">
+                    <h3 class="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">메뉴</h3>
+                </div>
+                
+                <div class="space-y-1">
+                    <!-- Dashboard -->
+                    <a href="index.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
+                        <span>대시보드</span>
+                    </a>
+
+                    <!-- Part Registration -->
+                    <a href="part-registration.html" class="nav-item active flex items-center px-4 py-3 text-white hover:bg-white/20 transition-all duration-200">
+                        <i class="fas fa-plus w-5 h-5 mr-3"></i>
+                        <span class="font-medium">파트 등록</span>
+                    </a>
+
+                    <!-- Inbound Status -->
+                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
+                        <span>입고 현황</span>
+                    </a>
+
+                    <!-- Outbound Status -->
+                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
+                        <span>출고 현황</span>
+                    </a>
+
+                    <!-- Inventory Status -->
+                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-boxes w-5 h-5 mr-3"></i>
+                        <span>재고 현황</span>
+                    </a>
+
+                    <!-- Outbound Summary -->
+                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
+                        <span>출하 현황</span>
+                    </a>
+
+                    <!-- Physical Inventory -->
+                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
+                        <span>실사 관리</span>
+                    </a>
+                </div>
+            </nav>
+
+            <!-- User Info & Current Time -->
+            <div class="absolute bottom-0 w-64 p-4 border-t border-white/20">
+                <div class="flex items-center mb-3">
+                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-white text-sm"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-white">관리자</p>
+                        <button onclick="logout()" class="text-xs text-white/80 hover:text-white transition-colors">
+                            <i class="fas fa-sign-out-alt mr-1"></i>로그아웃
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="glass-effect border-b border-white/20">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-white">파트 등록</h1>
+                            <p class="text-sm text-white/80">새로운 파트 등록 및 관리</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <button id="refreshBtn" class="flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors">
+                                <i class="fas fa-sync-alt mr-2"></i>
+                                새로고침
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-blue-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-box text-blue-300 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">총 파트 수</p>
+                                <p class="text-2xl font-semibold text-white" id="totalParts">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.1s;">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-green-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-300 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">활성 파트</p>
+                                <p class="text-2xl font-semibold text-white" id="activeParts">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.2s;">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-orange-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-pause-circle text-orange-300 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">비활성 파트</p>
+                                <p class="text-2xl font-semibold text-white" id="inactiveParts">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.3s;">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-purple-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-tags text-purple-300 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-white/80">카테고리</p>
+                                <p class="text-2xl font-semibold text-white" id="totalCategories">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form and Table Container -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Registration Form -->
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.4s;">
+                        <h2 class="text-lg font-semibold text-white mb-4">새 파트 등록</h2>
+                        <form id="partForm" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">파트 번호 *</label>
+                                    <input type="text" id="partNumber" name="partNumber" required 
+                                           class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                                           placeholder="예: 49560-12345">
+                                    <p class="mt-1 text-xs text-white/60">파트 번호를 입력하면 카테고리가 자동으로 설정됩니다.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">카테고리 *</label>
+                                    <select id="category" name="category" required 
+                                            class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                                        <option value="">카테고리 선택</option>
+                                        <option value="REAR">REAR</option>
+                                        <option value="INNER">INNER</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-white/80 mb-2">상태 *</label>
+                                <select id="status" name="status" required 
+                                        class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                                    <option value="active">활성</option>
+                                    <option value="inactive">비활성</option>
+                                    <option value="discontinued">단종</option>
+                                </select>
+                            </div>
+                            
+                            <div class="flex space-x-3">
+                                <button type="submit" 
+                                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-save mr-2"></i>등록
+                                </button>
+                                <button type="button" id="resetBtn"
+                                        class="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                                    <i class="fas fa-undo mr-2"></i>초기화
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Search and Filter -->
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.5s;">
+                        <h2 class="text-lg font-semibold text-white mb-4">검색 및 필터</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-white/80 mb-2">검색</label>
+                                <input type="text" id="searchInput" 
+                                       class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                                       placeholder="파트 번호, 설명으로 검색...">
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">카테고리 필터</label>
+                                    <select id="categoryFilter" 
+                                            class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                                        <option value="">모든 카테고리</option>
+                                        <option value="REAR">REAR</option>
+                                        <option value="INNER">INNER</option>
+                                        <option value="OUTER">OUTER</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">상태 필터</label>
+                                    <select id="statusFilter" 
+                                            class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                                        <option value="">모든 상태</option>
+                                        <option value="active">활성</option>
+                                        <option value="inactive">비활성</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Parts Table -->
+                <div class="glass-effect rounded-xl p-6 mt-6 animate-slide-up" style="animation-delay: 0.6s;">
+                    <h2 class="text-lg font-semibold text-white mb-4">파트 목록</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-white/20">
+                                    <th class="text-left py-3 px-4 text-white/80 font-medium">파트 번호</th>
+                                    <th class="text-left py-3 px-4 text-white/80 font-medium">카테고리</th>
+                                    <th class="text-left py-3 px-4 text-white/80 font-medium">상태</th>
+                                    <th class="text-left py-3 px-4 text-white/80 font-medium">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody id="partsTableBody">
+                                <!-- Parts will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div id="pagination" class="mt-4 flex justify-center">
+                        <!-- Pagination will be rendered here -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl glass-effect">
+            <div class="mt-3">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100/20 rounded-full">
+                    <i class="fas fa-exclamation-triangle text-red-300 text-xl"></i>
+                </div>
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg font-medium text-white">파트 삭제 확인</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-white/80">
+                            이 파트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                        </p>
+                    </div>
+                    <div class="flex justify-center space-x-4">
+                        <button id="cancelDelete" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                            취소
+                        </button>
+                        <button id="confirmDelete" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            삭제
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+        <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div class="glass-effect p-6 rounded-xl shadow-lg">
+                <div class="flex items-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                    <span class="ml-3 text-white">로딩 중...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../js/config.js"></script>
+    <script src="../js/supabase-client.js"></script>
+    <script src="../js/admin.js"></script>
+    <script src="../js/part-registration-updated.js"></script>
+    <script>
+        // 로그아웃 함수
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userInfo');
+            localStorage.removeItem('userMode');
+            window.location.href = '../login.html';
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.partRegistration = new PartRegistration();
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PDA - 바코드 시스템</title>
+    
+    <!-- 개발 환경에서만 Tailwind CDN 사용 -->
+    <script>
+        // 개발 환경 확인
+        const isDevelopment = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' || 
+                            window.location.protocol === 'file:';
+        
+        if (isDevelopment) {
+            // 개발 환경에서는 CDN 사용
+            const script = document.createElement('script');
+            script.src = 'https://cdn.tailwindcss.com';
+            document.head.appendChild(script);
+        } else {
+            // 프로덕션 환경에서는 로컬 CSS 사용
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '../css/tailwind.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        // Tailwind 설정은 CDN 로드 후에 실행
+        function configureTailwind() {
+            if (window.tailwind) {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#3B82F6',
+                                secondary: '#64748B',
+                                success: '#10B981',
+                                warning: '#F59E0B',
+                                danger: '#EF4444'
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-in-out',
+                                'slide-up': 'slideUp 0.5s ease-out',
+                                'bounce-in': 'bounceIn 0.6s ease-out',
+                                'float': 'float 3s ease-in-out infinite',
+                                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0' },
+                                    '100%': { opacity: '1' }
+                                },
+                                slideUp: {
+                                    '0%': { transform: 'translateY(20px)', opacity: '0' },
+                                    '100%': { transform: 'translateY(0)', opacity: '1' }
+                                },
+                                bounceIn: {
+                                    '0%': { transform: 'scale(0.3)', opacity: '0' },
+                                    '50%': { transform: 'scale(1.05)' },
+                                    '70%': { transform: 'scale(0.9)' },
+                                    '100%': { transform: 'scale(1)', opacity: '1' }
+                                },
+                                float: {
+                                    '0%, 100%': { transform: 'translateY(0px)' },
+                                    '50%': { transform: 'translateY(-10px)' }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // CDN이 아직 로드되지 않았다면 잠시 후 다시 시도
+                setTimeout(configureTailwind, 100);
+            }
+        }
+        
+        // 페이지 로드 시 Tailwind 설정
+        document.addEventListener('DOMContentLoaded', configureTailwind);
+    </script>
+    <style>
+        /* PDA 최적화 스타일 */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .action-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .action-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .action-button:active::before {
+            left: 100%;
+        }
+        
+        .action-button:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .inbound-btn {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+        
+        .outbound-btn {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        }
+        
+        .inventory-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+        
+        .status-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+        
+        .menu-item {
+            transition: all 0.3s ease;
+        }
+        
+        .menu-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .menu-item:active {
+            transform: scale(0.95);
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .floating-icon {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="glass-effect p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 animate-bounce-in">
+                    <i class="fas fa-barcode text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white">PDA 시스템</h1>
+                    <p class="text-xs text-white/80">모바일 작업 환경</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-white text-sm"></i>
+                </div>
+                <button onclick="logout()" class="text-white/80 hover:text-white transition-colors">
+                    <i class="fas fa-sign-out-alt text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-4 space-y-6">
+        <!-- Welcome Message -->
+        <div class="glass-card rounded-2xl p-6 text-center animate-slide-up">
+            <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 floating-icon">
+                <i class="fas fa-mobile-alt text-white text-2xl"></i>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">안녕하세요!</h2>
+            <p class="text-gray-600 text-sm">작업할 모드를 선택하세요</p>
+        </div>
+
+        <!-- Main Action Buttons -->
+        <div class="grid grid-cols-1 gap-4 animate-slide-up" style="animation-delay: 0.1s;">
+            <!-- Inbound Button -->
+            <button onclick="window.location.href='inbound.html'" 
+                    class="action-button inbound-btn p-6 text-white menu-item">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
+                        <i class="fas fa-arrow-down text-white text-xl"></i>
+                    </div>
+                    <div class="text-left">
+                        <h3 class="text-lg font-bold">입고 작업</h3>
+                        <p class="text-sm opacity-90">새로운 물품 입고 처리</p>
+                    </div>
+                    <div class="ml-auto">
+                        <i class="fas fa-chevron-right text-white/60"></i>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Outbound Button -->
+            <button onclick="window.location.href='outbound.html'" 
+                    class="action-button outbound-btn p-6 text-white menu-item">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
+                        <i class="fas fa-arrow-up text-white text-xl"></i>
+                    </div>
+                    <div class="text-left">
+                        <h3 class="text-lg font-bold">출고 작업</h3>
+                        <p class="text-sm opacity-90">물품 출고 및 배송 처리</p>
+                    </div>
+                    <div class="ml-auto">
+                        <i class="fas fa-chevron-right text-white/60"></i>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Inventory Button -->
+            <button onclick="window.location.href='inventory.html'" 
+                    class="action-button inventory-btn p-6 text-white menu-item">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
+                        <i class="fas fa-boxes text-white text-xl"></i>
+                    </div>
+                    <div class="text-left">
+                        <h3 class="text-lg font-bold">재고 확인</h3>
+                        <p class="text-sm opacity-90">현재 재고 현황 조회</p>
+                    </div>
+                    <div class="ml-auto">
+                        <i class="fas fa-chevron-right text-white/60"></i>
+                    </div>
+                </div>
+            </button>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="grid grid-cols-2 gap-4 animate-slide-up" style="animation-delay: 0.2s;">
+            <!-- Today's Inbound -->
+            <div class="status-card p-4 text-center">
+                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <i class="fas fa-arrow-down text-green-600 text-sm"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-600">오늘 입고</h3>
+                <p class="text-xl font-bold text-gray-800" id="todayInbound">0</p>
+            </div>
+
+            <!-- Today's Outbound -->
+            <div class="status-card p-4 text-center">
+                <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <i class="fas fa-arrow-up text-orange-600 text-sm"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-600">오늘 출고</h3>
+                <p class="text-xl font-bold text-gray-800" id="todayOutbound">0</p>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="glass-card rounded-2xl p-6 animate-slide-up" style="animation-delay: 0.3s;">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">빠른 작업</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="scanBarcode()" 
+                        class="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors menu-item">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-2">
+                        <i class="fas fa-barcode text-blue-600 text-lg"></i>
+                    </div>
+                    <span class="text-sm font-medium text-gray-700">바코드 스캔</span>
+                </button>
+                
+                <button onclick="searchPart()" 
+                        class="flex flex-col items-center p-4 bg-green-50 rounded-xl hover:bg-green-100 transition-colors menu-item">
+                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                        <i class="fas fa-search text-green-600 text-lg"></i>
+                    </div>
+                    <span class="text-sm font-medium text-gray-700">파트 검색</span>
+                </button>
+                
+                <button onclick="checkLocation()" 
+                        class="flex flex-col items-center p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors menu-item">
+                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-2">
+                        <i class="fas fa-map-marker-alt text-purple-600 text-lg"></i>
+                    </div>
+                    <span class="text-sm font-medium text-gray-700">위치 확인</span>
+                </button>
+                
+                <button onclick="showHistory()" 
+                        class="flex flex-col items-center p-4 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition-colors menu-item">
+                    <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mb-2">
+                        <i class="fas fa-history text-yellow-600 text-lg"></i>
+                    </div>
+                    <span class="text-sm font-medium text-gray-700">작업 기록</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="glass-card rounded-2xl p-6 animate-slide-up" style="animation-delay: 0.4s;">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">시스템 상태</h3>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">서버 연결</span>
+                    <div class="flex items-center">
+                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2 pulse-animation"></div>
+                        <span class="text-sm font-medium text-green-600">정상</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">데이터베이스</span>
+                    <div class="flex items-center">
+                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        <span class="text-sm font-medium text-green-600">정상</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">마지막 동기화</span>
+                    <span class="text-sm text-gray-500" id="lastSync">방금 전</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 로그아웃 함수
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userInfo');
+            localStorage.removeItem('userMode');
+            window.location.href = '../login.html';
+        }
+
+        // 바코드 스캔 함수
+        function scanBarcode() {
+            // 실제 구현에서는 카메라 API 사용
+            alert('바코드 스캔 기능을 시작합니다.');
+        }
+
+        // 파트 검색 함수
+        function searchPart() {
+            // 실제 구현에서는 검색 모달 표시
+            alert('파트 검색 기능을 시작합니다.');
+        }
+
+        // 위치 확인 함수
+        function checkLocation() {
+            // 실제 구현에서는 위치 정보 표시
+            alert('현재 위치를 확인합니다.');
+        }
+
+        // 작업 기록 함수
+        function showHistory() {
+            // 실제 구현에서는 기록 페이지로 이동
+            alert('작업 기록을 확인합니다.');
+        }
+
+        // 페이지 로드 시 애니메이션
+        document.addEventListener('DOMContentLoaded', function() {
+            // 데모 데이터 로드
+            document.getElementById('todayInbound').textContent = '12';
+            document.getElementById('todayOutbound').textContent = '8';
+            
+            // 마지막 동기화 시간 업데이트
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('lastSync').textContent = timeString;
+        });
+
+        // 터치 이벤트 최적화
+        document.addEventListener('touchstart', function() {}, {passive: true});
+        document.addEventListener('touchmove', function() {}, {passive: true});
+    </script>
+</body>
+</html> 

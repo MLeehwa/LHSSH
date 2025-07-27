@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CT40 - 실사재고</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* CT40 최적화 스타일 */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .action-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .action-button:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .save-btn {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+        
+        .reset-btn {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        }
+        
+        .home-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+        
+        .manual-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+        
+        .part-row {
+            transition: all 0.3s ease;
+            border-radius: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .part-row.matched {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            border: 2px solid #22c55e;
+        }
+        
+        .part-row.mismatched {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+        }
+        
+        .part-row.not-found {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border: 2px solid #ef4444;
+        }
+        
+        .part-row.incomplete {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #e5e7eb;
+        }
+        
+        .scan-input {
+            background: rgba(144, 238, 144, 0.3);
+            border: 2px solid #90ee90;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .scan-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .dropdown {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .dropdown:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .floating-icon {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="glass-card shadow-lg">
+        <div class="flex items-center justify-between px-6 py-4">
+            <div class="flex items-center">
+                <button onclick="goHome()" class="w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+                    <i class="fas fa-arrow-left text-white text-lg"></i>
+                </button>
+                <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fas fa-clipboard-check text-white text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <h1 class="text-xl font-bold text-gray-800">실사재고</h1>
+                    <p class="text-sm text-gray-600 font-medium">재고 실사 관리</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="text-right">
+                    <div class="text-xs text-gray-500 font-medium">현재 시간</div>
+                    <div id="currentTime" class="text-lg font-bold text-gray-800 font-mono"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-6 space-y-6">
+
+
+        <!-- Barcode Scanner -->
+        <div class="glass-card p-6 rounded-2xl" id="scannerSection">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-barcode text-purple-600 mr-3"></i>
+                바코드 스캔
+            </h3>
+            <div class="flex items-center space-x-4">
+                <input type="text" 
+                       id="barcodeInput" 
+                       class="flex-1 scan-input text-center text-xl font-bold" 
+                       placeholder="barcode"
+                       autocomplete="off"
+                       onkeypress="handleBarcodeScan(event)"
+                       oninput="handleBarcodeInput(event)"
+                       onfocus="this.select()">
+                <button onclick="clearBarcodeInput()" class="w-12 h-12 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fas fa-times text-white text-lg"></i>
+                </button>
+            </div>
+            <div class="mt-3 text-sm text-gray-600">
+                <i class="fas fa-info-circle mr-2"></i>
+                스캔 후 자동으로 실사 목록에 추가됩니다
+            </div>
+        </div>
+
+        <!-- Current Inventory List -->
+        <div class="glass-card p-6 rounded-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-boxes text-green-600 mr-3"></i>
+                    현재 등록된 재고
+                </h3>
+                <div class="text-sm text-gray-600">
+                    총 <span id="totalRegistered">0</span>개 파트
+                </div>
+            </div>
+            
+            <div id="registeredInventoryList" class="space-y-3">
+                <!-- Registered inventory items will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Manual Registration Button -->
+        <div class="glass-card p-6 rounded-2xl">
+            <button onclick="openManualModal()" class="action-button manual-btn w-full h-16 flex items-center justify-center text-white font-bold">
+                <i class="fas fa-plus text-xl mr-3"></i>
+                라벨 없는 제품 수동 등록
+            </button>
+        </div>
+
+        <!-- Current Part Status -->
+        <div class="glass-card p-6 rounded-2xl" id="currentPartSection" style="display: none;">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-info-circle text-blue-600 mr-3"></i>
+                현재 파트 상태
+            </h3>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <div class="text-2xl font-bold text-blue-600" id="currentPartNumber">-</div>
+                    <div class="text-xs text-gray-500">파트 번호</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-green-600" id="dbQuantity">-</div>
+                    <div class="text-xs text-gray-500">DB 재고</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-purple-600" id="scannedQuantity">-</div>
+                    <div class="text-xs text-gray-500">스캔 수량</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Check List -->
+        <div class="glass-card p-6 rounded-2xl" id="inventorySection" style="display: none;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-clipboard-check text-orange-600 mr-3"></i>
+                    실사 결과 목록
+                </h3>
+                <div class="text-sm text-gray-600">
+                    총 <span id="totalChecked">0</span>개 파트
+                </div>
+            </div>
+            
+            <div id="inventoryList" class="space-y-3">
+                <!-- Inventory items will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-3 gap-4" id="actionButtons" style="display: none;">
+            <button onclick="saveInventory()" class="action-button save-btn h-16 flex flex-col items-center justify-center text-white font-bold">
+                <i class="fas fa-save text-xl mb-1"></i>
+                <span class="text-sm">저장</span>
+            </button>
+            
+            <button onclick="resetInventory()" class="action-button reset-btn h-16 flex flex-col items-center justify-center text-white font-bold">
+                <i class="fas fa-undo text-xl mb-1"></i>
+                <span class="text-sm">초기화</span>
+            </button>
+            
+            <button onclick="goHome()" class="action-button home-btn h-16 flex flex-col items-center justify-center text-white font-bold">
+                <i class="fas fa-home text-xl mb-1"></i>
+                <span class="text-sm">홈</span>
+            </button>
+        </div>
+
+        <!-- Status Message -->
+        <div id="statusMessage" class="glass-card p-4 rounded-xl text-center" style="display: none;">
+            <div id="statusText" class="text-lg font-bold"></div>
+        </div>
+    </main>
+
+    <!-- Manual Registration Modal -->
+    <div id="manualModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-gray-800">수동 제품 등록</h3>
+                <button onclick="closeManualModal()" class="w-8 h-8 bg-gray-500 text-white rounded-lg flex items-center justify-center">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">파트 번호</label>
+                    <select id="manualPartSelect" class="dropdown w-full">
+                        <option value="">파트를 선택하세요</option>
+                        <option value="P49601S9000">P49601S9000</option>
+                        <option value="P49602S9001">P49602S9001</option>
+                        <option value="P49603S9002">P49603S9002</option>
+                        <option value="P49604S9003">P49604S9003</option>
+                        <option value="P49605S9004">P49605S9004</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">실사 수량</label>
+                    <input type="number" id="manualQuantity" class="dropdown w-full" placeholder="수량을 입력하세요" min="1">
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button onclick="addManualItem()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold">
+                        등록
+                    </button>
+                    <button onclick="closeManualModal()" class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold">
+                        취소
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let inventoryItems = {};
+        let currentPartNumber = '';
+        let currentDbQuantity = 0;
+        let currentScannedQuantity = 0;
+        let currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD 형식
+
+        // 현재 시간 표시
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'America/Chicago'
+            });
+            document.getElementById('currentTime').textContent = timeString;
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+
+
+
+        // 재고 리스트 렌더링
+        function renderInventoryList() {
+            const inventoryList = document.getElementById('inventoryList');
+            inventoryList.innerHTML = '';
+
+            Object.keys(inventoryItems).forEach(partNumber => {
+                const item = inventoryItems[partNumber];
+                const partRow = document.createElement('div');
+                
+                // 상태에 따른 클래스 결정
+                let statusClass = 'incomplete';
+                let statusText = '미확인';
+                let statusColor = 'text-gray-600';
+                
+                if (item.systemQuantity !== null && item.actualQuantity !== null) {
+                    if (item.systemQuantity === item.actualQuantity) {
+                        statusClass = 'matched';
+                        statusText = '일치';
+                        statusColor = 'text-green-600';
+                    } else {
+                        statusClass = 'mismatched';
+                        statusText = '불일치';
+                        statusColor = 'text-orange-600';
+                    }
+                } else if (item.actualQuantity !== null) {
+                    statusClass = 'not-found';
+                    statusText = '시스템 미등록';
+                    statusColor = 'text-red-600';
+                }
+                
+                partRow.className = `part-row p-4 ${statusClass}`;
+                partRow.innerHTML = `
+                    <div class="grid grid-cols-4 gap-4 items-center">
+                        <div class="col-span-1">
+                            <div class="font-bold text-gray-800">${partNumber}</div>
+                            <div class="text-xs text-gray-500">파트 번호</div>
+                        </div>
+                        <div class="col-span-1 text-center">
+                            <div class="text-lg font-bold text-blue-600">${item.systemQuantity || '-'}</div>
+                            <div class="text-xs text-gray-500">시스템 재고</div>
+                        </div>
+                        <div class="col-span-1 text-center">
+                            <div class="text-lg font-bold text-purple-600">${item.actualQuantity || '-'}</div>
+                            <div class="text-xs text-gray-500">실사 수량</div>
+                        </div>
+                        <div class="col-span-1 text-center">
+                            <div class="font-bold ${statusColor}">${statusText}</div>
+                            <button onclick="removeInventoryItem('${partNumber}')" class="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center mt-1">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                inventoryList.appendChild(partRow);
+            });
+
+            updateTotalChecked();
+        }
+
+        // 총 확인된 파트 수 업데이트
+        function updateTotalChecked() {
+            const total = Object.keys(inventoryItems).length;
+            document.getElementById('totalChecked').textContent = total;
+            
+            if (total > 0) {
+                document.getElementById('inventorySection').style.display = 'block';
+            } else {
+                document.getElementById('inventorySection').style.display = 'none';
+            }
+        }
+
+        // 재고 아이템 제거
+        function removeInventoryItem(partNumber) {
+            if (confirm(`${partNumber} 파트를 제거하시겠습니까?`)) {
+                delete inventoryItems[partNumber];
+                renderInventoryList();
+            }
+        }
+
+        // 저장
+        function saveInventory() {
+            if (Object.keys(inventoryItems).length === 0) {
+                showStatus('실사할 파트가 없습니다.', 'error');
+                return;
+            }
+
+            // 현재 날짜의 실사 데이터 저장
+            saveTodayInventoryData();
+            
+            // 실제로는 API 호출
+            showStatus(`${currentDate} 실사재고가 저장되었습니다.`, 'success');
+            
+            // 2초 후 초기화
+            setTimeout(() => {
+                resetInventory();
+            }, 2000);
+        }
+
+        // 초기화
+        function resetInventory() {
+            if (confirm('오늘 날짜의 모든 실사 데이터를 초기화하시겠습니까?')) {
+                inventoryItems = {};
+                
+                // 현재 파트 상태 초기화
+                clearCurrentPartStatus();
+                
+                // 등록된 재고 목록의 스캔 수량 초기화
+                const registeredItems = getRegisteredInventory();
+                registeredItems.forEach(item => {
+                    updateRegisteredInventoryScanCount(item.partNumber, 0);
+                });
+                
+                // localStorage에서 현재 날짜 데이터 삭제
+                localStorage.removeItem(`inventory_${currentDate}`);
+                
+                document.getElementById('inventorySection').style.display = 'none';
+                document.getElementById('statusMessage').style.display = 'none';
+                
+                // 스캔 입력창 초기화
+                document.getElementById('barcodeInput').value = '';
+                
+                // 타이머 클리어
+                if (barcodeInputTimer) {
+                    clearTimeout(barcodeInputTimer);
+                    barcodeInputTimer = null;
+                }
+            }
+        }
+
+        // 홈으로 이동
+        function goHome() {
+            const hasInventoryData = Object.keys(inventoryItems).length > 0;
+            
+            if (hasInventoryData) {
+                if (confirm('저장하지 않은 데이터가 있습니다. 홈으로 이동하시겠습니까?')) {
+                    // 현재 날짜의 데이터를 임시 저장
+                    saveTodayInventoryData();
+                    window.location.href = 'index.html';
+                }
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // 바코드 스캔 처리
+        function handleBarcodeScan(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const barcode = document.getElementById('barcodeInput').value.trim();
+                
+                if (barcode) {
+                    processBarcode(barcode);
+                    document.getElementById('barcodeInput').value = '';
+                }
+                
+                // 포커스 유지
+                setTimeout(() => {
+                    document.getElementById('barcodeInput').focus();
+                }, 50);
+            }
+        }
+
+        // 자동 엔터키 처리 (바코드 스캐너용)
+        let barcodeInputTimer = null;
+        function handleBarcodeInput(event) {
+            const input = event.target;
+            const value = input.value;
+            
+            // 이전 타이머 클리어
+            if (barcodeInputTimer) {
+                clearTimeout(barcodeInputTimer);
+            }
+            
+            // 바코드 패턴 확인 (실제 바코드 형식과 유사한지)
+            const isBarcodePattern = /^[)>*].*P\d{5}S\d{4}.*7Q\d+.*3SP\d+.*\*EOT$/.test(value);
+            
+            // 바코드 길이가 30자 이상이거나 바코드 패턴이 맞으면 자동 엔터
+            if (value.length >= 30 || (value.length >= 20 && isBarcodePattern)) {
+                barcodeInputTimer = setTimeout(() => {
+                    // 엔터키 이벤트 시뮬레이션
+                    const enterEvent = new KeyboardEvent('keypress', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    input.dispatchEvent(enterEvent);
+                }, 50);
+            }
+        }
+
+        // 바코드 파싱 및 처리
+        function processBarcode(barcode) {
+            try {
+                // 바코드 파싱
+                const parsedData = parseBarcode(barcode);
+                
+                if (!parsedData) {
+                    showStatus('잘못된 바코드 형식입니다.', 'error');
+                    return;
+                }
+
+                const { partNumber, quantity, uniqueNumber } = parsedData;
+                
+                // 유니크 번호 중복 체크
+                for (let existingPart in inventoryItems) {
+                    if (inventoryItems[existingPart].uniqueNumber === uniqueNumber) {
+                        showStatus(`이미 스캔된 박스: ${uniqueNumber}`, 'error');
+                        return;
+                    }
+                }
+                
+                // 시스템 재고 조회 (실제로는 API 호출)
+                const systemQuantity = getSystemQuantity(partNumber);
+                
+                // 현재 파트 상태 업데이트
+                updateCurrentPartStatus(partNumber, systemQuantity, quantity);
+                
+                // 실사 목록에 추가
+                if (inventoryItems[partNumber]) {
+                    // 기존 파트가 있으면 수량을 합산
+                    inventoryItems[partNumber].actualQuantity += quantity;
+                    inventoryItems[partNumber].scannedAt = new Date().toLocaleString();
+                    showStatus(`${partNumber} 수량 추가! (총 ${inventoryItems[partNumber].actualQuantity}개)`, 'success');
+                } else {
+                    // 새로운 파트 추가
+                    inventoryItems[partNumber] = {
+                        systemQuantity: systemQuantity,
+                        actualQuantity: quantity,
+                        uniqueNumber: uniqueNumber,
+                        scannedAt: new Date().toLocaleString()
+                    };
+                    showStatus(`${partNumber} 실사 등록 완료! (${quantity}개)`, 'success');
+                }
+                
+                // 등록된 재고 목록의 스캔 수량 업데이트
+                updateRegisteredInventoryScanCount(partNumber, inventoryItems[partNumber].actualQuantity);
+                
+                renderInventoryList();
+                
+            } catch (error) {
+                showStatus('바코드 처리 중 오류가 발생했습니다.', 'error');
+                console.error('Barcode processing error:', error);
+            }
+        }
+
+        // 바코드 파싱 함수
+        function parseBarcode(barcode) {
+            // 예시: [)>*06:D032125:5K:23L :24L :P49601S9000:7Q80:3SP11000321253583:VP1100*EOT
+            
+            try {
+                // 파트 번호 추출 (P49601S9000 -> P49601S9000) - 원본 그대로 사용
+                const partMatch = barcode.match(/P\d{5}S\d{4}/);
+                if (!partMatch) {
+                    return null;
+                }
+                const partNumber = partMatch[0]; // P와 S를 포함한 원본 파트 번호
+                
+                // 수량 추출 (7Q80 -> 80)
+                const quantityMatch = barcode.match(/7Q(\d+)/);
+                if (!quantityMatch) {
+                    return null;
+                }
+                const quantity = parseInt(quantityMatch[1]);
+                
+                // 유니크 넘버 추출 (3SP11000321253583:VP1100 -> P11000321253583)
+                const uniqueMatch = barcode.match(/3S(P\d+)/);
+                if (!uniqueMatch) {
+                    return null;
+                }
+                const uniqueNumber = uniqueMatch[1];
+                
+                return {
+                    partNumber,
+                    quantity,
+                    uniqueNumber
+                };
+                
+            } catch (error) {
+                console.error('Barcode parsing error:', error);
+                return null;
+            }
+        }
+
+        // 시스템 재고 조회 (시뮬레이션)
+        function getSystemQuantity(partNumber) {
+            // 실제로는 API 호출
+            const mockSystemData = {
+                'P49601S9000': 150,
+                'P49602S9001': 200,
+                'P49603S9002': 75,
+                'P49604S9003': 300,
+                'P49605S9004': 120
+            };
+            
+            return mockSystemData[partNumber] || null;
+        }
+
+        // 현재 파트 상태 업데이트
+        function updateCurrentPartStatus(partNumber, dbQuantity, scannedQuantity) {
+            currentPartNumber = partNumber;
+            currentDbQuantity = dbQuantity || 0;
+            currentScannedQuantity = scannedQuantity || 0;
+            
+            // UI 업데이트
+            document.getElementById('currentPartNumber').textContent = partNumber;
+            document.getElementById('dbQuantity').textContent = dbQuantity || '-';
+            document.getElementById('scannedQuantity').textContent = scannedQuantity || '-';
+            
+            // 현재 파트 상태 섹션 표시
+            document.getElementById('currentPartSection').style.display = 'block';
+        }
+        
+        // 현재 파트 상태 초기화
+        function clearCurrentPartStatus() {
+            currentPartNumber = '';
+            currentDbQuantity = 0;
+            currentScannedQuantity = 0;
+            
+            // UI 초기화
+            document.getElementById('currentPartNumber').textContent = '-';
+            document.getElementById('dbQuantity').textContent = '-';
+            document.getElementById('scannedQuantity').textContent = '-';
+            
+            // 현재 파트 상태 섹션 숨김
+            document.getElementById('currentPartSection').style.display = 'none';
+        }
+
+        // 등록된 재고 목록의 스캔 수량 업데이트
+        function updateRegisteredInventoryScanCount(partNumber, scannedQuantity) {
+            const scanCountElement = document.getElementById(`scanned_${partNumber}`);
+            if (scanCountElement) {
+                scanCountElement.textContent = scannedQuantity;
+            }
+        }
+        
+        // 바코드 입력창 초기화
+        function clearBarcodeInput() {
+            document.getElementById('barcodeInput').value = '';
+            document.getElementById('barcodeInput').focus();
+        }
+
+        // 수동 등록 모달 열기
+        function openManualModal() {
+            document.getElementById('manualModal').style.display = 'flex';
+            document.getElementById('manualPartSelect').focus();
+        }
+
+        // 수동 등록 모달 닫기
+        function closeManualModal() {
+            document.getElementById('manualModal').style.display = 'none';
+            document.getElementById('manualPartSelect').value = '';
+            document.getElementById('manualQuantity').value = '';
+            document.getElementById('barcodeInput').focus();
+        }
+
+        // 수동 아이템 추가
+        function addManualItem() {
+            const partNumber = document.getElementById('manualPartSelect').value;
+            const quantity = parseInt(document.getElementById('manualQuantity').value);
+            
+            if (!partNumber) {
+                showStatus('파트를 선택해주세요.', 'error');
+                return;
+            }
+            
+            if (!quantity || quantity <= 0) {
+                showStatus('올바른 수량을 입력해주세요.', 'error');
+                return;
+            }
+            
+            // 시스템 재고 조회
+            const systemQuantity = getSystemQuantity(partNumber);
+            
+            // 현재 파트 상태 업데이트
+            updateCurrentPartStatus(partNumber, systemQuantity, quantity);
+            
+            // 실사 목록에 추가
+            if (inventoryItems[partNumber]) {
+                // 기존 파트가 있으면 수량을 합산
+                inventoryItems[partNumber].actualQuantity += quantity;
+                showStatus(`${partNumber} 수량 추가! (총 ${inventoryItems[partNumber].actualQuantity}개)`, 'success');
+            } else {
+                // 새로운 파트 추가
+                inventoryItems[partNumber] = {
+                    systemQuantity: systemQuantity,
+                    actualQuantity: quantity,
+                    uniqueNumber: null, // 수동 등록은 유니크 번호 없음
+                    scannedAt: new Date().toLocaleString()
+                };
+                showStatus(`${partNumber} 수동 등록 완료! (${quantity}개)`, 'success');
+            }
+            
+            // 등록된 재고 목록의 스캔 수량 업데이트
+            updateRegisteredInventoryScanCount(partNumber, inventoryItems[partNumber].actualQuantity);
+            
+            renderInventoryList();
+            closeManualModal();
+        }
+
+        // 상태 메시지 표시
+        function showStatus(message, type) {
+            const statusMessage = document.getElementById('statusMessage');
+            const statusText = document.getElementById('statusText');
+            
+            statusText.textContent = message;
+            statusMessage.className = `glass-card p-4 rounded-xl text-center ${type === 'success' ? 'bg-green-100 border-green-500' : 'bg-red-100 border-red-500'}`;
+            statusMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        // 인증 확인
+        function checkAuth() {
+            const authToken = localStorage.getItem('authToken');
+            const userMode = localStorage.getItem('userMode');
+            
+            if (!authToken) {
+                window.location.href = '../login.html';
+                return;
+            }
+            
+            if (userMode !== 'pda') {
+                localStorage.removeItem('userMode');
+                window.location.href = '../login.html';
+                return;
+            }
+        }
+
+        // 현재 등록된 재고 목록 렌더링
+        function renderRegisteredInventory() {
+            const registeredList = document.getElementById('registeredInventoryList');
+            registeredList.innerHTML = '';
+
+            // 실제로는 API에서 현재 등록된 재고 목록을 가져옴
+            const registeredItems = getRegisteredInventory();
+            
+            registeredItems.forEach(item => {
+                const itemRow = document.createElement('div');
+                itemRow.className = 'part-row p-4 incomplete';
+                itemRow.innerHTML = `
+                    <div class="grid grid-cols-3 gap-4 items-center">
+                        <div class="col-span-1">
+                            <div class="font-bold text-gray-800">${item.partNumber}</div>
+                            <div class="text-xs text-gray-500">파트 번호</div>
+                        </div>
+                        <div class="col-span-1 text-center">
+                            <div class="text-lg font-bold text-green-600">${item.quantity}</div>
+                            <div class="text-xs text-gray-500">등록 수량</div>
+                        </div>
+                        <div class="col-span-1 text-center">
+                            <div class="text-lg font-bold text-purple-600" id="scanned_${item.partNumber}">0</div>
+                            <div class="text-xs text-gray-500">스캔 수량</div>
+                        </div>
+                    </div>
+                `;
+                registeredList.appendChild(itemRow);
+            });
+
+            updateTotalRegistered();
+        }
+
+        // 총 등록된 파트 수 업데이트
+        function updateTotalRegistered() {
+            const registeredItems = getRegisteredInventory();
+            const total = registeredItems.length;
+            document.getElementById('totalRegistered').textContent = total;
+        }
+
+        // 등록된 재고 조회 (시뮬레이션)
+        function getRegisteredInventory() {
+            // 실제로는 API 호출
+            return [
+                { partNumber: 'P49601S9000', quantity: 150 },
+                { partNumber: 'P49602S9001', quantity: 200 },
+                { partNumber: 'P49603S9002', quantity: 75 },
+                { partNumber: 'P49604S9003', quantity: 300 },
+                { partNumber: 'P49605S9004', quantity: 120 }
+            ];
+        }
+
+        // 현재 날짜의 기존 실사 데이터 조회 (시뮬레이션)
+        function getTodayInventoryData() {
+            // 실제로는 API 호출로 현재 날짜의 실사 데이터를 가져옴
+            // localStorage에서 임시로 저장된 데이터를 가져오거나, 서버에서 조회
+            const savedData = localStorage.getItem(`inventory_${currentDate}`);
+            if (savedData) {
+                return JSON.parse(savedData);
+            }
+            return {};
+        }
+
+        // 실사 데이터 저장 (시뮬레이션)
+        function saveTodayInventoryData() {
+            // 실제로는 API 호출로 서버에 저장
+            localStorage.setItem(`inventory_${currentDate}`, JSON.stringify(inventoryItems));
+        }
+
+        // 페이지 로드 시 초기화
+        function initializePage() {
+            // 액션 버튼 표시 (즉시 사용 가능)
+            document.getElementById('actionButtons').style.display = 'grid';
+            
+            // 현재 등록된 재고 목록 로드
+            renderRegisteredInventory();
+            
+            // 현재 날짜의 기존 실사 데이터 로드
+            loadTodayInventoryData();
+        }
+
+        // 현재 날짜의 기존 실사 데이터 로드
+        function loadTodayInventoryData() {
+            const todayData = getTodayInventoryData();
+            
+            if (Object.keys(todayData).length > 0) {
+                // 기존 데이터가 있으면 inventoryItems에 병합
+                inventoryItems = { ...todayData };
+                
+                // 등록된 재고 목록의 스캔 수량 업데이트
+                Object.keys(inventoryItems).forEach(partNumber => {
+                    const scannedQuantity = inventoryItems[partNumber].actualQuantity;
+                    updateRegisteredInventoryScanCount(partNumber, scannedQuantity);
+                });
+                
+                // 실사 결과 목록 렌더링
+                renderInventoryList();
+                
+                showStatus(`오늘 날짜(${currentDate})의 기존 실사 데이터를 불러왔습니다.`, 'success');
+            }
+        }
+
+        // 페이지 로드 시 인증 확인 및 초기화
+        checkAuth();
+        initializePage();
+
+        // 터치 피드백 개선
+        document.addEventListener('touchstart', function() {}, {passive: true});
+        document.addEventListener('touchmove', function() {}, {passive: true});
+
+        // 포커스 유지 기능 (드롭다운 제외)
+        document.addEventListener('click', function(event) {
+            // 드롭다운이나 관련 요소 클릭 시 포커스 이동 방지
+            if (event.target.closest('select') || 
+                event.target.closest('.modal')) {
+                return;
+            }
+            
+            setTimeout(() => {
+                document.getElementById('barcodeInput').focus();
+            }, 100);
+        });
+
+        // 키보드 이벤트로 포커스 유지 (드롭다운 제외)
+        document.addEventListener('keydown', function(event) {
+            if (event.target.id !== 'barcodeInput') {
+                document.getElementById('barcodeInput').focus();
+            }
+        });
+
+        // 페이지 로드 시 바코드 입력창에 포커스
+        setTimeout(() => {
+            document.getElementById('barcodeInput').focus();
+        }, 500);
+    </script>
+</body>
+</html> 

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - 바코드 시스템</title>
+    
+    <!-- 개발 환경에서만 Tailwind CDN 사용 -->
+    <script>
+        // 개발 환경 확인
+        const isDevelopment = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' || 
+                            window.location.protocol === 'file:';
+        
+        if (isDevelopment) {
+            // 개발 환경에서는 CDN 사용
+            const script = document.createElement('script');
+            script.src = 'https://cdn.tailwindcss.com';
+            document.head.appendChild(script);
+        } else {
+            // 프로덕션 환경에서는 로컬 CSS 사용
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'css/tailwind.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        // Tailwind 설정은 CDN 로드 후에 실행
+        function configureTailwind() {
+            if (window.tailwind) {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#3B82F6',
+                                secondary: '#64748B',
+                                success: '#10B981',
+                                warning: '#F59E0B',
+                                danger: '#EF4444'
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-in-out',
+                                'slide-up': 'slideUp 0.5s ease-out',
+                                'bounce-in': 'bounceIn 0.6s ease-out'
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0' },
+                                    '100%': { opacity: '1' }
+                                },
+                                slideUp: {
+                                    '0%': { transform: 'translateY(20px)', opacity: '0' },
+                                    '100%': { transform: 'translateY(0)', opacity: '1' }
+                                },
+                                bounceIn: {
+                                    '0%': { transform: 'scale(0.3)', opacity: '0' },
+                                    '50%': { transform: 'scale(1.05)' },
+                                    '70%': { transform: 'scale(0.9)' },
+                                    '100%': { transform: 'scale(1)', opacity: '1' }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // CDN이 아직 로드되지 않았다면 잠시 후 다시 시도
+                setTimeout(configureTailwind, 100);
+            }
+        }
+        
+        // 페이지 로드 시 Tailwind 설정
+        document.addEventListener('DOMContentLoaded', configureTailwind);
+    </script>
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .input-focus {
+            transition: all 0.3s ease;
+        }
+        .input-focus:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3);
+        }
+        .btn-hover {
+            transition: all 0.3s ease;
+        }
+        .btn-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+        .mode-card {
+            transition: all 0.3s ease;
+        }
+        .mode-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full animate-fade-in">
+        <!-- 로그인 카드 -->
+        <div class="glass-effect rounded-2xl p-8 card-shadow">
+            <div class="text-center mb-8 animate-bounce-in">
+                <div class="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-white/20 backdrop-blur-sm mb-4">
+                    <i class="fas fa-barcode text-white text-2xl"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-white mb-2">
+                    바코드 시스템
+                </h2>
+                <p class="text-white/80 text-sm">
+                    로그인 후 모드를 선택하세요
+                </p>
+            </div>
+
+            <!-- 로그인 폼 -->
+            <form class="space-y-6 animate-slide-up" id="loginForm">
+                <div class="space-y-4">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-user text-white/60"></i>
+                        </div>
+                        <input id="username" name="username" type="text" required 
+                               class="input-focus appearance-none relative block w-full pl-10 pr-3 py-3 border-0 rounded-xl bg-white/20 backdrop-blur-sm placeholder-white/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+                               placeholder="사용자명">
+                    </div>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-white/60"></i>
+                        </div>
+                        <input id="password" name="password" type="password" required 
+                               class="input-focus appearance-none relative block w-full pl-10 pr-3 py-3 border-0 rounded-xl bg-white/20 backdrop-blur-sm placeholder-white/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+                               placeholder="비밀번호">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-sm">
+                    <label class="flex items-center text-white/80">
+                        <input id="remember-me" name="remember-me" type="checkbox" 
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <span class="ml-2">로그인 상태 유지</span>
+                    </label>
+                    <a href="#" class="text-white/80 hover:text-white transition-colors">
+                        비밀번호 찾기
+                    </a>
+                </div>
+
+                <button type="submit" 
+                        class="btn-hover group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-blue-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white">
+                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                        <i class="fas fa-sign-in-alt text-blue-500 group-hover:text-blue-400"></i>
+                    </span>
+                    로그인
+                </button>
+            </form>
+
+            <!-- 모드 선택 섹션 (로그인 후 표시) -->
+            <div id="modeSelection" class="hidden animate-fade-in">
+                <div class="text-center mb-6">
+                    <h3 class="text-xl font-bold text-white mb-2">모드를 선택하세요</h3>
+                    <p class="text-white/80 text-sm">작업 환경을 선택해주세요</p>
+                </div>
+                <div class="grid grid-cols-1 gap-4">
+                    <button onclick="selectMode('admin')" 
+                            class="mode-card flex items-center p-4 bg-white/20 backdrop-blur-sm rounded-xl hover:bg-white/30 transition-all duration-300">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-desktop text-blue-600 text-xl"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="text-lg font-semibold text-white">관리자 모드</span>
+                            <p class="text-white/80 text-sm">데스크톱 관리 시스템</p>
+                        </div>
+                    </button>
+                    
+                    <button onclick="selectMode('pda')" 
+                            class="mode-card flex items-center p-4 bg-white/20 backdrop-blur-sm rounded-xl hover:bg-white/30 transition-all duration-300">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-mobile-alt text-green-600 text-xl"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="text-lg font-semibold text-white">PDA 모드</span>
+                            <p class="text-white/80 text-sm">모바일 작업 시스템</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 데모 계정 정보 -->
+            <div class="text-center mt-6">
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <p class="text-white/90 text-sm font-medium">데모 계정</p>
+                    <p class="text-white/70 text-xs">사용자명: admin / 비밀번호: admin123</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 페이지 로드 시 애니메이션
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginCard = document.querySelector('.glass-effect');
+            loginCard.style.opacity = '0';
+            loginCard.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                loginCard.style.transition = 'all 0.6s ease-out';
+                loginCard.style.opacity = '1';
+                loginCard.style.transform = 'translateY(0)';
+            }, 100);
+        });
+
+        // 로그인 폼 처리
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            // 로딩 상태 표시
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>로그인 중...';
+            submitBtn.disabled = true;
+            
+            // Simple demo authentication
+            setTimeout(() => {
+                if (username === 'admin' && password === 'admin123') {
+                    // Store auth token (in real app, this would come from server)
+                    localStorage.setItem('authToken', 'demo-token');
+                    localStorage.setItem('userInfo', JSON.stringify({
+                        username: username,
+                        role: 'admin'
+                    }));
+                    
+                    // Show mode selection with animation
+                    document.getElementById('loginForm').style.opacity = '0';
+                    document.getElementById('loginForm').style.transform = 'translateY(-20px)';
+                    
+                    setTimeout(() => {
+                        document.getElementById('loginForm').classList.add('hidden');
+                        document.getElementById('modeSelection').classList.remove('hidden');
+                        document.getElementById('modeSelection').style.opacity = '0';
+                        document.getElementById('modeSelection').style.transform = 'translateY(20px)';
+                        
+                        setTimeout(() => {
+                            document.getElementById('modeSelection').style.transition = 'all 0.6s ease-out';
+                            document.getElementById('modeSelection').style.opacity = '1';
+                            document.getElementById('modeSelection').style.transform = 'translateY(0)';
+                        }, 100);
+                    }, 300);
+                } else {
+                    // 에러 애니메이션
+                    const inputs = document.querySelectorAll('input');
+                    inputs.forEach(input => {
+                        input.style.border = '2px solid #EF4444';
+                        input.style.animation = 'shake 0.5s ease-in-out';
+                    });
+                    
+                    setTimeout(() => {
+                        inputs.forEach(input => {
+                            input.style.border = '';
+                            input.style.animation = '';
+                        });
+                    }, 500);
+                    
+                    alert('잘못된 사용자명 또는 비밀번호입니다.');
+                }
+                
+                // 버튼 상태 복원
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }, 1000);
+        });
+        
+        // 모드 선택 함수
+        function selectMode(mode) {
+            localStorage.setItem('userMode', mode);
+            
+            // 선택 애니메이션
+            const selectedBtn = event.target.closest('button');
+            selectedBtn.style.transform = 'scale(0.95)';
+            
+            setTimeout(() => {
+                if (mode === 'admin') {
+                    window.location.href = 'admin/index.html';
+                } else if (mode === 'pda') {
+                    window.location.href = 'pda/index.html';
+                }
+            }, 200);
+        }
+
+        // 입력 필드 포커스 효과
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'scale(1.02)';
+            });
+            
+            input.addEventListener('blur', function() {
+                this.parentElement.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+
+    <style>
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        input:focus::placeholder {
+            color: rgba(255, 255, 255, 0.8);
+        }
+    </style>
+</body>
+</html> 

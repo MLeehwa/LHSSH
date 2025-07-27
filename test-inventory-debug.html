@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>재고 현황 디버그 - 바코드 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6B7280'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 p-6">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">재고 현황 디버그 페이지</h1>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">데이터베이스 연결 테스트</h2>
+            <button id="testConnection" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                연결 테스트
+            </button>
+            <div id="connectionResult" class="mt-4 p-4 bg-gray-100 rounded-md hidden">
+                <!-- 결과가 여기에 표시됩니다 -->
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">재고 데이터 테스트</h2>
+            <button id="testInventory" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                재고 데이터 로드
+            </button>
+            <div id="inventoryResult" class="mt-4 p-4 bg-gray-100 rounded-md hidden">
+                <!-- 결과가 여기에 표시됩니다 -->
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">거래 내역 테스트</h2>
+            <button id="testTransactions" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">
+                거래 내역 로드
+            </button>
+            <div id="transactionResult" class="mt-4 p-4 bg-gray-100 rounded-md hidden">
+                <!-- 결과가 여기에 표시됩니다 -->
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">파트 데이터 테스트</h2>
+            <button id="testParts" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">
+                파트 데이터 로드
+            </button>
+            <div id="partsResult" class="mt-4 p-4 bg-gray-100 rounded-md hidden">
+                <!-- 결과가 여기에 표시됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script>
+        // Supabase 클라이언트 초기화
+        let supabase;
+        
+        function initializeSupabase() {
+            try {
+                if (window.supabaseClient) {
+                    supabase = window.supabaseClient;
+                    console.log('전역 Supabase 클라이언트 사용');
+                } else if (typeof supabase !== 'undefined') {
+                    supabase = supabase.createClient(
+                        'https://vzemucykhxlxgjuldibf.supabase.co',
+                        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
+                    );
+                    console.log('새 Supabase 클라이언트 생성');
+                } else {
+                    throw new Error('Supabase 라이브러리가 로드되지 않았습니다.');
+                }
+                return true;
+            } catch (error) {
+                console.error('Supabase 클라이언트 초기화 실패:', error);
+                return false;
+            }
+        }
+
+        // 연결 테스트
+        document.getElementById('testConnection').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = '<p class="text-blue-600">연결 테스트 중...</p>';
+
+            if (!initializeSupabase()) {
+                resultDiv.innerHTML = '<p class="text-red-600">❌ Supabase 클라이언트 초기화 실패</p>';
+                return;
+            }
+
+            try {
+                // 간단한 쿼리로 연결 테스트
+                const { data, error } = await supabase
+                    .from('parts')
+                    .select('count')
+                    .limit(1);
+
+                if (error) {
+                    resultDiv.innerHTML = `<p class="text-red-600">❌ 연결 실패: ${error.message}</p>`;
+                } else {
+                    resultDiv.innerHTML = '<p class="text-green-600">✅ 연결 성공!</p>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="text-red-600">❌ 오류 발생: ${error.message}</p>`;
+            }
+        });
+
+        // 재고 데이터 테스트
+        document.getElementById('testInventory').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('inventoryResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = '<p class="text-blue-600">재고 데이터 로드 중...</p>';
+
+            if (!supabase) {
+                if (!initializeSupabase()) {
+                    resultDiv.innerHTML = '<p class="text-red-600">❌ Supabase 클라이언트 초기화 실패</p>';
+                    return;
+                }
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('inventory')
+                    .select('*')
+                    .limit(5);
+
+                if (error) {
+                    resultDiv.innerHTML = `<p class="text-red-600">❌ 재고 데이터 로드 실패: ${error.message}</p>`;
+                } else {
+                    const html = `
+                        <p class="text-green-600">✅ 재고 데이터 로드 성공!</p>
+                        <p class="text-gray-700">총 ${data.length}개 항목</p>
+                        <div class="mt-4">
+                            <h4 class="font-semibold mb-2">데이터 구조:</h4>
+                            <pre class="bg-gray-200 p-2 rounded text-sm overflow-x-auto">${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                    resultDiv.innerHTML = html;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="text-red-600">❌ 오류 발생: ${error.message}</p>`;
+            }
+        });
+
+        // 거래 내역 테스트
+        document.getElementById('testTransactions').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('transactionResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = '<p class="text-blue-600">거래 내역 로드 중...</p>';
+
+            if (!supabase) {
+                if (!initializeSupabase()) {
+                    resultDiv.innerHTML = '<p class="text-red-600">❌ Supabase 클라이언트 초기화 실패</p>';
+                    return;
+                }
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('inventory_transactions')
+                    .select('*')
+                    .limit(5);
+
+                if (error) {
+                    resultDiv.innerHTML = `<p class="text-red-600">❌ 거래 내역 로드 실패: ${error.message}</p>`;
+                } else {
+                    const html = `
+                        <p class="text-green-600">✅ 거래 내역 로드 성공!</p>
+                        <p class="text-gray-700">총 ${data.length}개 항목</p>
+                        <div class="mt-4">
+                            <h4 class="font-semibold mb-2">데이터 구조:</h4>
+                            <pre class="bg-gray-200 p-2 rounded text-sm overflow-x-auto">${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                    resultDiv.innerHTML = html;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="text-red-600">❌ 오류 발생: ${error.message}</p>`;
+            }
+        });
+
+        // 파트 데이터 테스트
+        document.getElementById('testParts').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('partsResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = '<p class="text-blue-600">파트 데이터 로드 중...</p>';
+
+            if (!supabase) {
+                if (!initializeSupabase()) {
+                    resultDiv.innerHTML = '<p class="text-red-600">❌ Supabase 클라이언트 초기화 실패</p>';
+                    return;
+                }
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('parts')
+                    .select('*')
+                    .limit(5);
+
+                if (error) {
+                    resultDiv.innerHTML = `<p class="text-red-600">❌ 파트 데이터 로드 실패: ${error.message}</p>`;
+                } else {
+                    const html = `
+                        <p class="text-green-600">✅ 파트 데이터 로드 성공!</p>
+                        <p class="text-gray-700">총 ${data.length}개 항목</p>
+                        <div class="mt-4">
+                            <h4 class="font-semibold mb-2">데이터 구조:</h4>
+                            <pre class="bg-gray-200 p-2 rounded text-sm overflow-x-auto">${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                    resultDiv.innerHTML = html;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="text-red-600">❌ 오류 발생: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html> 

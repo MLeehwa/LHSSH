@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>재고 업데이트 테스트</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { margin: 5px; padding: 10px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>재고 업데이트 테스트</h1>
+    
+    <div class="test-section">
+        <h2>1. Supabase 연결 테스트</h2>
+        <button onclick="testConnection()">연결 테스트</button>
+        <div id="connection-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 재고 테이블 조회</h2>
+        <button onclick="testInventoryQuery()">재고 조회</button>
+        <div id="inventory-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 재고 업데이트 테스트</h2>
+        <input type="text" id="testPartNumber" placeholder="파트 번호" value="49560-12345">
+        <input type="number" id="testQuantity" placeholder="수량" value="10">
+        <button onclick="testInventoryUpdate()">재고 업데이트</button>
+        <div id="update-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 거래 내역 테스트</h2>
+        <button onclick="testTransactionInsert()">거래 내역 추가</button>
+        <div id="transaction-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. 전체 프로세스 테스트</h2>
+        <button onclick="testFullProcess()">전체 프로세스 테스트</button>
+        <div id="full-process-result"></div>
+    </div>
+
+    <script>
+        // Supabase 클라이언트 초기화
+        const supabase = supabase.createClient(
+            'https://vzemucykhxlxgjuldibf.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
+        );
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML += `<div class="${className}">${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
+
+        async function testConnection() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('connection-result', '연결 테스트 시작...');
+                
+                const { data, error } = await supabase
+                    .from('inventory')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) {
+                    log('connection-result', `연결 실패: ${error.message}`, 'error');
+                    console.error('연결 오류:', error);
+                } else {
+                    log('connection-result', `연결 성공! 데이터: ${JSON.stringify(data)}`, 'success');
+                }
+            } catch (error) {
+                log('connection-result', `예외 발생: ${error.message}`, 'error');
+                console.error('예외:', error);
+            }
+        }
+
+        async function testInventoryQuery() {
+            const resultDiv = document.getElementById('inventory-result');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('inventory-result', '재고 조회 시작...');
+                
+                const { data, error } = await supabase
+                    .from('inventory')
+                    .select('*')
+                    .limit(5);
+                
+                if (error) {
+                    log('inventory-result', `재고 조회 실패: ${error.message}`, 'error');
+                    console.error('재고 조회 오류:', error);
+                } else {
+                    log('inventory-result', `재고 조회 성공! ${data.length}개 레코드`, 'success');
+                    log('inventory-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                }
+            } catch (error) {
+                log('inventory-result', `예외 발생: ${error.message}`, 'error');
+                console.error('예외:', error);
+            }
+        }
+
+        async function testInventoryUpdate() {
+            const resultDiv = document.getElementById('update-result');
+            resultDiv.innerHTML = '';
+            
+            const partNumber = document.getElementById('testPartNumber').value;
+            const quantity = parseInt(document.getElementById('testQuantity').value);
+            
+            if (!partNumber || !quantity) {
+                log('update-result', '파트 번호와 수량을 입력해주세요.', 'error');
+                return;
+            }
+            
+            try {
+                log('update-result', `재고 업데이트 시작: ${partNumber} - ${quantity}개`);
+                
+                // 1. 현재 재고 조회
+                const { data: currentData, error: fetchError } = await supabase
+                    .from('inventory')
+                    .select('current_stock, today_outbound')
+                    .eq('part_number', partNumber)
+                    .single();
+                
+                if (fetchError) {
+                    log('update-result', `재고 조회 실패: ${fetchError.message}`, 'error');
+                    return;
+                }
+                
+                log('update-result', `현재 재고: ${JSON.stringify(currentData)}`);
+                
+                // 2. 재고 업데이트
+                const newStock = currentData.current_stock - quantity;
+                const newTodayOutbound = currentData.today_outbound + quantity;
+                
+                const { data: updateData, error: updateError } = await supabase
+                    .from('inventory')
+                    .update({
+                        current_stock: newStock,
+                        today_outbound: newTodayOutbound,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('part_number', partNumber)
+                    .select();
+                
+                if (updateError) {
+                    log('update-result', `재고 업데이트 실패: ${updateError.message}`, 'error');
+                    console.error('업데이트 오류:', updateError);
+                } else {
+                    log('update-result', `재고 업데이트 성공!`, 'success');
+                    log('update-result', `<pre>${JSON.stringify(updateData, null, 2)}</pre>`);
+                }
+            } catch (error) {
+                log('update-result', `예외 발생: ${error.message}`, 'error');
+                console.error('예외:', error);
+            }
+        }
+
+        async function testTransactionInsert() {
+            const resultDiv = document.getElementById('transaction-result');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('transaction-result', '거래 내역 추가 시작...');
+                
+                const transactionData = {
+                    date: new Date().toISOString().split('T')[0],
+                    part_number: '49560-12345',
+                    type: 'OUTBOUND',
+                    quantity: 5,
+                    balance_after: 100,
+                    reference_number: 'TEST_' + Date.now(),
+                    notes: '테스트 거래 내역'
+                };
+                
+                const { data, error } = await supabase
+                    .from('inventory_transactions')
+                    .insert(transactionData)
+                    .select();
+                
+                if (error) {
+                    log('transaction-result', `거래 내역 추가 실패: ${error.message}`, 'error');
+                    console.error('거래 내역 오류:', error);
+                } else {
+                    log('transaction-result', `거래 내역 추가 성공!`, 'success');
+                    log('transaction-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                }
+            } catch (error) {
+                log('transaction-result', `예외 발생: ${error.message}`, 'error');
+                console.error('예외:', error);
+            }
+        }
+
+        async function testFullProcess() {
+            const resultDiv = document.getElementById('full-process-result');
+            resultDiv.innerHTML = '';
+            
+            const partNumber = '49560-12345';
+            const quantity = 5;
+            
+            try {
+                log('full-process-result', '전체 프로세스 테스트 시작...');
+                
+                // 1. 현재 재고 조회
+                log('full-process-result', '1단계: 현재 재고 조회');
+                const { data: inventoryData, error: inventoryError } = await supabase
+                    .from('inventory')
+                    .select('current_stock, today_outbound')
+                    .eq('part_number', partNumber)
+                    .single();
+                
+                if (inventoryError) {
+                    log('full-process-result', `재고 조회 실패: ${inventoryError.message}`, 'error');
+                    return;
+                }
+                
+                log('full-process-result', `현재 재고: ${JSON.stringify(inventoryData)}`);
+                
+                // 2. 재고 업데이트
+                log('full-process-result', '2단계: 재고 업데이트');
+                const newStock = inventoryData.current_stock - quantity;
+                const newTodayOutbound = inventoryData.today_outbound + quantity;
+                
+                const { data: updateData, error: updateError } = await supabase
+                    .from('inventory')
+                    .update({
+                        current_stock: newStock,
+                        today_outbound: newTodayOutbound,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('part_number', partNumber)
+                    .select();
+                
+                if (updateError) {
+                    log('full-process-result', `재고 업데이트 실패: ${updateError.message}`, 'error');
+                    return;
+                }
+                
+                log('full-process-result', `재고 업데이트 성공: ${JSON.stringify(updateData)}`);
+                
+                // 3. 거래 내역 기록
+                log('full-process-result', '3단계: 거래 내역 기록');
+                const transactionData = {
+                    date: new Date().toISOString().split('T')[0],
+                    part_number: partNumber,
+                    type: 'OUTBOUND',
+                    quantity: quantity,
+                    balance_after: newStock,
+                    reference_number: 'FULL_TEST_' + Date.now(),
+                    notes: '전체 프로세스 테스트'
+                };
+                
+                const { data: transactionResult, error: transactionError } = await supabase
+                    .from('inventory_transactions')
+                    .insert(transactionData)
+                    .select();
+                
+                if (transactionError) {
+                    log('full-process-result', `거래 내역 기록 실패: ${transactionError.message}`, 'error');
+                    return;
+                }
+                
+                log('full-process-result', `거래 내역 기록 성공: ${JSON.stringify(transactionResult)}`);
+                log('full-process-result', '전체 프로세스 테스트 완료!', 'success');
+                
+            } catch (error) {
+                log('full-process-result', `예외 발생: ${error.message}`, 'error');
+                console.error('예외:', error);
+            }
+        }
+    </script>
+</body>
+</html> 
