@@ -58,65 +58,34 @@
             });
         }
         
-        // 차수 선택 전 포커스 제어 (약한 제어)
-        function preventInputFocusBeforeShift() {
-            // 바코드 입력 필드와 드롭다운, 날짜 선택은 완전히 제외
+        // 포커스 제어 함수 (드롭다운과 날짜 선택은 완전히 허용)
+        function preventInputFocus() {
+            // 허용할 요소들 (드롭다운, 날짜 선택, 바코드 입력)
             const allowedIds = ['barcodeInput', 'shiftSelect', 'asPartSelect', 'dateSelect'];
             
-            // 허용된 요소들은 키보드만 숨김
-            allowedIds.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.addEventListener('focus', function(e) {
-                        setTimeout(hideKeyboard, 100);
-                    });
-                    
-                    element.addEventListener('change', function(e) {
-                        setTimeout(hideKeyboard, 100);
-                    });
-                }
-            });
-        }
-        
-        // 차수 선택 후 포커스 제어 (강한 제어)
-        function preventInputFocusAfterShift() {
-            // 바코드 입력 필드와 드롭다운, 날짜 선택은 완전히 제외
-            const allowedIds = ['barcodeInput', 'shiftSelect', 'asPartSelect', 'dateSelect'];
-            
-            // 모든 입력 요소를 찾아서 허용된 ID가 아닌 것만 제어
-            const allInputs = document.querySelectorAll('input, textarea, select');
-            allInputs.forEach(input => {
-                // 허용된 ID는 완전히 제외
-                if (allowedIds.includes(input.id)) {
-                    return;
-                }
+            // 일반 텍스트 입력 필드만 포커스 방지
+            const textInputs = document.querySelectorAll('input[type="text"]:not(#barcodeInput), input[type="number"], textarea');
+            textInputs.forEach(input => {
+                // 포커스 이벤트 방지
+                input.addEventListener('focus', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
                 
-                // input[type="text"], input[type="number"], textarea만 포커스 방지
-                if (input.tagName === 'INPUT' && 
-                    (input.type === 'text' || input.type === 'number') ||
-                    input.tagName === 'TEXTAREA') {
-                    
-                    // 포커스 이벤트 방지
-                    input.addEventListener('focus', function(e) {
-                        e.preventDefault();
-                        e.target.blur();
-                        hideKeyboard();
-                    });
-                    
-                    // 클릭 이벤트 방지
-                    input.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.target.blur();
-                        hideKeyboard();
-                    });
-                    
-                    // 터치 이벤트 방지
-                    input.addEventListener('touchstart', function(e) {
-                        e.preventDefault();
-                        e.target.blur();
-                        hideKeyboard();
-                    });
-                }
+                // 클릭 이벤트 방지
+                input.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+                
+                // 터치 이벤트 방지
+                input.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
             });
             
             // 허용된 요소들은 키보드만 숨김
@@ -161,7 +130,7 @@
             setTimeout(hideKeyboard, 100);
             setTimeout(hideKeyboard, 500);
             setTimeout(hideKeyboard, 1000);
-            setTimeout(preventInputFocusBeforeShift, 200);
+            setTimeout(preventInputFocus, 200);
             setTimeout(setupBarcodeInput, 300);
         });
         
@@ -658,8 +627,8 @@
             if (date && shift) {
                 console.log('날짜와 차수가 모두 선택됨, 화면 업데이트 시작');
                 
-                // 차수 선택 후 강한 포커스 제어 적용
-                setTimeout(preventInputFocusAfterShift, 100);
+                // 차수 선택 후 포커스 제어 적용
+                setTimeout(preventInputFocus, 100);
                 
                 // AS 차수인지 확인
                 if (shift === 'AS') {
