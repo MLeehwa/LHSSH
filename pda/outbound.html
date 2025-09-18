@@ -58,8 +58,28 @@
             });
         }
         
-        // 입력 필드 포커스 방지 함수
-        function preventInputFocus() {
+        // 차수 선택 전 포커스 제어 (약한 제어)
+        function preventInputFocusBeforeShift() {
+            // 바코드 입력 필드와 드롭다운, 날짜 선택은 완전히 제외
+            const allowedIds = ['barcodeInput', 'shiftSelect', 'asPartSelect', 'dateSelect'];
+            
+            // 허용된 요소들은 키보드만 숨김
+            allowedIds.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('focus', function(e) {
+                        setTimeout(hideKeyboard, 100);
+                    });
+                    
+                    element.addEventListener('change', function(e) {
+                        setTimeout(hideKeyboard, 100);
+                    });
+                }
+            });
+        }
+        
+        // 차수 선택 후 포커스 제어 (강한 제어)
+        function preventInputFocusAfterShift() {
             // 바코드 입력 필드와 드롭다운, 날짜 선택은 완전히 제외
             const allowedIds = ['barcodeInput', 'shiftSelect', 'asPartSelect', 'dateSelect'];
             
@@ -141,7 +161,7 @@
             setTimeout(hideKeyboard, 100);
             setTimeout(hideKeyboard, 500);
             setTimeout(hideKeyboard, 1000);
-            setTimeout(preventInputFocus, 200);
+            setTimeout(preventInputFocusBeforeShift, 200);
             setTimeout(setupBarcodeInput, 300);
         });
         
@@ -637,6 +657,9 @@
             
             if (date && shift) {
                 console.log('날짜와 차수가 모두 선택됨, 화면 업데이트 시작');
+                
+                // 차수 선택 후 강한 포커스 제어 적용
+                setTimeout(preventInputFocusAfterShift, 100);
                 
                 // AS 차수인지 확인
                 if (shift === 'AS') {

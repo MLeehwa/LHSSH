@@ -1280,6 +1280,9 @@
             document.getElementById('containerSelect').addEventListener('change', function(e) {
                 const arnNumber = e.target.value;
                 if (arnNumber) {
+                    // 컨테이너 선택 후 강한 포커스 제어 적용
+                    setTimeout(preventInputFocus, 100);
+                    
                     // 선택된 컨테이너 정보 로드
                     loadSelectedContainerInfo(arnNumber);
                     loadContainerParts(arnNumber);
