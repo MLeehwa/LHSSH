@@ -828,10 +828,16 @@
                     return false;
                 }
                 
-                // 5자리 숫자 + 알파벳 + 4자리 숫자 형식인지 확인하고 마지막 알파벳 제거
+                // P 접두사가 있으면 제거
+                if (cleanPartNumber.startsWith('P')) {
+                    cleanPartNumber = cleanPartNumber.substring(1);
+                    console.log('P 접두사 제거 후:', cleanPartNumber);
+                }
+                
+                // 5자리 숫자 + 알파벳 + 4자리 숫자 형식인지 확인
                 const partMatch = cleanPartNumber.match(/^(\d{5})([A-Za-z])(\d{4})$/);
                 if (partMatch) {
-                    // 마지막 알파벳 제거하고 하이픈 추가
+                    // 하이픈 추가
                     cleanPartNumber = `${partMatch[1]}-${partMatch[2]}${partMatch[3]}`;
                     console.log('파트 번호 정리됨:', barcode, '->', cleanPartNumber);
                 } else {
