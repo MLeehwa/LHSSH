@@ -6,25 +6,7 @@
     <title>출고 요약 - 이화 - 서한 시스템</title>
     
     <!-- Tailwind CSS CDN -->
-    <script>
-        // 개발 환경 확인
-        const isDevelopment = window.location.hostname === 'localhost' || 
-                            window.location.hostname === '127.0.0.1' || 
-                            window.location.protocol === 'file:';
-        
-        if (isDevelopment) {
-            // 개발 환경에서는 CDN 사용
-            const script = document.createElement('script');
-            script.src = 'https://cdn.tailwindcss.com';
-            document.head.appendChild(script);
-        } else {
-            // 프로덕션 환경에서는 로컬 CSS 사용
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = '../css/tailwind.css';
-            document.head.appendChild(link);
-        }
-    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- ExcelJS 라이브러리로 변경 (더 나은 스타일링 지원) -->
