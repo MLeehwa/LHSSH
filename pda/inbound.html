@@ -60,7 +60,8 @@
         
         // 입력 필드 포커스 방지 함수
         function preventInputFocus() {
-            const inputs = document.querySelectorAll('input, textarea');
+            // 일반 입력 필드만 포커스 방지 (드롭다운과 날짜 선택은 제외)
+            const inputs = document.querySelectorAll('input[type="text"], input[type="number"], textarea');
             inputs.forEach(input => {
                 // 바코드 입력 필드는 제외 (스캔 기능을 위해)
                 if (input.id === 'barcodeInput') {
@@ -89,14 +90,14 @@
                 });
             });
             
-            // select 요소는 드롭다운 선택을 위해 허용하되, 키보드만 숨김
-            const selects = document.querySelectorAll('select');
-            selects.forEach(select => {
-                select.addEventListener('focus', function(e) {
+            // select 요소와 날짜 선택은 키보드만 숨김
+            const selectAndDateInputs = document.querySelectorAll('select, input[type="date"]');
+            selectAndDateInputs.forEach(element => {
+                element.addEventListener('focus', function(e) {
                     setTimeout(hideKeyboard, 100);
                 });
                 
-                select.addEventListener('change', function(e) {
+                element.addEventListener('change', function(e) {
                     setTimeout(hideKeyboard, 100);
                 });
             });
