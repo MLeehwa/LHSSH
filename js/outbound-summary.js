@@ -7,6 +7,7 @@ class OutboundSummary {
         this.selectedMonth = new Date().toISOString().slice(0, 7);
         this.supabase = null;
         this.filterTimeout = null;
+        this.isCompactMode = false;
         
         // Performance optimizations
         this.cache = new Map();
@@ -95,6 +96,7 @@ class OutboundSummary {
             this.bindEvents();
             this.initializeDropdowns();
             this.updateDropdownVisibility();
+            this.updateCompactMode();
             this.updateStats();
             this.updateCurrentTime();
             
@@ -104,6 +106,92 @@ class OutboundSummary {
             console.log('OutboundSummary 초기화 완료');
         } catch (error) {
             console.error('OutboundSummary 초기화 오류:', error);
+        }
+    }
+
+    initializeDropdowns() {
+        try {
+            console.log('드롭다운 초기화 시작...');
+            
+            // 년도 드롭다운 초기화
+            const yearDropdown = document.getElementById('yearFilter');
+            if (yearDropdown) {
+                const currentYear = new Date().getFullYear();
+                yearDropdown.innerHTML = '';
+                
+                // 최근 5년 추가
+                for (let year = currentYear - 2; year <= currentYear + 2; year++) {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = `${year}년`;
+                    if (year === currentYear) {
+                        option.selected = true;
+                    }
+                    yearDropdown.appendChild(option);
+                }
+            }
+
+            // 월 드롭다운 초기화
+            const monthDropdown = document.getElementById('monthFilter');
+            if (monthDropdown) {
+                monthDropdown.innerHTML = '';
+                for (let month = 1; month <= 12; month++) {
+                    const option = document.createElement('option');
+                    option.value = month;
+                    option.textContent = `${month}월`;
+                    if (month === new Date().getMonth() + 1) {
+                        option.selected = true;
+                    }
+                    monthDropdown.appendChild(option);
+                }
+            }
+
+            // 주 드롭다운 초기화
+            const weekDropdown = document.getElementById('weekFilter');
+            if (weekDropdown) {
+                weekDropdown.innerHTML = '';
+                const currentWeek = this.getWeekNumber(new Date());
+                
+                for (let week = 1; week <= 52; week++) {
+                    const option = document.createElement('option');
+                    option.value = week;
+                    option.textContent = `${week}주차`;
+                    if (week === currentWeek) {
+                        option.selected = true;
+                    }
+                    weekDropdown.appendChild(option);
+                }
+            }
+
+            console.log('드롭다운 초기화 완료');
+        } catch (error) {
+            console.error('드롭다운 초기화 오류:', error);
+        }
+    }
+
+    updateDropdownVisibility() {
+        try {
+            console.log('드롭다운 가시성 업데이트 시작...');
+            
+            const monthlyDropdowns = document.getElementById('monthlyDropdowns');
+            const monthlyDropdowns2 = document.getElementById('monthlyDropdowns2');
+            const weeklyDropdown = document.getElementById('weeklyDropdown');
+            
+            if (this.currentView === 'monthly') {
+                // 월별 보기일 때
+                if (monthlyDropdowns) monthlyDropdowns.classList.remove('hidden');
+                if (monthlyDropdowns2) monthlyDropdowns2.classList.remove('hidden');
+                if (weeklyDropdown) weeklyDropdown.classList.add('hidden');
+            } else {
+                // 주별 보기일 때
+                if (monthlyDropdowns) monthlyDropdowns.classList.add('hidden');
+                if (monthlyDropdowns2) monthlyDropdowns2.classList.add('hidden');
+                if (weeklyDropdown) weeklyDropdown.classList.remove('hidden');
+            }
+            
+            console.log('드롭다운 가시성 업데이트 완료');
+        } catch (error) {
+            console.error('드롭다운 가시성 업데이트 오류:', error);
         }
     }
 
@@ -135,9 +223,9 @@ class OutboundSummary {
 
         // Dropdown change events
         container.addEventListener('change', (e) => {
-            if (e.target.matches('#yearDropdown, #monthDropdown')) {
+            if (e.target.matches('#yearFilter, #monthFilter')) {
                 this.handleMonthChange();
-            } else if (e.target.matches('#weekDropdown')) {
+            } else if (e.target.matches('#weekFilter')) {
                 this.handleWeekChange();
             }
         });
@@ -148,6 +236,16 @@ class OutboundSummary {
                 this.debouncedApplyFilters();
             }
         });
+        
+        // 컴팩트 모드 토글
+        const compactModeCheckbox = document.getElementById('compactMode');
+        if (compactModeCheckbox) {
+            compactModeCheckbox.addEventListener('change', () => {
+                this.isCompactMode = compactModeCheckbox.checked;
+                this.updateCompactMode();
+                this.renderTable();
+            });
+        }
     }
 
     switchToMonthlyView() {
@@ -167,9 +265,11 @@ class OutboundSummary {
     }
 
     handleMonthChange() {
-        const year = document.getElementById('yearDropdown').value;
-        const month = document.getElementById('monthDropdown').value;
+        const year = document.getElementById('yearFilter').value;
+        const month = document.getElementById('monthFilter').value;
         this.selectedMonth = `${year}-${month}`;
+        console.log('월 변경 감지:', this.selectedMonth);
+        // 자동으로 필터 적용
         this.applyFilters();
     }
 
@@ -180,8 +280,8 @@ class OutboundSummary {
     async loadData() {
         if (this.isLoading) return;
         
-        const now = Date.now();
-        if (now - this.lastDataUpdate < this.dataUpdateInterval) {
+        const timestamp = Date.now();
+        if (timestamp - this.lastDataUpdate < this.dataUpdateInterval) {
             console.log('Using cached data');
             return;
         }
@@ -192,24 +292,47 @@ class OutboundSummary {
             console.log('데이터 로딩 시작...');
             
             if (!this.supabase) {
-                console.warn('Supabase 클라이언트가 초기화되지 않았습니다. Mock 데이터를 사용합니다.');
-                this.loadMockData();
+                console.error('Supabase 클라이언트가 초기화되지 않았습니다.');
+                this.showNotification('데이터베이스 연결에 실패했습니다.', 'error');
                 return;
             }
             
-            // Performance: Load data in parallel
+            // 실제 데이터 로드
+            
+            // outbound_sequences와 outbound_parts에서 데이터 로드
             const [sequencesResult, partsResult] = await Promise.all([
                 this.loadOutboundSequences(),
                 this.loadOutboundParts()
             ]);
             
+            console.log('로드된 출고 시퀀스 데이터:', sequencesResult?.length || 0);
+            console.log('로드된 출고 파트 데이터:', partsResult?.length || 0);
+            console.log('첫 번째 시퀀스 샘플:', sequencesResult?.[0]);
+            console.log('첫 번째 파트 샘플:', partsResult?.[0]);
+            
             this.outboundData = this.combineOutboundData(sequencesResult, partsResult);
+            console.log('전체 데이터 로드:', this.outboundData.length, '개');
+            
             this.filteredData = [...this.outboundData];
             
-            this.lastDataUpdate = now;
+            // 현재 월로 자동 필터링
+            const now = new Date();
+            this.lastDataUpdate = timestamp;
             this.cache.clear();
             
             console.log('데이터 로드 완료. 총 데이터:', this.outboundData.length);
+            console.log('첫 번째 조합된 데이터 샘플:', this.outboundData?.[0]);
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+            
+            // 필터 드롭다운 설정
+            const yearEl = document.getElementById('yearFilter');
+            const monthEl = document.getElementById('monthFilter');
+            if (yearEl) yearEl.value = currentYear;
+            if (monthEl) monthEl.value = currentMonth;
+            
+            // 필터 적용
+            this.applyFilters();
             
             this.renderTable();
             this.updateStats();
@@ -230,8 +353,15 @@ class OutboundSummary {
 
         const { data, error } = await this.supabase
             .from('outbound_sequences')
-            .select('*')
-            .order('date', { ascending: false });
+            .select(`
+                id,
+                sequence_number,
+                outbound_date,
+                status,
+                created_at
+            `)
+            .order('outbound_date', { ascending: false })
+            .order('created_at', { ascending: false });
         
         if (error) {
             console.error('출고 시퀀스 데이터 로드 오류:', error);
@@ -251,8 +381,18 @@ class OutboundSummary {
 
         const { data, error } = await this.supabase
             .from('outbound_parts')
-            .select('*')
-            .order('sequence_id', { ascending: false });
+            .select(`
+                id,
+                sequence_id,
+                part_number,
+                planned_qty,
+                actual_qty,
+                scanned_qty,
+                status,
+                created_at
+            `)
+            .order('sequence_id', { ascending: false })
+            .order('part_number');
         
         if (error) {
             console.error('출고 파트 데이터 로드 오류:', error);
@@ -264,47 +404,150 @@ class OutboundSummary {
         return result;
     }
 
+    // 더 이상 사용하지 않는 함수들 제거
+
     loadMockData() {
-        this.outboundData = this.getMockOutboundData();
+        console.log('Mock 데이터 로드 중...');
+        // Mock 시퀀스 데이터
+        const mockSequences = [
+            {
+                id: 1,
+                sequence_number: '20241215-1',
+                outbound_date: '2024-12-15',
+                status: 'PENDING',
+                created_at: new Date().toISOString()
+            },
+            {
+                id: 2,
+                sequence_number: '20241215-2',
+                outbound_date: '2024-12-15',
+                status: 'COMPLETED',
+                created_at: new Date().toISOString()
+            },
+            {
+                id: 3,
+                sequence_number: '20241216-1',
+                outbound_date: '2024-12-16',
+                status: 'PENDING',
+                created_at: new Date().toISOString()
+            }
+        ];
+        
+        // Mock 파트 데이터
+        const mockParts = [
+            {
+                id: 1,
+                sequence_id: 1,
+                part_number: '49560-12345',
+                planned_qty: 50,
+                scanned_qty: 50,
+                actual_qty: 48,
+                status: 'PENDING',
+                created_at: new Date().toISOString()
+            },
+            {
+                id: 2,
+                sequence_id: 1,
+                part_number: '49560-67890',
+                planned_qty: 30,
+                scanned_qty: 30,
+                actual_qty: 28,
+                status: 'PENDING',
+                created_at: new Date().toISOString()
+            },
+            {
+                id: 3,
+                sequence_id: 2,
+                part_number: '49560-12345',
+                planned_qty: 25,
+                scanned_qty: 25,
+                actual_qty: 25,
+                status: 'COMPLETED',
+                created_at: new Date().toISOString()
+            },
+            {
+                id: 4,
+                sequence_id: 2,
+                part_number: '49560-67890',
+                planned_qty: 20,
+                scanned_qty: 20,
+                actual_qty: 20,
+                status: 'COMPLETED',
+                created_at: new Date().toISOString()
+            },
+            {
+                id: 5,
+                sequence_id: 3,
+                part_number: '49560-12345',
+                planned_qty: 15,
+                scanned_qty: 15,
+                actual_qty: 15,
+                status: 'PENDING',
+                created_at: new Date().toISOString()
+            }
+        ];
+        
+        this.outboundData = this.combineOutboundData(mockSequences, mockParts);
         this.filteredData = [...this.outboundData];
         this.renderTable();
         this.updateStats();
     }
 
-    // 시퀀스와 파트 데이터를 조합하여 출하 요약 데이터 생성
+    // outbound_sequences와 outbound_parts 데이터를 출하 요약 데이터로 변환
     combineOutboundData(sequences, parts) {
         const combinedData = [];
+        
+        console.log('combineOutboundData 시작 - sequences:', sequences?.length || 0, 'parts:', parts?.length || 0);
         
         if (!sequences || !parts) {
             console.warn('시퀀스 또는 파트 데이터가 없습니다.');
             return combinedData;
         }
         
+        // 시퀀스별로 파트들을 그룹화
+        const partsBySequence = {};
+        for (const part of parts) {
+            if (!partsBySequence[part.sequence_id]) {
+                partsBySequence[part.sequence_id] = [];
+            }
+            partsBySequence[part.sequence_id].push(part);
+        }
+        
+        // 각 시퀀스에 대해 데이터 생성 (차수별로 그룹화)
         for (const sequence of sequences) {
-            if (!sequence || !sequence.id) continue;
+            const sequenceParts = partsBySequence[sequence.id] || [];
             
-            const sequenceParts = parts.filter(part => part && part.sequence_id === sequence.id);
+            // 차수 번호에서 숫자 부분만 추출 (예: "20241215-1" -> "1")
+            let sequenceNumber = sequence.sequence_number;
+            if (sequence.sequence_number && sequence.sequence_number.includes('-')) {
+                sequenceNumber = sequence.sequence_number.split('-')[1];
+            }
             
+            // 파트별로 데이터 생성하되, 상태는 시퀀스 레벨에서 가져옴
             for (const part of sequenceParts) {
                 if (!part || !part.part_number) continue;
                 
-                const scannedQty = part.scanned_qty || 0;
-                const actualQty = part.actual_qty || 0;
+                console.log(`파트 처리 중: ${part.part_number}, 수량: ${part.actual_qty}, 시퀀스 상태: ${sequence.status}`);
                 
                 combinedData.push({
-                    date: sequence.date || new Date().toISOString().split('T')[0],
-                    sequence: sequence.seq || 'Unknown', // seq 필드 사용
+                    date: sequence.outbound_date || new Date().toISOString().split('T')[0],
+                    sequence: sequenceNumber,
                     partNumber: part.part_number,
-                    scannedQty: scannedQty,
-                    actualQty: actualQty,
-                    difference: scannedQty - actualQty,
-                    status: sequence.status || 'PENDING',
-                    sequenceId: sequence.id
+                    scannedQty: part.scanned_qty || 0,
+                    actualQty: part.actual_qty || 0,
+                    difference: (part.scanned_qty || 0) - (part.actual_qty || 0),
+                    status: sequence.status, // 시퀀스 상태를 사용 (PENDING/COMPLETED)
+                    sequenceId: sequence.id,
+                    partId: part.id,
+                    partStatus: part.status // 파트 개별 상태는 별도로 유지
                 });
             }
         }
         
         console.log('조합된 출하 데이터:', combinedData.length, '개 항목');
+        if (combinedData.length > 0) {
+            console.log('첫 번째 조합된 항목:', combinedData[0]);
+        }
         return combinedData;
     }
 
@@ -333,6 +576,14 @@ class OutboundSummary {
             const partNumberEl = document.getElementById('partNumberFilter');
             const statusEl = document.getElementById('statusFilter');
             
+            console.log('필터 요소 확인:', {
+                yearEl: !!yearEl,
+                monthEl: !!monthEl,
+                weekEl: !!weekEl,
+                partNumberEl: !!partNumberEl,
+                statusEl: !!statusEl
+            });
+            
             if (!yearEl && !monthEl && !weekEl) {
                 console.error('필터 요소를 찾을 수 없습니다.');
                 return;
@@ -351,14 +602,22 @@ class OutboundSummary {
                 const selectedMonth = monthEl ? parseInt(monthEl.value) : new Date().getMonth() + 1;
                 
                 console.log(`월별 필터링: ${selectedYear}년 ${selectedMonth}월`);
+                console.log('필터링 전 데이터:', filteredData.length, '개');
                 
                 filteredData = filteredData.filter(item => {
                     const itemDate = new Date(item.date);
                     const itemYear = itemDate.getFullYear();
                     const itemMonth = itemDate.getMonth() + 1;
                     
-                    return itemYear === selectedYear && itemMonth === selectedMonth;
+                    const matches = itemYear === selectedYear && itemMonth === selectedMonth;
+                    if (matches) {
+                        console.log('매칭된 항목:', item);
+                    }
+                    
+                    return matches;
                 });
+                
+                console.log('월별 필터링 후:', filteredData.length, '개');
             } else {
                 // 주별 보기: week 필터 사용
                 const selectedWeek = weekEl ? weekEl.value : '';
@@ -381,11 +640,12 @@ class OutboundSummary {
                 );
             }
             
-            // 상태 필터 (CONFIRMED만 표시)
-            filteredData = filteredData.filter(item => item.status === 'CONFIRMED');
+            // 이미 확정된 데이터만 로드되므로 상태 필터링 불필요
+            console.log('필터링된 데이터:', filteredData.length, '개');
             
             this.filteredData = filteredData;
             console.log(`필터링 완료: ${filteredData.length}개 항목`);
+            console.log('필터링된 데이터 샘플:', filteredData.slice(0, 3));
             
             this.renderTable();
             this.updateStats();
@@ -478,6 +738,10 @@ class OutboundSummary {
 
     renderTable() {
         try {
+            console.log('=== renderTable 시작 ===');
+            console.log('filteredData:', this.filteredData?.length || 0);
+            console.log('filteredData 샘플:', this.filteredData?.slice(0, 2));
+            
             const tbody = document.getElementById('summaryTableBody');
             
             if (!tbody) {
@@ -486,9 +750,10 @@ class OutboundSummary {
             }
             
             if (!this.filteredData || this.filteredData.length === 0) {
+                console.log('필터링된 데이터가 없음 - 빈 테이블 표시');
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">
                             <div class="flex flex-col items-center">
                                 <i class="fas fa-inbox text-4xl mb-4 text-gray-300"></i>
                                 <p class="text-lg font-medium">조건에 맞는 출하 데이터가 없습니다.</p>
@@ -500,28 +765,18 @@ class OutboundSummary {
                 return;
             }
 
-            // 확정된 데이터만 필터링
-            const confirmedData = this.filteredData.filter(item => item.status === 'CONFIRMED');
-            
-            if (confirmedData.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                            <div class="flex flex-col items-center">
-                                <i class="fas fa-check-circle text-4xl mb-4 text-gray-300"></i>
-                                <p class="text-lg font-medium">확정된 출하 데이터가 없습니다.</p>
-                                <p class="text-sm text-gray-400 mt-1">확정된 데이터만 표시됩니다.</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
+            // 이미 확정된 데이터만 로드되므로 추가 필터링 불필요
+            const confirmedData = this.filteredData;
+            console.log('확정된 데이터:', confirmedData.length, '개');
+            console.log('확정된 데이터 샘플:', confirmedData.slice(0, 2));
 
             // 가로 요약 테이블 구조 생성
+            console.log('가로 요약 구조 생성 시작...');
             const summaryStructure = this.createHorizontalSummaryStructure(confirmedData);
+            console.log('생성된 요약 구조:', summaryStructure);
             
             if (!summaryStructure || summaryStructure.dates.length === 0) {
+                console.log('요약 구조가 비어있음 - 빈 구조 메시지 표시');
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="7" class="px-6 py-8 text-center text-gray-500">
@@ -539,26 +794,27 @@ class OutboundSummary {
             let html = '';
             
             // 1. 날짜 헤더 행
+            const compactClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm';
+            const compactWidth = this.isCompactMode ? 'min-w-[80px] max-w-[100px]' : 'min-w-[100px] max-w-[120px]';
+            
             html += `
                 <tr class="bg-gradient-to-r from-blue-600 to-blue-700 border-b-2 border-blue-800">
-                    <td class="px-6 py-3 text-sm font-bold text-white border-r border-blue-800" style="min-width: 150px;">
+                    <td class="sticky left-0 z-20 bg-gradient-to-r from-blue-600 to-blue-700 ${compactClass} font-bold text-white border-r border-blue-800" style="min-width: 120px; max-width: 150px;">
                         파트 번호
                     </td>
             `;
             
             summaryStructure.dates.forEach(date => {
                 const dateObj = new Date(date);
-                const formattedDate = dateObj.toLocaleDateString('ko-KR', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    weekday: 'short'
-                });
+                const formattedDate = this.isCompactMode 
+                    ? dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
+                    : dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', weekday: 'short' });
                 
                 const sequences = summaryStructure.dateSequences[date] || [];
                 const colSpan = sequences.length > 0 ? sequences.length : 1;
                 
                 html += `
-                    <td colspan="${colSpan}" class="px-6 py-3 text-center text-sm font-bold text-white border-r border-blue-800">
+                    <td colspan="${colSpan}" class="${compactClass} text-center font-bold text-white border-r border-blue-800 ${compactWidth}">
                         ${formattedDate}
                     </td>
                 `;
@@ -567,9 +823,11 @@ class OutboundSummary {
             html += '</tr>';
             
             // 2. 차수 헤더 행
+            const compactHeaderClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm';
+            
             html += `
                 <tr class="bg-blue-100 border-b border-blue-300">
-                    <td class="px-6 py-2 text-sm font-medium text-blue-900 border-r border-blue-300">
+                    <td class="sticky left-0 z-20 bg-blue-100 ${compactHeaderClass} font-medium text-blue-900 border-r border-blue-300">
                         차수
                     </td>
             `;
@@ -579,18 +837,62 @@ class OutboundSummary {
                 
                 if (sequences.length === 0) {
                     html += `
-                        <td class="px-6 py-2 text-center text-xs text-blue-700 border-r border-blue-300">
+                        <td class="${compactHeaderClass} text-center text-xs text-blue-700 border-r border-blue-300 ${compactWidth}">
                             -
                         </td>
                     `;
                 } else {
                     sequences.forEach((sequence, index) => {
                         const isLast = index === sequences.length - 1;
-                        const sequenceName = sequence === 'AS' ? 'AS' : `${sequence}차`;
+                        // 차수만 표시 (날짜 부분 제거)
+                        const sequenceName = this.isCompactMode 
+                            ? (sequence === 'AS' ? 'AS' : sequence)
+                            : (sequence === 'AS' ? 'AS' : `${sequence}차`);
+                        
+                        // 해당 차수의 상태 확인 (시퀀스 레벨에서 직접 확인)
+                        let sequenceStatus = 'PENDING';
+                        
+                        // 디버깅을 위한 로그
+                        console.log(`=== 차수 상태 확인: ${date}-${sequence} ===`);
+                        
+                        // 해당 시퀀스의 모든 파트 중 하나라도 COMPLETED이면 COMPLETED로 표시
+                        const sequenceParts = summaryStructure.parts.filter(part => {
+                            const key = `${date}-${sequence}-${part}`;
+                            const status = summaryStructure.statuses[key];
+                            console.log(`파트 ${part} 상태: ${status} (키: ${key})`);
+                            return status === 'COMPLETED';
+                        });
+                        
+                        console.log(`COMPLETED 파트 수: ${sequenceParts.length}`);
+                        
+                        if (sequenceParts.length > 0) {
+                            sequenceStatus = 'COMPLETED';
+                        } else {
+                            // 모든 파트가 PENDING이거나 데이터가 없으면 PENDING
+                            const allParts = summaryStructure.parts.filter(part => {
+                                const key = `${date}-${sequence}-${part}`;
+                                const status = summaryStructure.statuses[key];
+                                return status === 'PENDING';
+                            });
+                            
+                            console.log(`PENDING 파트 수: ${allParts.length}`);
+                            
+                            if (allParts.length > 0) {
+                                sequenceStatus = 'PENDING';
+                            }
+                        }
+                        
+                        console.log(`최종 차수 상태: ${sequenceStatus}`);
+                        
+                        const statusText = sequenceStatus === 'COMPLETED' ? 'COMPLETED' : 'PENDING';
+                        const statusClass = sequenceStatus === 'COMPLETED' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100';
                         
                         html += `
-                            <td class="px-6 py-2 text-center text-xs font-medium text-blue-800 border-r ${isLast ? 'border-blue-300' : 'border-blue-200'}">
-                                ${sequenceName}
+                            <td class="${compactHeaderClass} text-center border-r ${isLast ? 'border-blue-300' : 'border-blue-200'} ${compactWidth}">
+                                <div class="font-medium text-blue-800 mb-1">${sequenceName}</div>
+                                <span class="px-1 py-0.5 text-xs font-medium rounded-full ${statusClass}">
+                                    ${statusText}
+                                </span>
                             </td>
                         `;
                     });
@@ -600,11 +902,17 @@ class OutboundSummary {
             html += '</tr>';
             
             // 3. 파트별 데이터 행
+            const compactDataClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm';
+            
             summaryStructure.parts.forEach((partNumber, rowIndex) => {
                 const isEvenRow = rowIndex % 2 === 0;
+                const rowBgClass = isEvenRow ? 'bg-gray-50' : 'bg-white';
+                const stickyBgClass = isEvenRow ? 'bg-gray-50' : 'bg-white';
+                let partTotal = 0; // 파트별 총합계
+                
                 html += `
-                    <tr class="hover:bg-blue-50 transition-colors duration-150 border-b border-gray-200 ${isEvenRow ? 'bg-gray-50' : 'bg-white'}">
-                        <td class="px-6 py-3 text-sm font-medium text-gray-900 border-r border-gray-300">
+                    <tr class="hover:bg-blue-50 transition-colors duration-150 border-b border-gray-200 ${rowBgClass}">
+                        <td class="sticky left-0 z-20 ${stickyBgClass} ${compactDataClass} font-medium text-gray-900 border-r border-gray-300">
                             ${partNumber}
                         </td>
                 `;
@@ -614,7 +922,7 @@ class OutboundSummary {
                     
                     if (sequences.length === 0) {
                         html += `
-                            <td class="px-6 py-3 text-center text-sm text-gray-400 border-r border-gray-300">
+                            <td class="${compactDataClass} text-center text-gray-400 border-r border-gray-300 ${compactWidth}">
                                 -
                             </td>
                         `;
@@ -622,33 +930,45 @@ class OutboundSummary {
                         sequences.forEach((sequence, index) => {
                             const isLast = index === sequences.length - 1;
                             const quantity = summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0;
+                            partTotal += quantity; // 파트별 총합계 누적
                             
                             html += `
-                                <td class="px-6 py-3 text-center text-sm text-gray-900 border-r ${isLast ? 'border-gray-300' : 'border-gray-200'}">
-                                    ${quantity.toLocaleString()}
+                                <td class="${compactDataClass} text-center text-gray-900 border-r ${isLast ? 'border-gray-300' : 'border-gray-200'} ${compactWidth}">
+                                    ${this.isCompactMode ? quantity.toLocaleString() : quantity.toLocaleString()}
                                 </td>
                             `;
                         });
                     }
                 });
                 
+                // 파트별 총합계 컬럼 추가
+                html += `
+                    <td class="${compactDataClass} text-center font-bold text-gray-900 border-r border-gray-300 ${compactWidth}">
+                        ${partTotal.toLocaleString()}
+                    </td>
+                `;
+                
                 html += '</tr>';
             });
             
             // 4. 합계 행
+            const compactTotalClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm';
+            
             html += `
                 <tr class="bg-gradient-to-r from-green-600 to-green-700 border-t-2 border-green-800">
-                    <td class="px-6 py-3 text-sm font-bold text-white border-r border-green-800">
+                    <td class="sticky left-0 z-20 bg-gradient-to-r from-green-600 to-green-700 ${compactTotalClass} font-bold text-white border-r border-green-800">
                         합계
                     </td>
             `;
+            
+            let grandTotal = 0; // 전체 총합계
             
             summaryStructure.dates.forEach(date => {
                 const sequences = summaryStructure.dateSequences[date] || [];
                 
                 if (sequences.length === 0) {
                     html += `
-                        <td class="px-6 py-3 text-center text-sm font-bold text-white border-r border-green-800">
+                        <td class="${compactTotalClass} text-center font-bold text-white border-r border-green-800 ${compactWidth}">
                             -
                         </td>
                     `;
@@ -659,14 +979,23 @@ class OutboundSummary {
                             return sum + (summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0);
                         }, 0);
                         
+                        grandTotal += totalQuantity; // 전체 총합계 누적
+                        
                         html += `
-                            <td class="px-6 py-3 text-center text-sm font-bold text-white border-r ${isLast ? 'border-green-800' : 'border-green-700'}">
+                            <td class="${compactTotalClass} text-center font-bold text-white border-r ${isLast ? 'border-green-800' : 'border-green-700'} ${compactWidth}">
                                 ${totalQuantity.toLocaleString()}
                             </td>
                         `;
                     });
                 }
             });
+            
+            // 총합계 컬럼 추가
+            html += `
+                <td class="${compactTotalClass} text-center font-bold text-white border-r border-green-800 ${compactWidth}">
+                    ${grandTotal.toLocaleString()}
+                </td>
+            `;
             
             html += '</tr>';
             
@@ -698,7 +1027,8 @@ class OutboundSummary {
             dates: [],
             dateSequences: {},
             parts: [],
-            quantities: {}
+            quantities: {},
+            statuses: {} // 상태 정보 추가
         };
         
         // 날짜별로 데이터 그룹화
@@ -716,7 +1046,19 @@ class OutboundSummary {
         // 각 날짜별로 시퀀스와 파트 정보 수집
         structure.dates.forEach(date => {
             const dateData = groupedByDate[date];
-            const sequences = [...new Set(dateData.map(item => item.sequence))].sort((a, b) => {
+            const sequences = [...new Set(dateData.map(item => {
+                // inventory_transactions에서는 reference_id를 차수로 사용
+                const seq = String(item.sequence || 'Unknown');
+                console.log('처리 중인 sequence:', item.sequence, '타입:', typeof item.sequence, '문자열 변환:', seq);
+                
+                // reference_id가 숫자면 그대로 사용, 아니면 'Unknown'
+                if (seq === 'Unknown' || seq === 'null' || seq === 'undefined') {
+                    return 'Unknown';
+                }
+                return seq;
+            }))].sort((a, b) => {
+                if (a === 'Unknown') return 1;
+                if (b === 'Unknown') return -1;
                 if (a === 'AS') return 1;
                 if (b === 'AS') return -1;
                 return parseInt(a) - parseInt(b);
@@ -724,10 +1066,11 @@ class OutboundSummary {
             
             structure.dateSequences[date] = sequences;
             
-            // 파트별 수량 정보 수집
+            // 파트별 수량 정보 및 상태 수집
             dateData.forEach(item => {
                 const key = `${date}-${item.sequence}-${item.partNumber}`;
                 structure.quantities[key] = item.actualQty || 0;
+                structure.statuses[key] = item.status || 'PENDING'; // 상태 정보 저장
                 
                 // 파트 목록에 추가
                 if (!structure.parts.includes(item.partNumber)) {
@@ -747,10 +1090,10 @@ class OutboundSummary {
         const grouped = {};
         
         this.filteredData.forEach(item => {
-            if (!grouped[item.date]) {
-                grouped[item.date] = [];
+            if (!grouped[item.outbound_date]) {
+                grouped[item.outbound_date] = [];
             }
-            grouped[item.date].push(item);
+            grouped[item.outbound_date].push(item);
         });
         
         return grouped;
@@ -771,26 +1114,26 @@ class OutboundSummary {
 
     updateStats() {
         try {
-            // 확정된 데이터만 필터링
-            const confirmedData = this.filteredData.filter(item => item.status === 'CONFIRMED');
-            const totalItems = confirmedData.length;
-            const totalActual = confirmedData.reduce((sum, item) => sum + (item.actualQty || 0), 0);
-            const uniqueParts = [...new Set(confirmedData.map(item => item.partNumber))].length;
-            const uniqueDates = [...new Set(confirmedData.map(item => item.date))].length;
+            // 완료된 데이터만 필터링 (출고 현황과 동일한 상태 체크)
+            const completedData = this.filteredData.filter(item => item.status === 'COMPLETED');
+            const totalItems = completedData.length;
+            const totalActual = completedData.reduce((sum, item) => sum + (item.actualQty || 0), 0);
+            const uniqueParts = [...new Set(completedData.map(item => item.partNumber))].length;
+            const uniqueDates = [...new Set(completedData.map(item => item.date))].length;
 
-            // 이번 주 출고 (최근 7일, 확정된 데이터만)
+            // 이번 주 출고 (최근 7일, 완료된 데이터만)
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-            const weeklyData = confirmedData.filter(item => {
+            const weeklyData = completedData.filter(item => {
                 const itemDate = new Date(item.date);
                 return itemDate >= oneWeekAgo;
             });
             const weeklyOutbound = weeklyData.reduce((sum, item) => sum + (item.actualQty || 0), 0);
 
-            // 이번 달 출고 (현재 월, 확정된 데이터만)
+            // 이번 달 출고 (현재 월, 완료된 데이터만)
             const currentMonth = new Date().getMonth();
             const currentYear = new Date().getFullYear();
-            const monthlyData = confirmedData.filter(item => {
+            const monthlyData = completedData.filter(item => {
                 const itemDate = new Date(item.date);
                 return itemDate.getMonth() === currentMonth && itemDate.getFullYear() === currentYear;
             });
@@ -1071,8 +1414,8 @@ class OutboundSummary {
 
 
     generateExcelData() {
-        // 확정된 데이터만 필터링
-        const confirmedData = this.filteredData.filter(item => item.status === 'CONFIRMED');
+        // 이미 확정된 데이터만 로드되므로 추가 필터링 불필요
+        const confirmedData = this.filteredData;
         
         if (confirmedData.length === 0) {
             return [['파트 번호']];
@@ -1106,11 +1449,16 @@ class OutboundSummary {
             }
         });
         
+        // 총합계 컬럼 헤더 추가
+        dateRow.push('총합계');
+        sequenceRow.push('');
+        
         const rows = [dateRow, sequenceRow];
         
         // 파트별 데이터 행
         summaryStructure.parts.forEach(partNumber => {
             const row = [partNumber];
+            let partTotal = 0; // 파트별 총합계
             
             summaryStructure.dates.forEach(date => {
                 const sequences = summaryStructure.dateSequences[date] || [];
@@ -1121,15 +1469,21 @@ class OutboundSummary {
                     sequences.forEach(sequence => {
                         const quantity = summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0;
                         row.push(quantity);
+                        partTotal += quantity; // 파트별 총합계 누적
                     });
                 }
             });
+            
+            // 파트별 총합계를 마지막 컬럼에 추가
+            row.push(partTotal);
             
             rows.push(row);
         });
         
         // 합계 행
         const totalRow = ['합계'];
+        let grandTotal = 0; // 전체 총합계
+        
         summaryStructure.dates.forEach(date => {
             const sequences = summaryStructure.dateSequences[date] || [];
             
@@ -1142,9 +1496,13 @@ class OutboundSummary {
                         total += summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0;
                     });
                     totalRow.push(total);
+                    grandTotal += total; // 전체 총합계 누적
                 });
             }
         });
+        
+        // 전체 총합계를 마지막 컬럼에 추가
+        totalRow.push(grandTotal);
         
         rows.push(totalRow);
         
@@ -1163,7 +1521,7 @@ class OutboundSummary {
         
         // 주말 데이터만 필터링 (토요일=6, 일요일=0)
         const weekendData = confirmedData.filter(item => {
-            const date = new Date(item.date);
+            const date = new Date(item.outbound_date);
             const dayOfWeek = date.getDay();
             return dayOfWeek === 0 || dayOfWeek === 6; // 일요일 또는 토요일
         });
@@ -1328,10 +1686,7 @@ class OutboundSummary {
             // 미국 중부 시간 기준으로 현재 시간 표시
             const now = new Date();
             
-            // 미국 중부 시간대 (CST/CDT)로 변환
-            const centralTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-            
-            const timeString = centralTime.toLocaleString('ko-KR', {
+            const timeString = now.toLocaleString('en-US', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
@@ -1343,10 +1698,25 @@ class OutboundSummary {
             
             const timeElement = document.getElementById('currentTime');
             if (timeElement) {
-                timeElement.textContent = timeString + ' (CST/CDT)';
+                timeElement.textContent = timeString;
             }
         } catch (error) {
             console.error('시간 업데이트 중 오류:', error);
+        }
+    }
+    
+    updateCompactMode() {
+        try {
+            const tableContainer = document.querySelector('.table-container');
+            if (tableContainer) {
+                if (this.isCompactMode) {
+                    tableContainer.classList.add('compact-mode');
+                } else {
+                    tableContainer.classList.remove('compact-mode');
+                }
+            }
+        } catch (error) {
+            console.error('컴팩트 모드 업데이트 중 오류:', error);
         }
     }
 
@@ -1375,7 +1745,7 @@ class OutboundSummary {
         } catch (error) {
             console.error('알림 표시 중 오류:', error);
             // 폴백: alert 사용
-            alert(`${type.toUpperCase()}: ${message}`);
+            alert(`${i18n.t(type === 'error' ? 'error_prefix' : 'success_prefix')}${message}`);
         }
     }
 
@@ -1440,11 +1810,14 @@ class OutboundSummary {
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     try {
         console.log('OutboundSummary DOM 초기화 시작...');
         window.outboundSummary = new OutboundSummary();
         console.log('OutboundSummary 인스턴스 생성 완료');
+        
+        // 초기화 실행
+        await window.outboundSummary.init();
         
         // 디버깅 함수를 전역에 추가
         window.debugOutboundData = () => {

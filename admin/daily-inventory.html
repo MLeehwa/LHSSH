@@ -3,190 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>일일 재고 추적 - 관리자</title>
-    <link href="../css/tailwind.css" rel="stylesheet">
+    <title>일일 재고 관리 - 이화 - 서한 시스템</title>
+    <meta http-equiv="refresh" content="0; url=daily-inventory-enhanced.html">
     <style>
-        .status-ok { color: #10B981; }
-        .status-error { color: #EF4444; }
-        .status-warning { color: #F59E0B; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .redirect-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .message {
+            color: #374151;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+        .link {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
-<body class="bg-gray-100">
-    <div class="min-h-screen">
-        <!-- Header -->
-        <header class="bg-white shadow-sm border-b">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center py-4">
-                    <div class="flex items-center">
-                        <h1 class="text-2xl font-bold text-gray-900">일일 재고 추적</h1>
-                    </div>
-                    <nav class="flex space-x-4">
-                        <a href="index.html" class="text-gray-500 hover:text-gray-700">관리자 홈</a>
-                        <a href="inventory-status.html" class="text-gray-500 hover:text-gray-700">재고 현황</a>
-                        <a href="outbound-status.html" class="text-gray-500 hover:text-gray-700">출고 현황</a>
-                    </nav>
-                </div>
-            </div>
-        </header>
-
-        <!-- Main Content -->
-        <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <!-- Control Panel -->
-            <div class="bg-white rounded-lg shadow p-6 mb-6">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex items-center space-x-4">
-                        <label for="dateSelector" class="text-sm font-medium text-gray-700">날짜 선택:</label>
-                        <input type="date" id="dateSelector" class="border border-gray-300 rounded-md px-3 py-2">
-                        
-                        <button id="createSnapshotBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                            스냅샷 생성
-                        </button>
-                        
-                        <button id="validateBtn" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700">
-                            오류 검증
-                        </button>
-                    </div>
-                    
-                    <div class="flex items-center space-x-4">
-                        <button id="refreshBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
-                            새로고침
-                        </button>
-                        
-                        <button id="exportBtn" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">
-                            데이터 내보내기
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Summary Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                <span class="text-blue-600 font-bold">📦</span>
-                            </div>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500">총 파트 수</p>
-                            <p id="totalParts" class="text-2xl font-bold text-gray-900">-</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                <span class="text-green-600 font-bold">📈</span>
-                            </div>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500">총 입고</p>
-                            <p id="totalInbound" class="text-2xl font-bold text-gray-900">-</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                                <span class="text-red-600 font-bold">📉</span>
-                            </div>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500">총 출고</p>
-                            <p id="totalOutbound" class="text-2xl font-bold text-gray-900">-</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                                <span class="text-yellow-600 font-bold">⚠️</span>
-                            </div>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500">오류 수</p>
-                            <p id="errorCount" class="text-2xl font-bold text-gray-900">-</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Daily Inventory Table -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-medium text-gray-900">일일 재고 현황</h2>
-                </div>
-                
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    파트 번호
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    카테고리
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    시작 재고
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    종료 재고
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    일일 입고
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    일일 출고
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    계산된 재고
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    상태
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventoryTableBody" class="bg-white divide-y divide-gray-200">
-                            <!-- 데이터가 여기에 동적으로 로드됩니다 -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Error Details Modal -->
-            <div id="errorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-                <div class="flex items-center justify-center min-h-screen p-4">
-                    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-96 overflow-y-auto">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h3 class="text-lg font-medium text-gray-900">재고 오류 상세</h3>
-                        </div>
-                        <div class="p-6">
-                            <div id="errorDetails" class="space-y-4">
-                                <!-- 오류 상세 정보가 여기에 표시됩니다 -->
-                            </div>
-                        </div>
-                        <div class="px-6 py-4 border-t border-gray-200">
-                            <button id="closeErrorModal" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
-                                닫기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+<body>
+    <div class="redirect-container">
+        <div class="spinner"></div>
+        <div class="message">
+            일일 재고 관리 페이지로 이동 중입니다...
+        </div>
+        <p>
+            자동으로 이동되지 않으면 
+            <a href="daily-inventory-enhanced.html" class="link">여기를 클릭</a>
+            해주세요.
+        </p>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/supabase-client.js"></script>
-    <script src="../js/daily-inventory.js"></script>
+    <script>
+        // 즉시 리다이렉트
+        window.location.replace('daily-inventory-enhanced.html');
+    </script>
 </body>
-</html> 
+</html>

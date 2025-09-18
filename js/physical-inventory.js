@@ -12,10 +12,22 @@ class PhysicalInventoryManager {
     // Supabase 초기화
     initializeSupabase() {
         try {
-            this.supabase = supabase.createClient(
-                'https://your-project.supabase.co',
-                'your-anon-key',
-                {
+            console.log('🔄 Supabase 초기화 시작...');
+            console.log('window.supabase 존재 여부:', typeof window.supabase);
+            console.log('window.getCurrentConfig 존재 여부:', typeof window.getCurrentConfig);
+            
+            // Supabase 클라이언트가 로드되었는지 확인
+            if (typeof window.supabase === 'undefined') {
+                console.error('❌ Supabase 클라이언트 라이브러리가 로드되지 않았습니다.');
+                console.error('HTML에서 Supabase CDN이 제대로 로드되었는지 확인하세요.');
+                return;
+            }
+
+            // config.js에서 설정 가져오기
+            if (window.getCurrentConfig) {
+                const config = window.getCurrentConfig();
+                console.log('config.js에서 설정 가져옴:', config);
+                this.supabase = window.supabase.createClient(config.url, config.anonKey, {
                     auth: {
                         autoRefreshToken: true,
                         persistSession: true,
@@ -27,124 +39,305 @@ class PhysicalInventoryManager {
                             'Content-Type': 'application/json'
                         }
                     }
-                }
-            );
+                });
+            } else {
+                console.log('config.js 없음, 기본 설정 사용');
+                // 기본 설정 사용
+                this.supabase = window.supabase.createClient(
+                    'https://vzemucykhxlxgjuldibf.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ',
+                    {
+                        auth: {
+                            autoRefreshToken: true,
+                            persistSession: true,
+                            detectSessionInUrl: true
+                        },
+                        global: {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    }
+                );
+            }
             console.log('✅ Supabase 클라이언트 초기화 완료');
+            console.log('Supabase 클라이언트 객체:', this.supabase);
         } catch (error) {
             console.error('❌ Supabase 초기화 오류:', error);
+            console.error('오류 상세:', error.message);
+            console.error('오류 스택:', error.stack);
         }
     }
 
-    // 인벤토리된 파트를 찾아서 current_stock에 더하기
-    async updateCurrentStockFromInventory() {
+    // 실사 데이터 로드
+    async loadPhysicalInventoryData() {
         if (!this.supabase) {
             console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
             return;
         }
 
         try {
-            console.log('🔄 인벤토리된 파트를 찾아서 current_stock 업데이트 시작...');
+            console.log('🔄 실사 데이터 로드 시작...');
+            console.log('Supabase 클라이언트 상태:', this.supabase);
             
-            // 인벤토리된 파트들 (physicalStock > dbStock인 경우)
-            const inventoriedParts = this.physicalInventoryData.filter(item => 
-                item.physicalStock > item.dbStock && item.status !== 'matched'
-            );
+            // physical_inventory_details 뷰에서 데이터 조회
+            console.log('physical_inventory_details 뷰 조회 시도...');
+            const { data, error } = await this.supabase
+                .from('physical_inventory_details')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-            console.log(`📦 인벤토리된 파트 ${inventoriedParts.length}개 발견`);
-
-            for (const part of inventoriedParts) {
-                const additionalQuantity = part.physicalStock - part.dbStock;
-                console.log(`➕ ${part.partNumber}: ${additionalQuantity}개 추가`);
-
-                // inventory 테이블에서 현재 재고 조회
-                const { data: inventoryData, error: inventoryError } = await this.supabase
-                    .from('inventory')
-                    .select('current_stock')
-                    .eq('part_number', part.partNumber)
-                    .maybeSingle();
-
-                if (inventoryError && inventoryError.code !== 'PGRST116') {
-                    console.error(`❌ ${part.partNumber} 재고 조회 오류:`, inventoryError);
-                    continue;
-                }
-
-                const currentStock = inventoryData ? inventoryData.current_stock : 0;
-                const newStock = currentStock + additionalQuantity;
-
-                // inventory 테이블 업데이트
-                if (inventoryData) {
-                    const { error: updateError } = await this.supabase
-                        .from('inventory')
-                        .update({
-                            current_stock: newStock,
-                            last_updated: new Date().toISOString()
-                        })
-                        .eq('part_number', part.partNumber);
-
-                    if (updateError) {
-                        console.error(`❌ ${part.partNumber} 재고 업데이트 오류:`, updateError);
-                        continue;
-                    }
-                } else {
-                    // 파트가 inventory 테이블에 없으면 새로 생성
-                    const { error: insertError } = await this.supabase
-                        .from('inventory')
-                        .insert({
-                            part_number: part.partNumber,
-                            current_stock: newStock,
-                            last_updated: new Date().toISOString()
-                        });
-
-                    if (insertError) {
-                        console.error(`❌ ${part.partNumber} 재고 생성 오류:`, insertError);
-                        continue;
-                    }
-                }
-
-                // 거래 내역 기록
-                await this.supabase
-                    .from('inventory_transactions')
-                    .insert({
-                        date: new Date().toISOString().split('T')[0],
-                        part_number: part.partNumber,
-                        type: 'PHYSICAL_INVENTORY',
-                        quantity: additionalQuantity,
-                        balance_after: newStock,
-                        reference_number: `PHYSICAL_${Date.now()}`,
-                        notes: `실사 재고 조정: ${part.dbStock} → ${part.physicalStock}`
-                    });
-
-                console.log(`✅ ${part.partNumber}: ${currentStock} → ${newStock} (${additionalQuantity}개 추가)`);
+            if (error) {
+                console.error('❌ 실사 데이터 로드 오류:', error);
+                console.error('오류 코드:', error.code);
+                console.error('오류 메시지:', error.message);
+                console.error('오류 상세:', error.details);
+                return;
             }
 
-            this.showNotification(`인벤토리된 파트 ${inventoriedParts.length}개의 current_stock이 업데이트되었습니다.`, 'success');
+            console.log('조회된 데이터:', data);
+            this.physicalInventoryData = data || [];
+            this.filteredData = [...this.physicalInventoryData];
+            
+            console.log(`✅ 실사 데이터 ${this.physicalInventoryData.length}건 로드 완료`);
+            this.renderTable();
+            this.updateStatistics();
             
         } catch (error) {
-            console.error('❌ current_stock 업데이트 중 오류:', error);
-            this.showNotification('current_stock 업데이트 중 오류가 발생했습니다.', 'error');
+            console.error('❌ 실사 데이터 로드 중 오류:', error);
+            console.error('오류 상세:', error.message);
+            console.error('오류 스택:', error.stack);
         }
     }
 
-    init() {
-        this.initializeSupabase();
-        this.loadMockData();
-        this.loadMockHistoryData();
-        this.setupEventListeners();
-        this.updateCurrentTime();
-        this.renderTable();
-        this.renderHistoryTable();
-        this.updateStatistics();
-        this.updateHistoryCount(this.physicalInventoryHistory.length, false);
-        
-        // 시간 업데이트를 1초마다 실행
-        setInterval(() => this.updateCurrentTime(), 1000);
+    // 실사 이력 데이터 로드
+    async loadPhysicalInventoryHistory() {
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
+            return;
+        }
+
+        try {
+            console.log('🔄 실사 이력 데이터 로드 시작...');
+            
+            // physical_inventory_adjustment_history 뷰에서 데이터 조회
+            const { data, error } = await this.supabase
+                .from('physical_inventory_adjustment_history')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('❌ 실사 이력 데이터 로드 오류:', error);
+                return;
+            }
+
+            this.physicalInventoryHistory = data || [];
+            
+            console.log(`✅ 실사 이력 데이터 ${this.physicalInventoryHistory.length}건 로드 완료`);
+            this.renderHistoryTable();
+            this.updateHistoryCount(this.physicalInventoryHistory.length);
+            
+        } catch (error) {
+            console.error('❌ 실사 이력 데이터 로드 중 오류:', error);
+        }
     }
 
-    // US Central Time으로 현재 시간 표시
+    // 새로운 실사 세션 생성
+    async createPhysicalSession(sessionName, sessionDate, notes = '') {
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
+            return null;
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('physical_inventory_sessions')
+                .insert({
+                    session_name: sessionName,
+                    session_date: sessionDate,
+                    notes: notes,
+                    created_by: 'admin'
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error('❌ 실사 세션 생성 오류:', error);
+                return null;
+            }
+
+            console.log('✅ 실사 세션 생성 완료:', data);
+            return data;
+            
+        } catch (error) {
+            console.error('❌ 실사 세션 생성 중 오류:', error);
+            return null;
+        }
+    }
+
+    // 실사 항목 추가
+    async addPhysicalItem(sessionId, partNumber, physicalStock, notes = '') {
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
+            return false;
+        }
+
+        try {
+            // DB 재고 조회
+            const { data: inventoryData, error: inventoryError } = await this.supabase
+                .from('inventory')
+                .select('current_stock')
+                .eq('part_number', partNumber)
+                .maybeSingle();
+
+            if (inventoryError && inventoryError.code !== 'PGRST116') {
+                console.error('❌ 재고 조회 오류:', inventoryError);
+                return false;
+            }
+
+            const dbStock = inventoryData ? inventoryData.current_stock : 0;
+
+            // 실사 항목 추가
+            const { error } = await this.supabase
+                .from('physical_inventory_items')
+                .insert({
+                    session_id: sessionId,
+                    part_number: partNumber,
+                    db_stock: dbStock,
+                    physical_stock: physicalStock,
+                    notes: notes
+                });
+
+            if (error) {
+                console.error('❌ 실사 항목 추가 오류:', error);
+                return false;
+            }
+
+            console.log('✅ 실사 항목 추가 완료');
+            await this.loadPhysicalInventoryData(); // 데이터 새로고침
+            return true;
+            
+        } catch (error) {
+            console.error('❌ 실사 항목 추가 중 오류:', error);
+            return false;
+        }
+    }
+
+    // 실사 항목 수정
+    async updatePhysicalItem(itemId, physicalStock, notes = '') {
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
+            return false;
+        }
+
+        try {
+            const { error } = await this.supabase
+                .from('physical_inventory_items')
+                .update({
+                    physical_stock: physicalStock,
+                    notes: notes,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', itemId);
+
+            if (error) {
+                console.error('❌ 실사 항목 수정 오류:', error);
+                return false;
+            }
+
+            console.log('✅ 실사 항목 수정 완료');
+            await this.loadPhysicalInventoryData(); // 데이터 새로고침
+            return true;
+            
+        } catch (error) {
+            console.error('❌ 실사 항목 수정 중 오류:', error);
+            return false;
+        }
+    }
+
+    // 실사 항목 조정 (재고 업데이트)
+    async adjustPhysicalItem(itemId, newStock, reason = '') {
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
+            return false;
+        }
+
+        try {
+            // 실사 항목을 ADJUSTED 상태로 업데이트
+            const { error } = await this.supabase
+                .from('physical_inventory_items')
+                .update({
+                    physical_stock: newStock,
+                    status: 'ADJUSTED',
+                    notes: reason,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', itemId);
+
+            if (error) {
+                console.error('❌ 실사 항목 조정 오류:', error);
+                return false;
+            }
+
+            console.log('✅ 실사 항목 조정 완료');
+            await this.loadPhysicalInventoryData(); // 데이터 새로고침
+            await this.loadPhysicalInventoryHistory(); // 이력 새로고침
+            return true;
+            
+        } catch (error) {
+            console.error('❌ 실사 항목 조정 중 오류:', error);
+            return false;
+        }
+    }
+
+    // 실사 세션 완료
+    async completePhysicalSession(sessionId) {
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
+            return false;
+        }
+
+        try {
+            const { error } = await this.supabase
+                .from('physical_inventory_sessions')
+                .update({
+                    status: 'COMPLETED',
+                    completed_at: new Date().toISOString()
+                })
+                .eq('id', sessionId);
+
+            if (error) {
+                console.error('❌ 실사 세션 완료 오류:', error);
+                return false;
+            }
+
+            console.log('✅ 실사 세션 완료');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ 실사 세션 완료 중 오류:', error);
+            return false;
+        }
+    }
+
+    // 초기화
+    init() {
+        this.initializeSupabase();
+        this.setupEventListeners();
+        this.updateCurrentTime();
+        
+        // 데이터 로드
+        this.loadPhysicalInventoryData();
+        this.loadPhysicalInventoryHistory();
+        
+        console.log('✅ 실사재고 관리자 초기화 완료');
+    }
+
+    // 현재 시간 업데이트
     updateCurrentTime() {
         const now = new Date();
-        const centralTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-        const timeString = centralTime.toLocaleString('ko-KR', {
+        const timeString = now.toLocaleString('en-US', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -153,357 +346,82 @@ class PhysicalInventoryManager {
             second: '2-digit',
             timeZone: 'America/Chicago'
         });
-        document.getElementById('currentTime').textContent = timeString;
-    }
-
-    // Mock 데이터 로드
-    loadMockData() {
-        this.physicalInventoryData = [
-            {
-                id: 1,
-                partNumber: 'ABC001',
-                partName: '엔진 마운트',
-                dbStock: 150,
-                physicalStock: 148,
-                difference: -2,
-                status: 'mismatched',
-                inspector: '김철수',
-                inspectionDate: '2024-01-15',
-                inspectionTime: '14:30:00',
-                history: [
-                    {
-                        date: '2024-01-15 16:45:00',
-                        oldStock: 150,
-                        newStock: 148,
-                        reason: '실사 결과 부족 확인',
-                        modifier: '관리자'
-                    }
-                ]
-            },
-            {
-                id: 2,
-                partNumber: 'DEF002',
-                partName: '브레이크 패드',
-                dbStock: 200,
-                physicalStock: 200,
-                difference: 0,
-                status: 'matched',
-                inspector: '이영희',
-                inspectionDate: '2024-01-15',
-                inspectionTime: '15:20:00',
-                history: []
-            },
-            {
-                id: 3,
-                partNumber: 'GHI003',
-                partName: '타이어 밸브',
-                dbStock: 300,
-                physicalStock: 295,
-                difference: -5,
-                status: 'mismatched',
-                inspector: '박민수',
-                inspectionDate: '2024-01-15',
-                inspectionTime: '16:10:00',
-                history: []
-            },
-            {
-                id: 4,
-                partNumber: 'JKL004',
-                partName: '배터리',
-                dbStock: 50,
-                physicalStock: 52,
-                difference: 2,
-                status: 'mismatched',
-                inspector: '최지영',
-                inspectionDate: '2024-01-15',
-                inspectionTime: '17:00:00',
-                history: []
-            },
-            {
-                id: 5,
-                partNumber: 'MNO005',
-                partName: '오일 필터',
-                dbStock: 100,
-                physicalStock: 98,
-                difference: -2,
-                status: 'modified',
-                inspector: '정수민',
-                inspectionDate: '2024-01-14',
-                inspectionTime: '13:45:00',
-                history: [
-                    {
-                        date: '2024-01-14 15:30:00',
-                        oldStock: 100,
-                        newStock: 98,
-                        reason: '실사 후 재고 조정',
-                        modifier: '관리자'
-                    }
-                ]
-            },
-            {
-                id: 6,
-                partNumber: 'PQR006',
-                partName: '에어 필터',
-                dbStock: 75,
-                physicalStock: 75,
-                difference: 0,
-                status: 'matched',
-                inspector: '김철수',
-                inspectionDate: '2024-01-14',
-                inspectionTime: '14:15:00',
-                history: []
-            },
-            {
-                id: 7,
-                partNumber: 'STU007',
-                partName: '스파크 플러그',
-                dbStock: 120,
-                physicalStock: 118,
-                difference: -2,
-                status: 'mismatched',
-                inspector: '이영희',
-                inspectionDate: '2024-01-14',
-                inspectionTime: '15:30:00',
-                history: []
-            },
-            {
-                id: 8,
-                partNumber: 'VWX008',
-                partName: '점화 코일',
-                dbStock: 80,
-                physicalStock: 82,
-                difference: 2,
-                status: 'modified',
-                inspector: '박민수',
-                inspectionDate: '2024-01-13',
-                inspectionTime: '16:20:00',
-                history: [
-                    {
-                        date: '2024-01-13 17:45:00',
-                        oldStock: 80,
-                        newStock: 82,
-                        reason: '실사 결과 초과 확인',
-                        modifier: '관리자'
-                    }
-                ]
-            }
-        ];
-        this.filteredData = [...this.physicalInventoryData];
-    }
-
-    // Mock 실사 이력 데이터 로드
-    loadMockHistoryData() {
-        this.physicalInventoryHistory = [
-            {
-                id: 1,
-                partNumber: 'ABC001',
-                inspectionDate: '2024-01-15',
-                inspectionTime: '14:30:00',
-                beforeDbStock: 150,
-                physicalStock: 148,
-                difference: -2,
-                afterDbStock: 148,
-                status: '수정됨',
-                inspector: '김철수',
-                modificationDate: '2024-01-15 16:45:00',
-                modificationReason: '실사 결과 부족 확인'
-            },
-            {
-                id: 2,
-                partNumber: 'DEF002',
-                inspectionDate: '2024-01-15',
-                inspectionTime: '15:20:00',
-                beforeDbStock: 200,
-                physicalStock: 200,
-                difference: 0,
-                afterDbStock: 200,
-                status: '일치',
-                inspector: '이영희',
-                modificationDate: null,
-                modificationReason: null
-            },
-            {
-                id: 3,
-                partNumber: 'GHI003',
-                inspectionDate: '2024-01-15',
-                inspectionTime: '16:10:00',
-                beforeDbStock: 300,
-                physicalStock: 295,
-                difference: -5,
-                afterDbStock: 300,
-                status: '불일치',
-                inspector: '박민수',
-                modificationDate: null,
-                modificationReason: null
-            },
-            {
-                id: 4,
-                partNumber: 'MNO005',
-                inspectionDate: '2024-01-14',
-                inspectionTime: '13:45:00',
-                beforeDbStock: 100,
-                physicalStock: 98,
-                difference: -2,
-                afterDbStock: 98,
-                status: '수정됨',
-                inspector: '정수민',
-                modificationDate: '2024-01-14 15:30:00',
-                modificationReason: '실사 후 재고 조정'
-            },
-            {
-                id: 5,
-                partNumber: 'VWX008',
-                inspectionDate: '2024-01-13',
-                inspectionTime: '16:20:00',
-                beforeDbStock: 80,
-                physicalStock: 82,
-                difference: 2,
-                afterDbStock: 82,
-                status: '수정됨',
-                inspector: '박민수',
-                modificationDate: '2024-01-13 17:45:00',
-                modificationReason: '실사 결과 초과 확인'
-            },
-            {
-                id: 6,
-                partNumber: 'ABC001',
-                inspectionDate: '2024-01-10',
-                inspectionTime: '10:15:00',
-                beforeDbStock: 150,
-                physicalStock: 150,
-                difference: 0,
-                afterDbStock: 150,
-                status: '일치',
-                inspector: '김철수',
-                modificationDate: null,
-                modificationReason: null
-            },
-            {
-                id: 7,
-                partNumber: 'GHI003',
-                inspectionDate: '2024-01-08',
-                inspectionTime: '14:20:00',
-                beforeDbStock: 300,
-                physicalStock: 300,
-                difference: 0,
-                afterDbStock: 300,
-                status: '일치',
-                inspector: '박민수',
-                modificationDate: null,
-                modificationReason: null
-            },
-            {
-                id: 8,
-                partNumber: 'JKL004',
-                inspectionDate: '2024-01-12',
-                inspectionTime: '09:30:00',
-                beforeDbStock: 50,
-                physicalStock: 52,
-                difference: 2,
-                afterDbStock: 52,
-                status: '수정됨',
-                inspector: '최지영',
-                modificationDate: '2024-01-12 11:15:00',
-                modificationReason: '실사 결과 초과 확인'
-            },
-            {
-                id: 9,
-                partNumber: 'PQR006',
-                inspectionDate: '2024-01-11',
-                inspectionTime: '14:45:00',
-                beforeDbStock: 75,
-                physicalStock: 75,
-                difference: 0,
-                afterDbStock: 75,
-                status: '일치',
-                inspector: '김철수',
-                modificationDate: null,
-                modificationReason: null
-            },
-            {
-                id: 10,
-                partNumber: 'STU007',
-                inspectionDate: '2024-01-09',
-                inspectionTime: '16:30:00',
-                beforeDbStock: 120,
-                physicalStock: 118,
-                difference: -2,
-                afterDbStock: 118,
-                status: '수정됨',
-                inspector: '이영희',
-                modificationDate: '2024-01-09 17:45:00',
-                modificationReason: '실사 결과 부족 확인'
-            },
-            {
-                id: 11,
-                partNumber: 'ABC001',
-                inspectionDate: '2024-01-05',
-                inspectionTime: '11:20:00',
-                beforeDbStock: 150,
-                physicalStock: 150,
-                difference: 0,
-                afterDbStock: 150,
-                status: '일치',
-                inspector: '김철수',
-                modificationDate: null,
-                modificationReason: null
-            },
-            {
-                id: 12,
-                partNumber: 'DEF002',
-                inspectionDate: '2024-01-03',
-                inspectionTime: '13:15:00',
-                beforeDbStock: 200,
-                physicalStock: 200,
-                difference: 0,
-                afterDbStock: 200,
-                status: '일치',
-                inspector: '이영희',
-                modificationDate: null,
-                modificationReason: null
-            }
-        ];
+        
+        const timeElement = document.getElementById('currentTime');
+        if (timeElement) {
+            timeElement.textContent = timeString;
+        }
     }
 
     // 이벤트 리스너 설정
     setupEventListeners() {
         // 필터 이벤트
-        document.getElementById('partFilter').addEventListener('input', () => this.applyFilters());
-        document.getElementById('statusFilter').addEventListener('change', () => this.applyFilters());
-        document.getElementById('dateFilter').addEventListener('change', () => this.applyFilters());
+        const partFilter = document.getElementById('partFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        const dateFilter = document.getElementById('dateFilter');
 
-        // 실사 이력 날짜 필터 이벤트
-        document.getElementById('filterHistoryBtn').addEventListener('click', () => this.applyHistoryFilters());
-        document.getElementById('clearHistoryFilterBtn').addEventListener('click', () => this.clearHistoryFilters());
+        if (partFilter) {
+            partFilter.addEventListener('input', () => this.applyFilters());
+        }
+        if (statusFilter) {
+            statusFilter.addEventListener('change', () => this.applyFilters());
+        }
+        if (dateFilter) {
+            dateFilter.addEventListener('change', () => this.applyFilters());
+        }
+
+        // 이력 필터 이벤트
+        const filterHistoryBtn = document.getElementById('filterHistoryBtn');
+        const clearHistoryFilterBtn = document.getElementById('clearHistoryFilterBtn');
+
+        if (filterHistoryBtn) {
+            filterHistoryBtn.addEventListener('click', () => this.applyHistoryFilters());
+        }
+        if (clearHistoryFilterBtn) {
+            clearHistoryFilterBtn.addEventListener('click', () => this.clearHistoryFilters());
+        }
 
         // 내보내기 버튼
-        document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.exportData());
+        }
 
-        // 모달 닫기 버튼들
-        document.getElementById('closeHistoryModal').addEventListener('click', () => this.closeHistoryModal());
-        document.getElementById('closeEditModal').addEventListener('click', () => this.closeEditModal());
-        document.getElementById('cancelEdit').addEventListener('click', () => this.closeEditModal());
+        // 모달 이벤트
+        const closeHistoryModal = document.getElementById('closeHistoryModal');
+        const closeEditModal = document.getElementById('closeEditModal');
+        const cancelEdit = document.getElementById('cancelEdit');
+
+        if (closeHistoryModal) {
+            closeHistoryModal.addEventListener('click', () => this.closeHistoryModal());
+        }
+        if (closeEditModal) {
+            closeEditModal.addEventListener('click', () => this.closeEditModal());
+        }
+        if (cancelEdit) {
+            cancelEdit.addEventListener('click', () => this.closeEditModal());
+        }
 
         // 수정 폼 제출
-        document.getElementById('editForm').addEventListener('submit', (e) => this.handleEditSubmit(e));
+        const editForm = document.getElementById('editForm');
+        if (editForm) {
+            editForm.addEventListener('submit', (e) => this.handleEditSubmit(e));
+        }
 
-        // 모달 외부 클릭 시 닫기
-        window.addEventListener('click', (e) => {
-            if (e.target.id === 'historyModal') this.closeHistoryModal();
-            if (e.target.id === 'editModal') this.closeEditModal();
-        });
+        // 현재 시간 업데이트
+        setInterval(() => this.updateCurrentTime(), 1000);
     }
 
     // 필터 적용
     applyFilters() {
-        const partFilter = document.getElementById('partFilter').value.toLowerCase();
-        const statusFilter = document.getElementById('statusFilter').value;
-        const dateFilter = document.getElementById('dateFilter').value;
+        const partFilter = document.getElementById('partFilter')?.value.toLowerCase() || '';
+        const statusFilter = document.getElementById('statusFilter')?.value || '';
+        const dateFilter = document.getElementById('dateFilter')?.value || '';
 
         this.filteredData = this.physicalInventoryData.filter(item => {
-            const matchesPart = item.partNumber.toLowerCase().includes(partFilter);
-            const matchesStatus = !statusFilter || item.status === statusFilter;
-            const matchesDate = !dateFilter || item.inspectionDate === dateFilter;
+            const matchesPart = !partFilter || item.part_number.toLowerCase().includes(partFilter);
+            const matchesStatus = !statusFilter || item.status.toLowerCase() === statusFilter.toLowerCase();
+            const matchesDate = !dateFilter || item.session_date === dateFilter;
 
             return matchesPart && matchesStatus && matchesDate;
         });
@@ -514,14 +432,16 @@ class PhysicalInventoryManager {
 
     // 테이블 렌더링
     renderTable() {
-        const tbody = document.getElementById('physicalInventoryTable');
-        tbody.innerHTML = '';
+        const tableBody = document.getElementById('physicalInventoryTable');
+        if (!tableBody) return;
+
+        tableBody.innerHTML = '';
 
         if (this.filteredData.length === 0) {
-            tbody.innerHTML = `
+            tableBody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
-                        데이터가 없습니다.
+                    <td colspan="7" class="px-6 py-4 text-center text-white/60">
+                        실사 데이터가 없습니다.
                     </td>
                 </tr>
             `;
@@ -530,255 +450,210 @@ class PhysicalInventoryManager {
 
         this.filteredData.forEach(item => {
             const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50';
+            row.className = 'hover:bg-white/5 transition-colors duration-200';
             
             const statusClass = this.getStatusClass(item.status);
-            const differenceClass = item.difference > 0 ? 'text-green-600' : 
-                                  item.difference < 0 ? 'text-red-600' : 'text-gray-600';
+            const statusText = this.getStatusText(item.status);
+            const differenceClass = item.difference > 0 ? 'text-green-300' : item.difference < 0 ? 'text-red-300' : 'text-white/80';
+            const differenceText = item.difference > 0 ? `+${item.difference}` : item.difference.toString();
 
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${item.partNumber}
+                <td class="px-6 py-4 text-sm text-white/90">${item.part_number}</td>
+                <td class="px-6 py-4 text-sm text-white/80">${item.db_stock}</td>
+                <td class="px-6 py-4 text-sm text-white/80">${item.physical_stock}</td>
+                <td class="px-6 py-4 text-sm ${differenceClass}">${differenceText}</td>
+                <td class="px-6 py-4 text-sm">
+                    <span class="px-2 py-1 text-xs rounded-full ${statusClass}">${statusText}</span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.dbStock.toLocaleString()}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.physicalStock.toLocaleString()}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${differenceClass}">
-                    ${item.difference > 0 ? '+' : ''}${item.difference}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
-                        ${this.getStatusText(item.status)}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.inspectionDate} ${item.inspectionTime}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <td class="px-6 py-4 text-sm text-white/70">${new Date(item.created_at).toLocaleString('ko-KR')}</td>
+                <td class="px-6 py-4 text-sm">
                     <div class="flex space-x-2">
-                        ${item.history.length > 0 ? `
-                            <button onclick="physicalInventoryManager.showHistory(${item.id})" 
-                                    class="text-blue-600 hover:text-blue-900">
-                                <i class="fas fa-history"></i>
+                        <button onclick="physicalInventoryManager.showHistory(${item.id})" class="text-blue-300 hover:text-blue-200">
+                            <i class="fas fa-history"></i>
+                        </button>
+                        ${item.status === 'DIFFERENCE' ? `
+                            <button onclick="physicalInventoryManager.showEditModal(${item.id})" class="text-yellow-300 hover:text-yellow-200">
+                                <i class="fas fa-edit"></i>
                             </button>
                         ` : ''}
-                        <button onclick="physicalInventoryManager.showEditModal(${item.id})" 
-                                class="text-green-600 hover:text-green-900">
-                            <i class="fas fa-edit"></i>
-                        </button>
                     </div>
                 </td>
             `;
-            tbody.appendChild(row);
+            
+            tableBody.appendChild(row);
         });
     }
 
-    // 상태별 클래스 반환
+    // 상태 클래스 반환
     getStatusClass(status) {
-        switch (status) {
-            case 'matched': return 'bg-green-100 text-green-800';
-            case 'mismatched': return 'bg-red-100 text-red-800';
-            case 'modified': return 'bg-yellow-100 text-yellow-800';
-            default: return 'bg-gray-100 text-gray-800';
+        switch (status.toLowerCase()) {
+            case 'matched':
+                return 'bg-green-500/20 text-green-300';
+            case 'difference':
+                return 'bg-red-500/20 text-red-300';
+            case 'adjusted':
+                return 'bg-yellow-500/20 text-yellow-300';
+            case 'pending':
+                return 'bg-gray-500/20 text-gray-300';
+            default:
+                return 'bg-gray-500/20 text-gray-300';
         }
     }
 
-    // 상태별 텍스트 반환
+    // 상태 텍스트 반환
     getStatusText(status) {
-        switch (status) {
-            case 'matched': return '일치';
-            case 'mismatched': return '불일치';
-            case 'modified': return '수정됨';
-            default: return '알 수 없음';
+        switch (status.toLowerCase()) {
+            case 'matched':
+                return '일치';
+            case 'difference':
+                return '불일치';
+            case 'adjusted':
+                return '조정됨';
+            case 'pending':
+                return '대기';
+            default:
+                return status;
         }
     }
 
     // 통계 업데이트
     updateStatistics() {
-        const total = this.filteredData.length;
-        const matched = this.filteredData.filter(item => item.status === 'matched').length;
-        const mismatched = this.filteredData.filter(item => item.status === 'mismatched').length;
-        const modified = this.filteredData.filter(item => item.status === 'modified').length;
+        const totalItems = this.filteredData.length;
+        const matchedItems = this.filteredData.filter(item => item.status === 'MATCHED').length;
+        const mismatchedItems = this.filteredData.filter(item => item.status === 'DIFFERENCE').length;
+        const modifiedItems = this.filteredData.filter(item => item.status === 'ADJUSTED').length;
 
-        document.getElementById('totalItems').textContent = total;
-        document.getElementById('matchedItems').textContent = matched;
-        document.getElementById('mismatchedItems').textContent = mismatched;
-        document.getElementById('modifiedItems').textContent = modified;
+        document.getElementById('totalItems').textContent = totalItems;
+        document.getElementById('matchedItems').textContent = matchedItems;
+        document.getElementById('mismatchedItems').textContent = mismatchedItems;
+        document.getElementById('modifiedItems').textContent = modifiedItems;
     }
 
-    // 실사 이력 필터 적용
+    // 이력 필터 적용
     applyHistoryFilters() {
-        const startDate = document.getElementById('historyStartDate').value;
-        const endDate = document.getElementById('historyEndDate').value;
+        const startDate = document.getElementById('historyStartDate')?.value || '';
+        const endDate = document.getElementById('historyEndDate')?.value || '';
 
-        let filteredHistory = [...this.physicalInventoryHistory];
+        let filteredHistory = this.physicalInventoryHistory;
 
         if (startDate || endDate) {
-            filteredHistory = filteredHistory.filter(item => {
-                const itemDate = new Date(item.inspectionDate);
-                const start = startDate ? new Date(startDate) : null;
-                const end = endDate ? new Date(endDate) : null;
-
-                if (start && end) {
-                    return itemDate >= start && itemDate <= end;
-                } else if (start) {
-                    return itemDate >= start;
-                } else if (end) {
-                    return itemDate <= end;
-                }
-                return true;
+            filteredHistory = this.physicalInventoryHistory.filter(item => {
+                const itemDate = new Date(item.created_at).toISOString().split('T')[0];
+                const matchesStart = !startDate || itemDate >= startDate;
+                const matchesEnd = !endDate || itemDate <= endDate;
+                return matchesStart && matchesEnd;
             });
         }
 
         this.renderHistoryTable(filteredHistory);
-        this.updateHistoryCount(filteredHistory.length, startDate || endDate);
+        this.updateHistoryCount(filteredHistory.length, true);
     }
 
-    // 실사 이력 필터 초기화
+    // 이력 필터 초기화
     clearHistoryFilters() {
         document.getElementById('historyStartDate').value = '';
         document.getElementById('historyEndDate').value = '';
         this.renderHistoryTable();
-        this.updateHistoryCount(this.physicalInventoryHistory.length, false);
+        this.updateHistoryCount(this.physicalInventoryHistory.length);
     }
 
-    // 실사 이력 개수 업데이트
+    // 이력 개수 업데이트
     updateHistoryCount(count, isFiltered = false) {
-        const totalCountElement = document.getElementById('totalHistoryCount');
-        const historyCountElement = document.getElementById('historyCount');
+        const historyCountElement = document.getElementById('totalHistoryCount');
+        const historyCountText = document.getElementById('historyCount');
         
-        totalCountElement.textContent = count;
+        if (historyCountElement) {
+            historyCountElement.textContent = count;
+        }
         
-        if (isFiltered) {
-            historyCountElement.innerHTML = `검색 결과: <span id="totalHistoryCount">${count}</span>건의 실사 이력`;
-            historyCountElement.className = 'text-sm text-green-600 mt-1';
-        } else {
-            historyCountElement.innerHTML = `총 <span id="totalHistoryCount">${count}</span>건의 실사 이력`;
-            historyCountElement.className = 'text-sm text-blue-600 mt-1';
+        if (historyCountText) {
+            if (isFiltered) {
+                historyCountText.innerHTML = i18n.t('total_inventory_history_filtered', { count });
+            } else {
+                historyCountText.innerHTML = i18n.t('total_inventory_history', { count });
+            }
         }
     }
 
-    // 실사 이력 테이블 렌더링
+    // 이력 테이블 렌더링
     renderHistoryTable(filteredData = null) {
-        const tbody = document.getElementById('physicalInventoryHistoryTable');
-        tbody.innerHTML = '';
+        const tableBody = document.getElementById('physicalInventoryHistoryTable');
+        if (!tableBody) return;
 
-        const dataToRender = filteredData || this.physicalInventoryHistory;
+        const data = filteredData || this.physicalInventoryHistory;
+        tableBody.innerHTML = '';
 
-        if (dataToRender.length === 0) {
-            tbody.innerHTML = `
+        if (data.length === 0) {
+            tableBody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
-                        ${filteredData ? '검색 조건에 맞는 실사 이력이 없습니다.' : '실사 이력이 없습니다.'}
+                    <td colspan="7" class="px-6 py-4 text-center text-white/60">
+                        실사 이력이 없습니다.
                     </td>
                 </tr>
             `;
             return;
         }
 
-        // 날짜순으로 정렬 (최신순)
-        const sortedHistory = [...dataToRender].sort((a, b) => {
-            const dateA = new Date(`${a.inspectionDate} ${a.inspectionTime}`);
-            const dateB = new Date(`${b.inspectionDate} ${b.inspectionTime}`);
-            return dateB - dateA;
-        });
-
-        sortedHistory.forEach(item => {
+        data.forEach(item => {
             const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50';
+            row.className = 'hover:bg-white/5 transition-colors duration-200';
             
-            const statusClass = this.getHistoryStatusClass(item.status);
-            const differenceClass = item.difference > 0 ? 'text-green-600' : 
-                                  item.difference < 0 ? 'text-red-600' : 'text-gray-600';
+            const adjustmentClass = item.adjustment_quantity > 0 ? 'text-green-300' : 'text-red-300';
+            const adjustmentText = item.adjustment_quantity > 0 ? `+${item.adjustment_quantity}` : item.adjustment_quantity.toString();
 
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${item.partNumber}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.inspectionDate} ${item.inspectionTime}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.beforeDbStock.toLocaleString()}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.physicalStock.toLocaleString()}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${differenceClass}">
-                    ${item.difference > 0 ? '+' : ''}${item.difference}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.afterDbStock.toLocaleString()}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
-                        ${item.status}
-                    </span>
+                <td class="px-6 py-4 text-sm text-white/90">${item.part_number}</td>
+                <td class="px-6 py-4 text-sm text-white/70">${new Date(item.created_at).toLocaleString('ko-KR')}</td>
+                <td class="px-6 py-4 text-sm text-white/80">${item.original_stock}</td>
+                <td class="px-6 py-4 text-sm text-white/80">${item.adjusted_stock}</td>
+                <td class="px-6 py-4 text-sm ${adjustmentClass}">${adjustmentText}</td>
+                <td class="px-6 py-4 text-sm text-white/80">${item.adjusted_stock}</td>
+                <td class="px-6 py-4 text-sm">
+                    <span class="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-300">조정됨</span>
                 </td>
             `;
-            tbody.appendChild(row);
+            
+            tableBody.appendChild(row);
         });
     }
 
-    // 이력 상태별 클래스 반환
-    getHistoryStatusClass(status) {
-        switch (status) {
-            case '일치': return 'bg-green-100 text-green-800';
-            case '불일치': return 'bg-red-100 text-red-800';
-            case '수정됨': return 'bg-yellow-100 text-yellow-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
-    }
-
-    // 히스토리 모달 표시
+    // 이력 모달 표시
     showHistory(itemId) {
         const item = this.physicalInventoryData.find(item => item.id === itemId);
         if (!item) return;
 
         const historyContent = document.getElementById('historyContent');
-        if (item.history.length === 0) {
-            historyContent.innerHTML = '<p class="text-gray-500 text-center py-4">수정 히스토리가 없습니다.</p>';
-        } else {
-            let historyHTML = `
-                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <h4 class="font-medium text-gray-900 mb-2">${item.partNumber} - ${item.partName}</h4>
-                    <p class="text-sm text-gray-600">현재 DB 재고: ${item.dbStock}개</p>
+        const historyModal = document.getElementById('historyModal');
+
+        if (historyContent && historyModal) {
+            historyContent.innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-medium text-gray-900 mb-2">파트 정보</h4>
+                        <p><strong>파트 번호:</strong> ${item.part_number}</p>
+                        <p><strong>DB 재고:</strong> ${item.db_stock}</p>
+                        <p><strong>실사 재고:</strong> ${item.physical_stock}</p>
+                        <p><strong>차이:</strong> ${item.difference > 0 ? '+' : ''}${item.difference}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-gray-900 mb-2">실사 정보</h4>
+                        <p><strong>실사일시:</strong> ${new Date(item.created_at).toLocaleString('ko-KR')}</p>
+                        <p><strong>상태:</strong> ${this.getStatusText(item.status)}</p>
+                        ${item.notes ? `<p><strong>비고:</strong> ${item.notes}</p>` : ''}
+                    </div>
                 </div>
-                <div class="space-y-3">
             `;
 
-            item.history.forEach(history => {
-                historyHTML += `
-                    <div class="border-l-4 border-blue-500 pl-4 py-2">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <p class="text-sm font-medium text-gray-900">
-                                    ${history.oldStock}개 → ${history.newStock}개
-                                </p>
-                                <p class="text-sm text-gray-600 mt-1">${history.reason}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-xs text-gray-500">${history.date}</p>
-                                <p class="text-xs text-gray-500">수정자: ${history.modifier}</p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            historyHTML += '</div>';
-            historyContent.innerHTML = historyHTML;
+            historyModal.classList.remove('hidden');
         }
-
-        document.getElementById('historyModal').classList.remove('hidden');
     }
 
-    // 히스토리 모달 닫기
+    // 이력 모달 닫기
     closeHistoryModal() {
-        document.getElementById('historyModal').classList.add('hidden');
+        const historyModal = document.getElementById('historyModal');
+        if (historyModal) {
+            historyModal.classList.add('hidden');
+        }
     }
 
     // 수정 모달 표시
@@ -788,247 +663,158 @@ class PhysicalInventoryManager {
 
         this.currentEditItem = item;
 
-        document.getElementById('editPartNumber').value = item.partNumber;
-        document.getElementById('editCurrentStock').value = item.dbStock;
-        document.getElementById('editPhysicalStock').value = item.physicalStock;
-        document.getElementById('editNewStock').value = item.dbStock;
-        document.getElementById('editReason').value = '';
+        const editPartNumber = document.getElementById('editPartNumber');
+        const editCurrentStock = document.getElementById('editCurrentStock');
+        const editPhysicalStock = document.getElementById('editPhysicalStock');
+        const editNewStock = document.getElementById('editNewStock');
+        const editReason = document.getElementById('editReason');
+        const editModal = document.getElementById('editModal');
 
-        document.getElementById('editModal').classList.remove('hidden');
+        if (editPartNumber && editCurrentStock && editPhysicalStock && editNewStock && editReason && editModal) {
+            editPartNumber.value = item.part_number;
+            editCurrentStock.value = item.db_stock;
+            editPhysicalStock.value = item.physical_stock;
+            editNewStock.value = item.physical_stock;
+            editReason.value = '';
+
+            editModal.classList.remove('hidden');
+        }
     }
 
     // 수정 모달 닫기
     closeEditModal() {
-        document.getElementById('editModal').classList.add('hidden');
+        const editModal = document.getElementById('editModal');
+        if (editModal) {
+            editModal.classList.add('hidden');
+        }
         this.currentEditItem = null;
-        document.getElementById('editForm').reset();
     }
 
     // 수정 폼 제출 처리
-    handleEditSubmit(e) {
+    async handleEditSubmit(e) {
         e.preventDefault();
 
-        if (!this.currentEditItem) return;
+        if (!this.currentEditItem) {
+            this.showNotification('수정할 항목이 선택되지 않았습니다.', 'error');
+            return;
+        }
 
         const newStock = parseInt(document.getElementById('editNewStock').value);
-        const reason = document.getElementById('editReason').value.trim();
+        const reason = document.getElementById('editReason').value;
 
-        if (!reason) {
+        if (!newStock || newStock < 0) {
+            this.showNotification('유효한 재고 수량을 입력해주세요.', 'error');
+            return;
+        }
+
+        if (!reason.trim()) {
             this.showNotification('수정 사유를 입력해주세요.', 'error');
             return;
         }
 
-        // 히스토리 추가
-        const historyEntry = {
-            date: new Date().toLocaleString('ko-KR', {timeZone: 'America/Chicago'}),
-            oldStock: this.currentEditItem.dbStock,
-            newStock: newStock,
-            reason: reason,
-            modifier: '관리자'
-        };
-
-        this.currentEditItem.history.push(historyEntry);
-        this.currentEditItem.dbStock = newStock;
-        this.currentEditItem.difference = this.currentEditItem.physicalStock - newStock;
-        
-        // 상태 업데이트: 실사 재고와 DB 재고가 일치하면 'matched', 아니면 'modified'
-        if (this.currentEditItem.physicalStock === newStock) {
-            this.currentEditItem.status = 'matched';
-        } else {
-            this.currentEditItem.status = 'modified';
+        try {
+            const success = await this.adjustPhysicalItem(this.currentEditItem.id, newStock, reason);
+            
+            if (success) {
+                this.showNotification('재고가 성공적으로 수정되었습니다.', 'success');
+                this.closeEditModal();
+            } else {
+                this.showNotification('재고 수정 중 오류가 발생했습니다.', 'error');
+            }
+        } catch (error) {
+            console.error('재고 수정 오류:', error);
+            this.showNotification('재고 수정 중 오류가 발생했습니다.', 'error');
         }
-
-        // 필터링된 데이터도 업데이트
-        const filteredIndex = this.filteredData.findIndex(item => item.id === this.currentEditItem.id);
-        if (filteredIndex !== -1) {
-            this.filteredData[filteredIndex] = { ...this.currentEditItem };
-        }
-
-        // 실사 이력에 기록 추가
-        const historyRecord = {
-            id: this.physicalInventoryHistory.length + 1,
-            partNumber: this.currentEditItem.partNumber,
-            inspectionDate: this.currentEditItem.inspectionDate,
-            inspectionTime: this.currentEditItem.inspectionTime,
-            beforeDbStock: this.currentEditItem.dbStock,
-            physicalStock: this.currentEditItem.physicalStock,
-            difference: this.currentEditItem.physicalStock - this.currentEditItem.dbStock,
-            afterDbStock: newStock,
-            status: this.currentEditItem.physicalStock === newStock ? '일치' : '수정됨',
-            inspector: this.currentEditItem.inspector,
-            modificationDate: new Date().toLocaleString('ko-KR', {timeZone: 'America/Chicago'}),
-            modificationReason: reason
-        };
-        this.physicalInventoryHistory.push(historyRecord);
-
-        this.closeEditModal();
-        this.renderTable();
-        this.renderHistoryTable();
-        this.updateStatistics();
-        this.showNotification('재고가 성공적으로 수정되었습니다.', 'success');
     }
 
     // 데이터 내보내기
     exportData() {
-        const format = document.getElementById('exportFormat').value;
+        const exportFormat = document.getElementById('exportFormat')?.value || 'csv';
         
-        if (format === 'csv') {
+        if (exportFormat === 'csv') {
             this.exportToCSV();
-        } else if (format === 'excel') {
+        } else if (exportFormat === 'excel') {
             this.exportToExcel();
         }
     }
 
     // CSV 내보내기
     exportToCSV() {
-        const headers = ['파트 번호', '파트명', 'DB 재고', '실사 재고', '차이', '상태', '실사자', '실사일시'];
+        const headers = ['파트 번호', 'DB 재고', '실사 재고', '차이', '상태', '실사일시', '비고'];
         const csvContent = [
-            '\ufeff' + headers.join(','),
+            headers.join(','),
             ...this.filteredData.map(item => [
-                item.partNumber,
-                item.partName,
-                item.dbStock,
-                item.physicalStock,
+                item.part_number,
+                item.db_stock,
+                item.physical_stock,
                 item.difference,
                 this.getStatusText(item.status),
-                item.inspector,
-                `${item.inspectionDate} ${item.inspectionTime}`
+                new Date(item.created_at).toLocaleString('ko-KR'),
+                item.notes || ''
             ].join(','))
         ].join('\n');
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `실사재고_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
+        link.href = URL.createObjectURL(blob);
+        link.download = `실사재고_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
-        document.body.removeChild(link);
     }
 
     // Excel 내보내기
     exportToExcel() {
         const workbook = XLSX.utils.book_new();
-
-        // 메인 데이터 시트
-        const mainData = this.filteredData.map(item => ({
-            '파트 번호': item.partNumber,
-            '파트명': item.partName,
-            'DB 재고': item.dbStock,
-            '실사 재고': item.physicalStock,
+        
+        // 실사 데이터 시트
+        const physicalData = this.filteredData.map(item => ({
+            '파트 번호': item.part_number,
+            'DB 재고': item.db_stock,
+            '실사 재고': item.physical_stock,
             '차이': item.difference,
             '상태': this.getStatusText(item.status),
-            '실사자': item.inspector,
-            '실사일시': `${item.inspectionDate} ${item.inspectionTime}`
+            '실사일시': new Date(item.created_at).toLocaleString('ko-KR'),
+            '비고': item.notes || ''
         }));
-
-        const mainWorksheet = XLSX.utils.json_to_sheet(mainData);
         
-        // 테이블 스타일 적용
-        const range = XLSX.utils.decode_range(mainWorksheet['!ref']);
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-            const address = XLSX.utils.encode_col(C) + "1";
-            if (!mainWorksheet[address]) continue;
-            mainWorksheet[address].s = {
-                fill: { fgColor: { rgb: "4472C4" } },
-                font: { color: { rgb: "FFFFFF" }, bold: true }
-            };
-        }
+        const physicalWorksheet = XLSX.utils.json_to_sheet(physicalData);
+        XLSX.utils.book_append_sheet(workbook, physicalWorksheet, '실사재고');
 
-        XLSX.utils.book_append_sheet(workbook, mainWorksheet, '실사재고');
-
-        // 수정 히스토리 시트
-        const modificationHistoryData = [];
-        this.filteredData.forEach(item => {
-            if (item.history.length > 0) {
-                item.history.forEach(history => {
-                    modificationHistoryData.push({
-                        '파트 번호': item.partNumber,
-                        '파트명': item.partName,
-                        '이전 재고': history.oldStock,
-                        '수정 재고': history.newStock,
-                        '수정 사유': history.reason,
-                        '수정자': history.modifier,
-                        '수정일시': history.date
-                    });
-                });
-            }
-        });
-
-        if (modificationHistoryData.length > 0) {
-            const modificationHistoryWorksheet = XLSX.utils.json_to_sheet(modificationHistoryData);
-            
-            // 수정 히스토리 테이블 스타일 적용
-            const modificationHistoryRange = XLSX.utils.decode_range(modificationHistoryWorksheet['!ref']);
-            for (let C = modificationHistoryRange.s.c; C <= modificationHistoryRange.e.c; ++C) {
-                const address = XLSX.utils.encode_col(C) + "1";
-                if (!modificationHistoryWorksheet[address]) continue;
-                modificationHistoryWorksheet[address].s = {
-                    fill: { fgColor: { rgb: "FF6B6B" } },
-                    font: { color: { rgb: "FFFFFF" }, bold: true }
-                };
-            }
-
-            XLSX.utils.book_append_sheet(workbook, modificationHistoryWorksheet, '수정히스토리');
-        }
-
-        // 실사 이력 시트
-        const physicalHistoryData = this.physicalInventoryHistory.map(item => ({
-            '파트 번호': item.partNumber,
-            '실사일시': `${item.inspectionDate} ${item.inspectionTime}`,
-            '실사 전 DB 재고': item.beforeDbStock,
-            '실사 재고': item.physicalStock,
-            '차이': item.difference,
-            '수정 후 DB 재고': item.afterDbStock,
-            '상태': item.status,
-            '실사자': item.inspector,
-            '수정일시': item.modificationDate || '-',
-            '수정사유': item.modificationReason || '-'
+        // 이력 데이터 시트
+        const historyData = this.physicalInventoryHistory.map(item => ({
+            '파트 번호': item.part_number,
+            '조정일시': new Date(item.created_at).toLocaleString('ko-KR'),
+            '조정 전 재고': item.original_stock,
+            '조정 후 재고': item.adjusted_stock,
+            '조정 수량': item.adjustment_quantity,
+            '조정 사유': item.reason || '',
+            '조정자': item.adjusted_by
         }));
-
-        if (physicalHistoryData.length > 0) {
-            const physicalHistoryWorksheet = XLSX.utils.json_to_sheet(physicalHistoryData);
-            
-            // 실사 이력 테이블 스타일 적용
-            const physicalHistoryRange = XLSX.utils.decode_range(physicalHistoryWorksheet['!ref']);
-            for (let C = physicalHistoryRange.s.c; C <= physicalHistoryRange.e.c; ++C) {
-                const address = XLSX.utils.encode_col(C) + "1";
-                if (!physicalHistoryWorksheet[address]) continue;
-                physicalHistoryWorksheet[address].s = {
-                    fill: { fgColor: { rgb: "4CAF50" } },
-                    font: { color: { rgb: "FFFFFF" }, bold: true }
-                };
-            }
-
-            XLSX.utils.book_append_sheet(workbook, physicalHistoryWorksheet, '실사이력');
-        }
+        
+        const historyWorksheet = XLSX.utils.json_to_sheet(historyData);
+        XLSX.utils.book_append_sheet(workbook, historyWorksheet, '조정이력');
 
         // 파일 다운로드
         XLSX.writeFile(workbook, `실사재고_${new Date().toISOString().split('T')[0]}.xlsx`);
-        this.showNotification('Excel 파일이 성공적으로 내보내졌습니다.', 'success');
     }
 
     // 알림 표시
     showNotification(message, type = 'info') {
+        // 간단한 알림 구현
         const notification = document.createElement('div');
-        notification.className = `fixed bottom-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+        notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
             type === 'success' ? 'bg-green-500 text-white' :
             type === 'error' ? 'bg-red-500 text-white' :
             'bg-blue-500 text-white'
         }`;
         notification.textContent = message;
-
+        
         document.body.appendChild(notification);
-
+        
         setTimeout(() => {
             notification.remove();
         }, 3000);
     }
 }
 
-// 페이지 로드 시 초기화
-let physicalInventoryManager;
-document.addEventListener('DOMContentLoaded', () => {
-    physicalInventoryManager = new PhysicalInventoryManager();
-}); 
+// 전역 인스턴스 생성
+const physicalInventoryManager = new PhysicalInventoryManager(); 

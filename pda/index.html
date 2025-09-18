@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>PDA - 바코드 시스템</title>
+    <title data-i18n="pda_system">PDA - 이화 - 서한 시스템</title>
+    
+    <!-- Supabase 클라이언트 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- i18n 스크립트 -->
+    <script src="../js/i18n.js"></script>
     
     <!-- 개발 환경에서만 Tailwind CDN 사용 -->
     <script>
@@ -91,15 +97,16 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             min-height: 100vh;
             overflow-x: hidden;
         }
         
         .glass-effect {
-            background: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
         
         .glass-card {
@@ -192,26 +199,125 @@
         .floating-icon {
             animation: float 3s ease-in-out infinite;
         }
+        
+        .language-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .language-btn {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 25px;
+            padding: 8px 16px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .language-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: none;
+        }
+        
+        .language-dropdown.show {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .language-option {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .language-option:last-child {
+            border-bottom: none;
+        }
+        
+        .language-option:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .language-option.active {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        
+        /* Physical Inventory Button Styles */
+        .physical-inventory-btn {
+            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .physical-inventory-btn:hover {
+            background: linear-gradient(135deg, #7C3AED 0%, #9333EA 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+        }
     </style>
 </head>
 <body>
+    <!-- 언어 선택기 -->
+    <div class="language-selector">
+        <button class="language-btn" onclick="toggleLanguageDropdown()">
+            <i class="fas fa-globe mr-2"></i>
+            <span id="currentLanguage">한국어</span>
+            <i class="fas fa-chevron-down ml-2"></i>
+        </button>
+        <div class="language-dropdown" id="languageDropdown">
+            <div class="language-option active" onclick="changeLanguage('ko')">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="korean">한국어</span>
+            </div>
+            <div class="language-option" onclick="changeLanguage('en')">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="english">English</span>
+            </div>
+            <div class="language-option" onclick="changeLanguage('es')">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="spanish">Español</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="glass-effect p-4">
         <div class="flex items-center justify-between">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 animate-bounce-in">
+                <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mr-3 animate-bounce-in">
                     <i class="fas fa-barcode text-white text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-white">PDA 시스템</h1>
-                    <p class="text-xs text-white/80">모바일 작업 환경</p>
+                    <h1 class="text-lg font-bold text-gray-800" data-i18n="pda_system">PDA 시스템</h1>
+                    <p class="text-xs text-gray-600" data-i18n="mobile_work_env">모바일 작업 환경</p>
                 </div>
             </div>
             <div class="flex items-center space-x-2">
-                <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                    <i class="fas fa-user text-white text-sm"></i>
+                <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-gray-600 text-sm"></i>
                 </div>
-                <button onclick="logout()" class="text-white/80 hover:text-white transition-colors">
+                <button onclick="logout()" class="text-gray-600 hover:text-gray-800 transition-colors">
                     <i class="fas fa-sign-out-alt text-sm"></i>
                 </button>
             </div>
@@ -225,8 +331,8 @@
             <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 floating-icon">
                 <i class="fas fa-mobile-alt text-white text-2xl"></i>
             </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-2">안녕하세요!</h2>
-            <p class="text-gray-600 text-sm">작업할 모드를 선택하세요</p>
+            <h2 class="text-xl font-bold text-gray-800 mb-2" data-i18n="hello">안녕하세요!</h2>
+            <p class="text-gray-600 text-sm" data-i18n="select_work_mode">작업할 모드를 선택하세요</p>
         </div>
 
         <!-- Main Action Buttons -->
@@ -239,8 +345,8 @@
                         <i class="fas fa-arrow-down text-white text-xl"></i>
                     </div>
                     <div class="text-left">
-                        <h3 class="text-lg font-bold">입고 작업</h3>
-                        <p class="text-sm opacity-90">새로운 물품 입고 처리</p>
+                        <h3 class="text-lg font-bold" data-i18n="inbound_work">입고 작업</h3>
+                        <p class="text-sm opacity-90" data-i18n="new_item_inbound">새로운 물품 입고 처리</p>
                     </div>
                     <div class="ml-auto">
                         <i class="fas fa-chevron-right text-white/60"></i>
@@ -256,8 +362,8 @@
                         <i class="fas fa-arrow-up text-white text-xl"></i>
                     </div>
                     <div class="text-left">
-                        <h3 class="text-lg font-bold">출고 작업</h3>
-                        <p class="text-sm opacity-90">물품 출고 및 배송 처리</p>
+                        <h3 class="text-lg font-bold" data-i18n="outbound_work">출고 작업</h3>
+                        <p class="text-sm opacity-90" data-i18n="item_outbound_delivery">물품 출고 및 배송 처리</p>
                     </div>
                     <div class="ml-auto">
                         <i class="fas fa-chevron-right text-white/60"></i>
@@ -265,160 +371,90 @@
                 </div>
             </button>
 
-            <!-- Inventory Button -->
-            <button onclick="window.location.href='inventory.html'" 
-                    class="action-button inventory-btn p-6 text-white menu-item">
+            <!-- Physical Inventory Button -->
+            <button onclick="window.location.href='physical-inventory.html'" 
+                    class="action-button physical-inventory-btn p-6 text-white menu-item">
                 <div class="flex items-center">
                     <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
-                        <i class="fas fa-boxes text-white text-xl"></i>
+                        <i class="fas fa-clipboard-check text-white text-xl"></i>
                     </div>
                     <div class="text-left">
-                        <h3 class="text-lg font-bold">재고 확인</h3>
-                        <p class="text-sm opacity-90">현재 재고 현황 조회</p>
+                        <h3 class="text-lg font-bold" data-i18n="physical_inventory">실사 재고</h3>
+                        <p class="text-sm opacity-90" data-i18n="physical_inventory_desc">바코드 스캔 및 수동 등록</p>
                     </div>
                     <div class="ml-auto">
                         <i class="fas fa-chevron-right text-white/60"></i>
                     </div>
                 </div>
             </button>
-        </div>
-
-        <!-- Status Cards -->
-        <div class="grid grid-cols-2 gap-4 animate-slide-up" style="animation-delay: 0.2s;">
-            <!-- Today's Inbound -->
-            <div class="status-card p-4 text-center">
-                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <i class="fas fa-arrow-down text-green-600 text-sm"></i>
-                </div>
-                <h3 class="text-sm font-medium text-gray-600">오늘 입고</h3>
-                <p class="text-xl font-bold text-gray-800" id="todayInbound">0</p>
-            </div>
-
-            <!-- Today's Outbound -->
-            <div class="status-card p-4 text-center">
-                <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <i class="fas fa-arrow-up text-orange-600 text-sm"></i>
-                </div>
-                <h3 class="text-sm font-medium text-gray-600">오늘 출고</h3>
-                <p class="text-xl font-bold text-gray-800" id="todayOutbound">0</p>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="glass-card rounded-2xl p-6 animate-slide-up" style="animation-delay: 0.3s;">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">빠른 작업</h3>
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="scanBarcode()" 
-                        class="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors menu-item">
-                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-                        <i class="fas fa-barcode text-blue-600 text-lg"></i>
-                    </div>
-                    <span class="text-sm font-medium text-gray-700">바코드 스캔</span>
-                </button>
-                
-                <button onclick="searchPart()" 
-                        class="flex flex-col items-center p-4 bg-green-50 rounded-xl hover:bg-green-100 transition-colors menu-item">
-                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
-                        <i class="fas fa-search text-green-600 text-lg"></i>
-                    </div>
-                    <span class="text-sm font-medium text-gray-700">파트 검색</span>
-                </button>
-                
-                <button onclick="checkLocation()" 
-                        class="flex flex-col items-center p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors menu-item">
-                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-2">
-                        <i class="fas fa-map-marker-alt text-purple-600 text-lg"></i>
-                    </div>
-                    <span class="text-sm font-medium text-gray-700">위치 확인</span>
-                </button>
-                
-                <button onclick="showHistory()" 
-                        class="flex flex-col items-center p-4 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition-colors menu-item">
-                    <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mb-2">
-                        <i class="fas fa-history text-yellow-600 text-lg"></i>
-                    </div>
-                    <span class="text-sm font-medium text-gray-700">작업 기록</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- System Status -->
-        <div class="glass-card rounded-2xl p-6 animate-slide-up" style="animation-delay: 0.4s;">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">시스템 상태</h3>
-            <div class="space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">서버 연결</span>
-                    <div class="flex items-center">
-                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2 pulse-animation"></div>
-                        <span class="text-sm font-medium text-green-600">정상</span>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">데이터베이스</span>
-                    <div class="flex items-center">
-                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                        <span class="text-sm font-medium text-green-600">정상</span>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600">마지막 동기화</span>
-                    <span class="text-sm text-gray-500" id="lastSync">방금 전</span>
-                </div>
-            </div>
         </div>
     </main>
 
+    <!-- 하단 고정 홈 버튼 -->
+    <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <button onclick="window.location.href='../login.html'" 
+                class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-8 py-4 rounded-full shadow-lg flex items-center space-x-2 transition-all duration-300 transform hover:scale-105">
+            <i class="fas fa-home text-xl"></i>
+            <span class="font-semibold" data-i18n="logout">로그아웃</span>
+        </button>
+    </div>
+
     <script>
+        // 언어 선택기 토글
+        function toggleLanguageDropdown() {
+            const dropdown = document.getElementById('languageDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // 언어 변경
+        function changeLanguage(lang) {
+            // 언어 설정
+            i18n.setLanguage(lang);
+            
+            // 현재 언어 표시 업데이트
+            const currentLanguageElement = document.getElementById('currentLanguage');
+            const languageNames = {
+                'ko': '한국어',
+                'en': 'English',
+                'es': 'Español'
+            };
+            currentLanguageElement.textContent = languageNames[lang];
+            
+            // 드롭다운 닫기
+            document.getElementById('languageDropdown').classList.remove('show');
+            
+            // 활성 옵션 업데이트
+            document.querySelectorAll('.language-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
         // 로그아웃 함수
         function logout() {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('userInfo');
-            localStorage.removeItem('userMode');
+            // 로그아웃 로직 구현
+            alert(i18n.t('logout_success'));
             window.location.href = '../login.html';
         }
 
-        // 바코드 스캔 함수
-        function scanBarcode() {
-            // 실제 구현에서는 카메라 API 사용
-            alert('바코드 스캔 기능을 시작합니다.');
-        }
-
-        // 파트 검색 함수
-        function searchPart() {
-            // 실제 구현에서는 검색 모달 표시
-            alert('파트 검색 기능을 시작합니다.');
-        }
-
-        // 위치 확인 함수
-        function checkLocation() {
-            // 실제 구현에서는 위치 정보 표시
-            alert('현재 위치를 확인합니다.');
-        }
-
-        // 작업 기록 함수
-        function showHistory() {
-            // 실제 구현에서는 기록 페이지로 이동
-            alert('작업 기록을 확인합니다.');
-        }
-
-        // 페이지 로드 시 애니메이션
-        document.addEventListener('DOMContentLoaded', function() {
-            // 데모 데이터 로드
-            document.getElementById('todayInbound').textContent = '12';
-            document.getElementById('todayOutbound').textContent = '8';
-            
-            // 마지막 동기화 시간 업데이트
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('ko-KR', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            document.getElementById('lastSync').textContent = timeString;
+        // 페이지 외부 클릭 시 드롭다운 닫기
+        document.addEventListener('click', function(event) {
+            const languageSelector = document.querySelector('.language-selector');
+            if (!languageSelector.contains(event.target)) {
+                document.getElementById('languageDropdown').classList.remove('show');
+            }
         });
 
-        // 터치 이벤트 최적화
-        document.addEventListener('touchstart', function() {}, {passive: true});
-        document.addEventListener('touchmove', function() {}, {passive: true});
+        // 페이지 로드 시 현재 언어 표시 업데이트
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentLanguage = i18n.currentLanguage;
+            const languageNames = {
+                'ko': '한국어',
+                'en': 'English',
+                'es': 'Español'
+            };
+            document.getElementById('currentLanguage').textContent = languageNames[currentLanguage];
+        });
     </script>
 </body>
 </html> 

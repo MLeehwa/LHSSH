@@ -9,27 +9,38 @@ const initializeSupabase = () => {
     // Supabase 라이브러리 확인
     if (typeof window !== 'undefined' && window.supabase) {
         try {
+            // config.js에서 설정 가져오기
+            const config = window.getCurrentConfig ? window.getCurrentConfig() : {
+                url: 'https://vzemucykhxlxgjuldibf.supabase.co',
+                anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
+            };
+            
             supabaseClient = window.supabase.createClient(
-                'https://vzemucykhxlxgjuldibf.supabase.co',
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
+                config.url,
+                config.anonKey,
+                {
+                    auth: {
+                        persistSession: false,
+                        autoRefreshToken: false,
+                        detectSessionInUrl: false
+                    },
+                    db: {
+                        schema: 'public'
+                    },
+                    global: {
+                        headers: {
+                            'apikey': config.anonKey
+                        }
+                    }
+                }
             );
             console.log('Supabase 클라이언트 초기화 성공');
         } catch (error) {
             console.error('Supabase 클라이언트 초기화 실패:', error);
-            // 개발 환경에서는 더미 데이터 사용
-            if (window.NODE_ENV === 'development') {
-                console.warn('개발 환경: Supabase 대신 더미 데이터 사용');
-                return createDummySupabase();
-            }
-            throw new Error('Supabase 클라이언트 초기화 실패');
+            throw error;
         }
     } else {
         console.warn('Supabase 라이브러리가 로드되지 않았습니다.');
-        // 개발 환경에서는 더미 데이터 사용
-        if (window.NODE_ENV === 'development') {
-            console.warn('개발 환경: Supabase 대신 더미 데이터 사용');
-            return createDummySupabase();
-        }
         throw new Error('Supabase 라이브러리가 로드되지 않았습니다.');
     }
     return supabaseClient;
@@ -128,7 +139,7 @@ class DatabaseService {
         if (window.showNotification) {
             window.showNotification(message, type);
         } else {
-            alert(message);
+            alert(i18n.t('error_prefix') + message);
         }
     }
 }
@@ -178,13 +189,13 @@ class PartService extends DatabaseService {
         }
     }
 
-    async deletePart(id) {
+    async deletePart(partNumber) {
         try {
             const { error } = await this.supabase
                 .from('parts')
                 .delete()
-                .eq('id', id);
-            
+                .eq('part_number', partNumber);
+
             if (error) throw error;
             return true;
         } catch (error) {
@@ -245,7 +256,7 @@ class OutboundService extends DatabaseService {
             const { data, error } = await this.supabase
                 .from('outbound_sequences')
                 .select('*')
-                .order('date', { ascending: false });
+                .order('outbound_date', { ascending: false });
             
             if (error) throw error;
             return data;
@@ -357,6 +368,8 @@ window.supabaseClient = initializeSupabase();
 window.DatabaseService = DatabaseService;
 window.PartService = PartService;
 window.InboundService = InboundService;
+// 전역 변수로 노출
+window.supabase = supabaseClient;
 window.OutboundService = OutboundService;
 window.InventoryService = InventoryService;
 window.partService = partService;

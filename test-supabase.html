@@ -4,212 +4,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supabase 연결 테스트</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
-        .success { background-color: #d4edda; border-color: #c3e6cb; }
-        .error { background-color: #f8d7da; border-color: #f5c6cb; }
-        .info { background-color: #d1ecf1; border-color: #bee5eb; }
-        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
-        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <h1>Supabase 연결 테스트</h1>
+    <div id="status"></div>
+    <div id="result"></div>
     
-    <div class="test-section info">
-        <h3>테스트 목적</h3>
-        <p>406 (Not Acceptable) 오류를 해결하기 위한 Supabase 연결 테스트</p>
-    </div>
-    
-    <div class="test-section">
-        <h3>1. 기본 연결 테스트</h3>
-        <button onclick="testBasicConnection()">기본 연결 테스트</button>
-        <div id="basicResult"></div>
-    </div>
-    
-    <div class="test-section">
-        <h3>2. 테이블 접근 테스트</h3>
-        <button onclick="testTableAccess()">arn_containers 테이블 접근</button>
-        <div id="tableResult"></div>
-    </div>
-    
-    <div class="test-section">
-        <h3>3. 헤더 테스트</h3>
-        <button onclick="testWithHeaders()">헤더 포함 연결 테스트</button>
-        <div id="headerResult"></div>
-    </div>
-    
-    <div class="test-section">
-        <h3>4. 상세 오류 정보</h3>
-        <button onclick="testDetailedError()">상세 오류 정보 확인</button>
-        <div id="detailedResult"></div>
-    </div>
-
     <script>
-        const SUPABASE_URL = 'https://vzemucykhxlxgjuldibf.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ';
-
-        function logResult(elementId, message, isSuccess = true) {
-            const element = document.getElementById(elementId);
-            element.innerHTML = `<pre class="${isSuccess ? 'success' : 'error'}">${message}</pre>`;
-        }
-
-        async function testBasicConnection() {
-            try {
-                console.log('기본 연결 테스트 시작...');
-                
-                const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                console.log('Supabase 클라이언트 생성됨:', client);
-                
-                const { data, error } = await client.from('arn_containers').select('*').limit(1);
-                
-                if (error) {
-                    console.error('기본 연결 테스트 실패:', error);
-                    logResult('basicResult', `❌ 실패\n오류 코드: ${error.code}\n오류 메시지: ${error.message}\n상세 정보: ${JSON.stringify(error, null, 2)}`, false);
-                } else {
-                    console.log('기본 연결 테스트 성공:', data);
-                    logResult('basicResult', `✅ 성공\n데이터: ${JSON.stringify(data, null, 2)}`);
-                }
-            } catch (error) {
-                console.error('기본 연결 테스트 중 예외:', error);
-                logResult('basicResult', `❌ 예외 발생\n${error.message}`, false);
-            }
-        }
-
-        async function testTableAccess() {
-            try {
-                console.log('테이블 접근 테스트 시작...');
-                
-                const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                
-                // 다양한 쿼리 시도
-                const queries = [
-                    { name: '전체 선택', query: client.from('arn_containers').select('*').limit(1) },
-                    { name: '특정 컬럼 선택', query: client.from('arn_containers').select('arn_number, container_number').limit(1) },
-                    { name: '카운트 쿼리', query: client.from('arn_containers').select('*', { count: 'exact' }) }
-                ];
-                
-                let results = '';
-                
-                for (const queryTest of queries) {
-                    try {
-                        const { data, error } = await queryTest.query;
-                        
-                        if (error) {
-                            results += `❌ ${queryTest.name} 실패: ${error.code} - ${error.message}\n`;
-                        } else {
-                            results += `✅ ${queryTest.name} 성공: ${JSON.stringify(data)}\n`;
-                        }
-                    } catch (err) {
-                        results += `❌ ${queryTest.name} 예외: ${err.message}\n`;
-                    }
-                }
-                
-                logResult('tableResult', results);
-            } catch (error) {
-                console.error('테이블 접근 테스트 중 예외:', error);
-                logResult('tableResult', `❌ 예외 발생\n${error.message}`, false);
-            }
-        }
-
-        async function testWithHeaders() {
-            try {
-                console.log('헤더 포함 연결 테스트 시작...');
-                
-                const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    auth: {
-                        autoRefreshToken: true,
-                        persistSession: true,
-                        detectSessionInUrl: false
-                    },
-                    global: {
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                });
-                
-                console.log('헤더 포함 클라이언트 생성됨:', client);
-                
-                const { data, error } = await client.from('arn_containers').select('*').limit(1);
-                
-                if (error) {
-                    console.error('헤더 포함 연결 테스트 실패:', error);
-                    logResult('headerResult', `❌ 실패\n오류 코드: ${error.code}\n오류 메시지: ${error.message}\n상세 정보: ${JSON.stringify(error, null, 2)}`, false);
-                } else {
-                    console.log('헤더 포함 연결 테스트 성공:', data);
-                    logResult('headerResult', `✅ 성공\n데이터: ${JSON.stringify(data, null, 2)}`);
-                }
-            } catch (error) {
-                console.error('헤더 포함 연결 테스트 중 예외:', error);
-                logResult('headerResult', `❌ 예외 발생\n${error.message}`, false);
-            }
-        }
-
-        async function testDetailedError() {
-            try {
-                console.log('상세 오류 정보 확인 시작...');
-                
-                const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                
-                // 다양한 오류 시나리오 테스트
-                const tests = [
-                    {
-                        name: '존재하지 않는 테이블',
-                        query: client.from('non_existent_table').select('*')
-                    },
-                    {
-                        name: '존재하지 않는 컬럼',
-                        query: client.from('arn_containers').select('non_existent_column')
-                    },
-                    {
-                        name: '잘못된 조건',
-                        query: client.from('arn_containers').select('*').eq('invalid_column', 'value')
-                    }
-                ];
-                
-                let results = '상세 오류 정보 테스트:\n\n';
-                
-                for (const test of tests) {
-                    try {
-                        const { data, error } = await test.query;
-                        
-                        if (error) {
-                            results += `❌ ${test.name}:\n`;
-                            results += `   코드: ${error.code}\n`;
-                            results += `   메시지: ${error.message}\n`;
-                            results += `   상세: ${JSON.stringify(error, null, 2)}\n\n`;
-                        } else {
-                            results += `✅ ${test.name}: 성공\n\n`;
-                        }
-                    } catch (err) {
-                        results += `❌ ${test.name} 예외: ${err.message}\n\n`;
-                    }
-                }
-                
-                logResult('detailedResult', results);
-            } catch (error) {
-                console.error('상세 오류 정보 확인 중 예외:', error);
-                logResult('detailedResult', `❌ 예외 발생\n${error.message}`, false);
-            }
-        }
-
-        // 페이지 로드 시 자동 테스트
-        window.addEventListener('load', function() {
-            console.log('페이지 로드 완료');
-            console.log('Supabase 객체 확인:', typeof supabase);
+        const supabaseUrl = 'https://vzemucykhxlxgjuldibf.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ';
+        
+        let supabase;
+        
+        async function testSupabase() {
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
             
-            if (typeof supabase !== 'undefined') {
-                console.log('Supabase CDN 로드 성공');
-                document.body.innerHTML += '<div class="test-section success"><h3>✅ Supabase 라이브러리 로드 성공</h3></div>';
-            } else {
-                console.error('Supabase CDN 로드 실패');
-                document.body.innerHTML += '<div class="test-section error"><h3>❌ Supabase 라이브러리 로드 실패</h3></div>';
+            try {
+                // Supabase 클라이언트 초기화
+                if (window.supabase) {
+                    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+                    statusDiv.innerHTML = '<p style="color: green;">✓ Supabase 클라이언트 초기화 성공</p>';
+                } else {
+                    throw new Error('Supabase 라이브러리가 로드되지 않았습니다.');
+                }
+                
+                // parts 테이블 테스트
+                const { data: partsData, error: partsError } = await supabase
+                    .from('parts')
+                    .select('part_number, description')
+                    .limit(5);
+                
+                if (partsError) throw partsError;
+                
+                resultDiv.innerHTML = '<h3>Parts 테이블 테스트:</h3>';
+                resultDiv.innerHTML += '<p style="color: green;">✓ Parts 테이블 조회 성공</p>';
+                resultDiv.innerHTML += '<pre>' + JSON.stringify(partsData, null, 2) + '</pre>';
+                
+                // physical_inventory_sessions 테이블 테스트
+                const { data: sessionsData, error: sessionsError } = await supabase
+                    .from('physical_inventory_sessions')
+                    .select('*')
+                    .limit(3);
+                
+                if (sessionsError) throw sessionsError;
+                
+                resultDiv.innerHTML += '<h3>Physical Inventory Sessions 테이블 테스트:</h3>';
+                resultDiv.innerHTML += '<p style="color: green;">✓ Sessions 테이블 조회 성공</p>';
+                resultDiv.innerHTML += '<pre>' + JSON.stringify(sessionsData, null, 2) + '</pre>';
+                
+            } catch (error) {
+                statusDiv.innerHTML = '<p style="color: red;">✗ 오류 발생: ' + error.message + '</p>';
+                resultDiv.innerHTML = '<pre style="color: red;">' + error.stack + '</pre>';
             }
-        });
+        }
+        
+        // 페이지 로드 시 테스트 실행
+        document.addEventListener('DOMContentLoaded', testSupabase);
     </script>
 </body>
 </html> 

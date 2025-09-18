@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>초기 재고 설정 - 이화 - 서한 시스템</title>
+    
+    <!-- 개발 환경에서만 Tailwind CDN 사용 -->
+    <script>
+        // 개발 환경 확인
+        const isDevelopment = window.location.hostname === 'localhost' || 
+                             window.location.hostname === '127.0.0.1' || 
+                             window.location.hostname === '';
+        
+        if (isDevelopment) {
+            document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="../css/tailwind.css">
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/supabase-client.js"></script>
+</head>
+<body class="admin-gradient-bg min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="admin-glass-sidebar w-64 flex flex-col">
+            <!-- Logo & Title -->
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                        <i class="fas fa-warehouse text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-800">이화 서한</h1>
+                        <p class="text-sm text-gray-600">재고 관리 시스템</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 px-4 py-6">
+                <div class="space-y-2">
+                    <!-- Dashboard -->
+                    <a href="index.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
+                        <span>대시보드</span>
+                    </a>
+
+                    <!-- Part Registration -->
+                    <a href="part-registration.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-plus-circle w-5 h-5 mr-3"></i>
+                        <span>파트 등록</span>
+                    </a>
+
+                    <!-- Inventory Status -->
+                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-boxes w-5 h-5 mr-3"></i>
+                        <span>재고 현황</span>
+                    </a>
+
+                    <!-- Inbound Status -->
+                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
+                        <span>입고 현황</span>
+                    </a>
+
+                    <!-- Outbound Status -->
+                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
+                        <span>출고 현황</span>
+                    </a>
+
+                    <!-- Outbound Summary -->
+                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
+                        <span>출하 현황</span>
+                    </a>
+
+                    <!-- Physical Inventory -->
+                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
+                        <span>실사재고</span>
+                    </a>
+
+                    <!-- Daily Inventory -->
+                    <a href="daily-inventory-enhanced.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-calendar-day w-5 h-5 mr-3"></i>
+                        <span>일일 재고</span>
+                    </a>
+
+                    <!-- Initial Inventory Setup -->
+                    <a href="initial-inventory-setup.html" class="nav-item active flex items-center px-4 py-3 text-gray-800">
+                        <i class="fas fa-database w-5 h-5 mr-3 text-blue-600"></i>
+                        <span class="font-medium">초기 재고 설정</span>
+                    </a>
+                </div>
+            </nav>
+
+            <!-- User Info & Current Time -->
+            <div class="absolute bottom-0 w-64 p-4 border-t border-gray-200">
+                <div class="flex items-center mb-3">
+                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-user text-gray-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-800">관리자</p>
+                        <p class="text-xs text-gray-600">Admin User</p>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-600">
+                    <i class="fas fa-clock mr-1"></i>
+                    <span id="currentTime"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="admin-glass-effect px-6 py-4 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800 animate-fade-in">초기 재고 설정</h1>
+                        <p class="text-gray-600">시스템 시작을 위한 초기 재고 데이터 입력</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
+                            <i class="fas fa-sign-out-alt mr-2"></i>
+                            로그아웃
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <!-- Warning Notice -->
+                <div class="admin-glass-effect rounded-xl border-2 border-yellow-200 mb-6 card-shadow bg-yellow-50">
+                    <div class="p-6">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-triangle text-yellow-600 text-xl mr-3"></i>
+                            <div>
+                                <h3 class="text-lg font-semibold text-yellow-800">주의사항</h3>
+                                <p class="text-yellow-700 mt-1">
+                                    이 페이지는 시스템 초기 설정을 위한 페이지입니다. 
+                                    기존 재고 데이터가 있다면 덮어쓰게 됩니다. 
+                                    신중하게 진행해주세요.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Setup Methods -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- CSV Upload Method -->
+                    <div class="admin-glass-effect rounded-xl border-2 border-gray-200 card-shadow">
+                        <div class="p-6">
+                            <div class="flex items-center mb-4">
+                                <i class="fas fa-file-csv text-blue-600 text-2xl mr-3"></i>
+                                <h3 class="text-xl font-semibold text-gray-800">CSV 파일 업로드</h3>
+                            </div>
+                            <p class="text-gray-600 mb-4">
+                                CSV 파일을 업로드하여 대량의 초기 재고 데이터를 한 번에 입력할 수 있습니다.
+                            </p>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">기준 날짜 선택</label>
+                                    <input type="date" id="referenceDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <p class="text-xs text-gray-500 mt-1">선택한 날짜의 마감 재고를 기준으로 초기 재고를 설정합니다.</p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">CSV 파일 선택</label>
+                                    <input type="file" id="csvFile" accept=".csv" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                
+                                <div class="flex space-x-2">
+                                    <button id="uploadCsvBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center justify-center">
+                                        <i class="fas fa-upload mr-2"></i>
+                                        업로드
+                                    </button>
+                                    <button id="downloadTemplateBtn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-all duration-200 flex items-center">
+                                        <i class="fas fa-download mr-2"></i>
+                                        템플릿 다운로드
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Entry Method -->
+                    <div class="admin-glass-effect rounded-xl border-2 border-gray-200 card-shadow">
+                        <div class="p-6">
+                            <div class="flex items-center mb-4">
+                                <i class="fas fa-keyboard text-green-600 text-2xl mr-3"></i>
+                                <h3 class="text-xl font-semibold text-gray-800">수동 입력</h3>
+                            </div>
+                            <p class="text-gray-600 mb-4">
+                                개별 파트의 초기 재고를 직접 입력할 수 있습니다.
+                            </p>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">기준 날짜 선택</label>
+                                    <input type="date" id="manualReferenceDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <p class="text-xs text-gray-500 mt-1">선택한 날짜의 마감 재고를 기준으로 초기 재고를 설정합니다.</p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">파트 번호</label>
+                                    <select id="partSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="">파트를 선택하세요</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">초기 재고 수량</label>
+                                    <input type="number" id="initialStock" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="초기 재고 수량 입력">
+                                </div>
+                                
+                                <button id="addInitialStockBtn" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center justify-center">
+                                    <i class="fas fa-plus mr-2"></i>
+                                    추가
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Initial Stock List -->
+                <div class="admin-glass-effect rounded-xl border-2 border-gray-200 card-shadow">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">초기 재고 목록</h3>
+                            <div class="flex space-x-2">
+                                <button id="clearAllBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-all duration-200 flex items-center">
+                                    <i class="fas fa-trash mr-2"></i>
+                                    전체 삭제
+                                </button>
+                                <button id="saveInitialStockBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center">
+                                    <i class="fas fa-save mr-2"></i>
+                                    초기 재고 저장
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">파트 번호</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">카테고리</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">초기 재고</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="initialStockTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- 초기 재고 목록이 JavaScript로 생성됨 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div id="emptyState" class="text-center py-8 text-gray-500" style="display: none;">
+                            <i class="fas fa-inbox text-4xl mb-4"></i>
+                            <p>아직 입력된 초기 재고가 없습니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <div class="flex items-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-4"></div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">처리 중...</h3>
+                    <p class="text-gray-600">잠시만 기다려주세요.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <div class="text-center">
+                <i class="fas fa-check-circle text-green-600 text-4xl mb-4"></i>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">성공!</h3>
+                <p class="text-gray-600 mb-4">초기 재고가 성공적으로 설정되었습니다.</p>
+                <button onclick="closeSuccessModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200">
+                    확인
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-red-600 text-4xl mb-4"></i>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">오류 발생</h3>
+                <p id="errorMessage" class="text-gray-600 mb-4">처리 중 오류가 발생했습니다.</p>
+                <button onclick="closeErrorModal()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-all duration-200">
+                    확인
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/initial-inventory-setup.js"></script>
+</body>
+</html>

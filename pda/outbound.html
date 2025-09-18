@@ -3,9 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>출고처리</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title data-i18n="outbound_title">출고 작업 - 이화 - 서한 시스템</title>
+    
+    <!-- Supabase 클라이언트 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- i18n 스크립트 -->
+    <script src="../js/i18n.js"></script>
+    
+    <!-- Supabase 설정 -->
+    <script src="../js/config.js"></script>
+    
+    <!-- 개발 환경에서만 Tailwind CDN 사용 -->
+    <script>
+        // 개발 환경 확인
+        const isDevelopment = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' || 
+                            window.location.protocol === 'file:';
+        
+        if (isDevelopment) {
+            // 개발 환경에서는 CDN 사용
+            const script = document.createElement('script');
+            script.src = 'https://cdn.tailwindcss.com';
+            document.head.appendChild(script);
+        } else {
+            // 프로덕션 환경에서는 로컬 CSS 사용
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '../css/tailwind.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        // Tailwind 설정은 CDN 로드 후에 실행
+        function configureTailwind() {
+            if (window.tailwind) {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#3B82F6',
+                                secondary: '#64748B',
+                                success: '#10B981',
+                                warning: '#F59E0B',
+                                danger: '#EF4444'
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-in-out',
+                                'slide-up': 'slideUp 0.5s ease-out',
+                                'bounce-in': 'bounceIn 0.6s ease-out',
+                                'float': 'float 3s ease-in-out infinite',
+                                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0' },
+                                    '100%': { opacity: '1' }
+                                },
+                                slideUp: {
+                                    '0%': { transform: 'translateY(20px)', opacity: '0' },
+                                    '100%': { transform: 'translateY(0)', opacity: '1' }
+                                },
+                                bounceIn: {
+                                    '0%': { transform: 'scale(0.3)', opacity: '0' },
+                                    '50%': { transform: 'scale(1.05)' },
+                                    '70%': { transform: 'scale(0.9)' },
+                                    '100%': { transform: 'scale(1)', opacity: '1' }
+                                },
+                                float: {
+                                    '0%, 100%': { transform: 'translateY(0px)' },
+                                    '50%': { transform: 'translateY(-10px)' }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // CDN이 아직 로드되지 않았다면 잠시 후 다시 시도
+                setTimeout(configureTailwind, 100);
+            }
+        }
+        
+        // 페이지 로드 시 Tailwind 설정
+        document.addEventListener('DOMContentLoaded', configureTailwind);
+    </script>
     <style>
         /* PDA 최적화 스타일 */
         * {
@@ -22,6 +105,12 @@
             overflow-x: hidden;
         }
         
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
         .glass-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -29,13 +118,28 @@
         }
         
         .action-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
             border: none;
-            border-radius: 16px;
+            border-radius: 20px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
+        }
+        
+        .action-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .action-button:active::before {
+            left: 100%;
         }
         
         .action-button:active {
@@ -43,746 +147,1186 @@
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }
         
-        .save-btn {
-            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
         }
         
-        .reset-btn {
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        .cancel-btn {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
         }
         
-        .home-btn {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        }
-        
-        .part-row {
-            transition: all 0.3s ease;
+        .dropdown-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
             border-radius: 12px;
-            margin-bottom: 8px;
+            font-size: 16px;
+            background: white;
+            transition: all 0.3s ease;
         }
         
-        .part-row.completed {
-            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-            border: 2px solid #22c55e;
-        }
-        
-        .part-row.incomplete {
-            background: rgba(255, 255, 255, 0.9);
-            border: 2px solid #e5e7eb;
-        }
-        
-        .part-row.disabled {
-            background: rgba(239, 68, 68, 0.1);
-            border: 2px solid #ef4444;
-            opacity: 0.7;
+        .dropdown-select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
         
         .scan-input {
-            background: rgba(144, 238, 144, 0.3);
-            border: 2px solid #90ee90;
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 16px;
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 18px;
+            text-align: center;
+            background: white;
             transition: all 0.3s ease;
         }
         
         .scan-input:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #f97316;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
         }
         
-        .dropdown {
-            background: rgba(255, 255, 255, 0.95);
-            border: 2px solid #e5e7eb;
+        .main-menu-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
             border-radius: 12px;
             padding: 12px;
+            color: white;
             font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+        }
+        
+        .main-menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+        }
+        
+        .main-menu-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .language-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .language-btn {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            padding: 8px 16px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
         
-        .dropdown:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        .language-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
         }
         
-        .pulse-animation {
-            animation: pulse 2s infinite;
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: none;
         }
         
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
+        .language-dropdown.show {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
         }
         
-        .floating-icon {
-            animation: float 3s ease-in-out infinite;
+        .language-option {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
         
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-5px); }
+        .language-option:last-child {
+            border-bottom: none;
+        }
+        
+        .language-option:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .language-option.active {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
+    <!-- 언어 선택기 -->
+    <div class="language-selector">
+        <button class="language-btn" onclick="toggleLanguageDropdown()">
+            <i class="fas fa-globe mr-2"></i>
+            <span id="currentLanguage">한국어</span>
+            <i class="fas fa-chevron-down ml-2"></i>
+        </button>
+        <div class="language-dropdown" id="languageDropdown">
+            <div class="language-option active" onclick="changeLanguage('ko')">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="korean">한국어</span>
+            </div>
+            <div class="language-option" onclick="changeLanguage('en')">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="english">English</span>
+            </div>
+            <div class="language-option" onclick="changeLanguage('es')">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="spanish">Español</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
-    <header class="glass-card shadow-lg">
-        <div class="flex items-center justify-between px-6 py-4">
+    <header class="glass-effect p-4">
+        <div class="flex items-center justify-between">
             <div class="flex items-center">
-                <button onclick="goHome()" class="w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-                    <i class="fas fa-arrow-left text-white text-lg"></i>
+                <button onclick="window.location.href='index.html'" class="main-menu-btn mr-3">
+                    <i class="fas fa-home text-lg"></i>
                 </button>
-                <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <i class="fas fa-arrow-up text-white text-xl"></i>
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3">
+                    <i class="fas fa-arrow-up text-white text-lg"></i>
                 </div>
-                <div class="ml-4">
-                    <h1 class="text-xl font-bold text-gray-800" data-i18n="outboundTitle">출고처리</h1>
-                    <p class="text-sm text-gray-600 font-medium" data-i18n="outboundSubtitle">재고 출고 관리</p>
+                <div>
+                    <h1 class="text-lg font-bold text-white" data-i18n="outbound_title">출고 작업</h1>
+                    <p class="text-xs text-white/80" data-i18n="outbound_subtitle">바코드 스캔 및 출고 등록</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-3">
-                <div class="text-right">
-                    <div class="text-xs text-gray-500 font-medium" data-i18n="currentTime">현재 시간</div>
-                    <div id="currentTime" class="text-lg font-bold text-gray-800 font-mono"></div>
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-white text-sm"></i>
                 </div>
+                <div class="text-white/80 text-sm" id="currentTime">00:00:00</div>
             </div>
         </div>
     </header>
 
     <!-- Main Content -->
-    <main class="p-6 space-y-6">
+    <main class="p-4 space-y-6">
         <!-- Date and Shift Selection -->
-        <div class="glass-card p-6 rounded-2xl">
-            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <i class="fas fa-calendar-alt text-blue-600 mr-3"></i>
-                <span data-i18n="dateShiftSelection">날짜 및 차수 선택</span>
-            </h3>
+        <div class="glass-card rounded-2xl p-6 animate-slide-up">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="date_shift_selection">날짜 및 차수 선택</h2>
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="date">날짜</label>
-                    <input type="date" id="dateSelect" class="dropdown w-full" onchange="updateOutboundInfo()">
+                    <input type="date" id="dateSelect" class="dropdown-select">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="shift">차수</label>
-                    <select id="shiftSelect" class="dropdown w-full" onchange="updateOutboundInfo()">
-                        <option value="" data-i18n="selectShift">차수를 선택하세요</option>
-                        <option value="1" data-i18n="shift1">1차</option>
-                        <option value="2" data-i18n="shift2">2차</option>
-                        <option value="3" data-i18n="shift3">3차</option>
+                    <select id="shiftSelect" class="dropdown-select">
+                        <option value="" data-i18n="select_shift">차수를 선택하세요</option>
+                        <option value="1" data-i18n="shift_1">1차</option>
+                        <option value="2" data-i18n="shift_2">2차</option>
+                        <option value="3" data-i18n="shift_3">3차</option>
+                        <option value="AS" data-i18n="shift_as">AS</option>
                     </select>
                 </div>
             </div>
         </div>
 
-        <!-- Barcode Scanner -->
-        <div class="glass-card p-6 rounded-2xl" id="scannerSection">
-            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <i class="fas fa-barcode text-purple-600 mr-3"></i>
-                <span data-i18n="barcodeScan">바코드 스캔</span>
-            </h3>
-            <div class="flex items-center space-x-4">
-                <input type="text" 
-                       id="barcodeInput" 
-                       class="flex-1 scan-input text-center text-xl font-bold" 
-                       placeholder="barcode"
-                       autocomplete="off"
-                       onkeypress="handleBarcodeScan(event)"
-                       oninput="handleBarcodeInput(event)"
-                       onfocus="this.select()">
-                <button onclick="clearBarcodeInput()" class="w-12 h-12 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <i class="fas fa-times text-white text-lg"></i>
-                </button>
-            </div>
-            <div class="mt-3 text-sm text-gray-600">
-                <i class="fas fa-info-circle mr-2"></i>
-                <span data-i18n="outboundScanInfo">스캔 후 자동으로 출고 목록에 추가됩니다</span>
-            </div>
-            
-            <!-- AS Button for Manual Registration -->
-            <div class="mt-4 pt-4 border-t border-gray-200">
-                <button id="asButton" onclick="openASModal()" class="w-full action-button bg-gradient-to-br from-purple-500 to-purple-600 h-12 flex items-center justify-center text-white font-bold rounded-xl">
-                    <i class="fas fa-plus-circle mr-2"></i>
-                    <span data-i18n="asManualRegistration">AS 수동 등록</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Scanned Parts List -->
-        <div class="glass-card p-6 rounded-2xl" id="partsSection" style="display: none;">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800 flex items-center">
-                    <i class="fas fa-boxes text-orange-600 mr-3"></i>
-                    <span data-i18n="outboundPartsList">출고 파트 목록</span>
-                </h3>
-                <div class="text-sm text-gray-600">
-                    <span data-i18n="totalParts">총</span> <span id="totalScanned">0</span><span data-i18n="parts">개 파트</span>
+        <!-- Confirmation Section -->
+        <div id="confirmationSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle text-red-600 text-xl mr-3"></i>
+                    <div>
+                        <h3 class="font-semibold text-red-800" data-i18n="all_parts_scanned">모든 파트 스캔 완료</h3>
+                        <p class="text-sm text-red-700" data-i18n="quantity_confirmed">수량이 확인되었습니다. 출고를 등록하시겠습니까?</p>
+                    </div>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="confirmOutbound()" class="action-button px-6 py-3 text-white">
+                        <i class="fas fa-check mr-2"></i><span data-i18n="confirm">확정</span>
+                    </button>
+                    <button onclick="cancelOutbound()" class="action-button cancel-btn px-6 py-3 text-white">
+                        <i class="fas fa-times mr-2"></i><span data-i18n="cancel">취소</span>
+                    </button>
                 </div>
             </div>
-            
-            <div id="partsList" class="space-y-3">
-                <!-- Parts will be loaded here -->
-            </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="grid grid-cols-3 gap-4" id="actionButtons" style="display: none;">
-            <button onclick="saveOutbound()" class="action-button save-btn h-16 flex flex-col items-center justify-center text-white font-bold">
-                <i class="fas fa-save text-xl mb-1"></i>
-                <span class="text-sm" data-i18n="save">저장</span>
-            </button>
-            
-            <button onclick="resetOutbound()" class="action-button reset-btn h-16 flex flex-col items-center justify-center text-white font-bold">
-                <i class="fas fa-undo text-xl mb-1"></i>
-                <span class="text-sm" data-i18n="reset">초기화</span>
-            </button>
-            
-            <button onclick="goHome()" class="action-button home-btn h-16 flex flex-col items-center justify-center text-white font-bold">
-                <i class="fas fa-home text-xl mb-1"></i>
-                <span class="text-sm" data-i18n="home">홈</span>
-            </button>
-        </div>
-
-        <!-- Status Message -->
-        <div id="statusMessage" class="glass-card p-4 rounded-xl text-center" style="display: none;">
-            <div id="statusText" class="text-lg font-bold"></div>
-        </div>
-    </main>
-
-    <!-- AS Manual Registration Modal -->
-    <div id="asModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
-        <div class="glass-card p-6 rounded-2xl w-11/12 max-w-md max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800 flex items-center">
-                    <i class="fas fa-plus-circle text-purple-600 mr-3"></i>
-                    <span data-i18n="asManualRegistration">AS 수동 등록</span>
-                </h3>
-                <button onclick="closeASModal()" class="w-8 h-8 bg-gray-500 text-white rounded-lg flex items-center justify-center">
-                    <i class="fas fa-times text-sm"></i>
-                </button>
-            </div>
-            
-            <!-- Part Input Form -->
+        <!-- Scan Section -->
+        <div id="scanSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="barcode_scan">바코드 스캔</h2>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="partNumber">파트 번호</label>
-                    <input type="text" id="asPartNumber" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none" placeholder="파트 번호 입력">
+                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="part_number_scan">파트 번호 스캔</label>
+                    <input type="text" id="barcodeInput" class="scan-input w-full" 
+                           data-i18n-placeholder="scan_barcode_placeholder"
+                           placeholder="바코드를 스캔하거나 파트 번호를 입력하세요" autocomplete="off">
+                </div>
+                <div class="flex justify-end">
+                    <button onclick="clearScan()" class="action-button cancel-btn px-6 py-3 text-white">
+                        <i class="fas fa-times mr-2"></i><span data-i18n="clear">초기화</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AS Manual Input Section (only visible for AS shift) -->
+        <div id="asManualSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="as_manual_input">AS 수동 입력</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="select_part_manual">파트 선택</label>
+                    <select id="asPartSelect" class="form-control w-full">
+                        <option value="" data-i18n="select_part_manual">파트를 선택하세요</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="quantity">수량</label>
-                    <input type="number" id="asQuantity" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none" placeholder="수량 입력" min="1">
+                    <input type="number" id="asQuantityInput" class="form-control w-full" 
+                           data-i18n-placeholder="quantity" placeholder="수량을 입력하세요" min="1">
                 </div>
-                <button onclick="addASPart()" class="w-full action-button bg-gradient-to-br from-purple-500 to-purple-600 h-12 flex items-center justify-center text-white font-bold rounded-xl">
-                    <i class="fas fa-plus mr-2"></i>
-                    <span data-i18n="addPart">파트 추가</span>
-                </button>
-            </div>
-            
-            <!-- Added Parts List -->
-            <div class="mt-6">
-                <h4 class="text-md font-bold text-gray-800 mb-3" data-i18n="addedParts">추가된 파트</h4>
-                <div id="asPartsList" class="space-y-2">
-                    <!-- Added parts will be displayed here -->
+                <div class="flex space-x-3">
+                    <button onclick="addAsPart()" class="action-button px-6 py-3 text-white flex-1">
+                        <i class="fas fa-plus mr-2"></i><span data-i18n="add">추가</span>
+                    </button>
+                    <button onclick="clearAsInput()" class="action-button cancel-btn px-6 py-3 text-white flex-1">
+                        <i class="fas fa-times mr-2"></i><span data-i18n="clear">초기화</span>
+                    </button>
                 </div>
-            </div>
-            
-            <!-- Modal Action Buttons -->
-            <div class="flex space-x-3 mt-6">
-                <button onclick="saveASParts()" class="flex-1 action-button save-btn h-12 flex items-center justify-center text-white font-bold rounded-xl">
-                    <i class="fas fa-save mr-2"></i>
-                    <span data-i18n="save">저장</span>
-                </button>
-                <button onclick="closeASModal()" class="flex-1 action-button reset-btn h-12 flex items-center justify-center text-white font-bold rounded-xl">
-                    <i class="fas fa-times mr-2"></i>
-                    <span data-i18n="cancel">취소</span>
-                </button>
             </div>
         </div>
+
+        <!-- Parts List -->
+        <div id="partsSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="outbound_parts_list">출고 파트 목록</h2>
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-600" data-i18n="part_number">파트 번호</th>
+                            <th class="px-4 py-3 text-center text-sm font-medium text-gray-600" data-i18n="scanned_quantity">스캔 수량</th>
+                            <th class="px-4 py-3 text-center text-sm font-medium text-gray-600">CART</th>
+                            <th class="px-4 py-3 text-center text-sm font-medium text-gray-600" data-i18n="status">상태</th>
+                        </tr>
+                    </thead>
+                    <tbody id="partsList" class="divide-y divide-gray-200">
+                        <!-- 파트 목록이 여기에 동적으로 추가됩니다 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Confirmation Section -->
+        <div id="confirmationSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="outbound_registration">출고 등록</h2>
+        </div>
+
+    </main>
+
+    <!-- 하단 고정 홈 버튼 -->
+    <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <button onclick="window.location.href='index.html'" 
+                class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-8 py-4 rounded-full shadow-lg flex items-center space-x-2 transition-all duration-300 transform hover:scale-105">
+            <i class="fas fa-home text-xl"></i>
+            <span class="font-semibold" data-i18n="main_menu">메인 메뉴</span>
+        </button>
     </div>
 
+    <!-- Supabase 설정 및 스크립트 -->
+    <script src="../js/config.js"></script>
     <script>
-        // 다중 언어 지원
-        const translations = {
-            ko: {
-                outboundTitle: '출고처리',
-                outboundSubtitle: '재고 출고 관리',
-                currentTime: '현재 시간',
-                dateShiftSelection: '날짜 및 차수 선택',
-                date: '날짜',
-                shift: '차수',
-                selectShift: '차수를 선택하세요',
-                shift1: '1차',
-                shift2: '2차',
-                shift3: '3차',
-                shiftAS: 'AS',
-                barcodeScan: '바코드 스캔',
-                outboundScanInfo: '스캔 후 자동으로 출고 목록에 추가됩니다',
-                outboundPartsList: '출고 파트 목록',
-                totalParts: '총',
-                parts: '개 파트',
-                save: '저장',
-                reset: '초기화',
-                home: '홈',
-                partNumber: '파트 번호',
-                outboundQuantity: '출고 수량',
-                removePart: '파트를 제거하시겠습니까?',
-                selectDateShift: '날짜와 차수를 선택해주세요.',
-                noOutboundParts: '출고할 파트가 없습니다.',
-                saveSuccess: '출고처리가 저장되었습니다.',
-                resetConfirm: '모든 데이터를 초기화하시겠습니까?',
-                unsavedData: '저장하지 않은 데이터가 있습니다. 홈으로 이동하시겠습니까?',
-                invalidBarcode: '잘못된 바코드 형식입니다.',
-                duplicateBox: '이미 스캔된 박스:',
-                quantityAdded: '수량 추가!',
-                totalQuantity: '총',
-                outboundRegistered: '출고 등록 완료!',
-                barcodeError: '바코드 처리 중 오류가 발생했습니다.',
-                asManualRegistration: 'AS 수동 등록',
-                addPart: '파트 추가',
-                addedParts: '추가된 파트',
-                cancel: '취소',
-                quantity: '수량',
-                partAdded: '파트가 성공적으로 추가되었습니다!',
-                invalidPartNumber: '유효한 파트 번호를 입력해주세요.',
-                invalidQuantity: '유효한 수량을 입력해주세요.',
-                noASParts: '저장할 AS 파트가 없습니다.',
-                asPartsSaved: 'AS 파트가 성공적으로 저장되었습니다!'
-            },
-            en: {
-                outboundTitle: 'Outbound Processing',
-                outboundSubtitle: 'Stock Outbound Management',
-                currentTime: 'Current Time',
-                dateShiftSelection: 'Date and Shift Selection',
-                date: 'Date',
-                shift: 'Shift',
-                selectShift: 'Please select a shift',
-                shift1: '1st Shift',
-                shift2: '2nd Shift',
-                shift3: '3rd Shift',
-                shiftAS: 'AS',
-                barcodeScan: 'Barcode Scan',
-                outboundScanInfo: 'Will be automatically added to outbound list after scanning',
-                outboundPartsList: 'Outbound Parts List',
-                totalParts: 'Total',
-                parts: 'parts',
-                save: 'Save',
-                reset: 'Reset',
-                home: 'Home',
-                partNumber: 'Part Number',
-                outboundQuantity: 'Outbound Qty',
-                removePart: 'Remove this part?',
-                selectDateShift: 'Please select date and shift.',
-                noOutboundParts: 'No parts to outbound.',
-                saveSuccess: 'Outbound processing has been saved.',
-                resetConfirm: 'Reset all data?',
-                unsavedData: 'There is unsaved data. Go to home?',
-                invalidBarcode: 'Invalid barcode format.',
-                duplicateBox: 'Already scanned box:',
-                quantityAdded: 'Quantity added!',
-                totalQuantity: 'Total',
-                outboundRegistered: 'Outbound registration complete!',
-                barcodeError: 'Error occurred while processing barcode.',
-                asManualRegistration: 'AS Manual Registration',
-                addPart: 'Add Part',
-                addedParts: 'Added Parts',
-                cancel: 'Cancel',
-                quantity: 'Quantity',
-                partAdded: 'Part added successfully!',
-                invalidPartNumber: 'Please enter a valid part number.',
-                invalidQuantity: 'Please enter a valid quantity.',
-                noASParts: 'No AS parts to save.',
-                asPartsSaved: 'AS parts saved successfully!'
-            },
-            es: {
-                outboundTitle: 'Procesamiento de Salida',
-                outboundSubtitle: 'Gestión de Salida de Inventario',
-                currentTime: 'Hora Actual',
-                dateShiftSelection: 'Selección de Fecha y Turno',
-                date: 'Fecha',
-                shift: 'Turno',
-                selectShift: 'Por favor seleccione un turno',
-                shift1: '1er Turno',
-                shift2: '2do Turno',
-                shift3: '3er Turno',
-                shiftAS: 'AS',
-                barcodeScan: 'Escaneo de Código de Barras',
-                outboundScanInfo: 'Se agregará automáticamente a la lista de salida después del escaneo',
-                outboundPartsList: 'Lista de Partes de Salida',
-                totalParts: 'Total',
-                parts: 'partes',
-                save: 'Guardar',
-                reset: 'Reiniciar',
-                home: 'Inicio',
-                partNumber: 'Número de Parte',
-                outboundQuantity: 'Cant. de Salida',
-                removePart: '¿Eliminar esta parte?',
-                selectDateShift: 'Por favor seleccione fecha y turno.',
-                noOutboundParts: 'No hay partes para salida.',
-                saveSuccess: 'El procesamiento de salida ha sido guardado.',
-                resetConfirm: '¿Reiniciar todos los datos?',
-                unsavedData: 'Hay datos sin guardar. ¿Ir al inicio?',
-                invalidBarcode: 'Formato de código de barras inválido.',
-                duplicateBox: 'Caja ya escaneada:',
-                quantityAdded: '¡Cantidad agregada!',
-                totalQuantity: 'Total',
-                outboundRegistered: '¡Registro de salida completo!',
-                barcodeError: 'Error al procesar el código de barras.',
-                asManualRegistration: 'Registro Manual AS',
-                addPart: 'Agregar Parte',
-                addedParts: 'Partes Agregadas',
-                cancel: 'Cancelar',
-                quantity: 'Cantidad',
-                partAdded: '¡Parte agregada exitosamente!',
-                invalidPartNumber: 'Por favor ingrese un número de parte válido.',
-                invalidQuantity: 'Por favor ingrese una cantidad válida.',
-                noASParts: 'No hay partes AS para guardar.',
-                asPartsSaved: '¡Partes AS guardadas exitosamente!'
-            }
-        };
-
-        let currentLanguage = localStorage.getItem('language') || 'ko';
+        // Supabase 클라이언트 초기화
+        let supabase;
         let scannedParts = {};
         let currentDate = '';
         let currentShift = '';
-        let asParts = []; // AS 수동 등록 파트 목록
-
-        // 언어 업데이트 함수
-        function updateLanguage() {
-            const elements = document.querySelectorAll('[data-i18n]');
-            elements.forEach(element => {
-                const key = element.getAttribute('data-i18n');
-                if (translations[currentLanguage] && translations[currentLanguage][key]) {
-                    element.textContent = translations[currentLanguage][key];
-                }
-            });
-        }
-
-        // 현재 시간 표시
-        function updateTime() {
-            const now = new Date();
-            const timeString = now.toLocaleString('ko-KR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'America/Chicago'
-            });
-            document.getElementById('currentTime').textContent = timeString;
-        }
+        let scannedUniqueCodes = new Set();
+        let scanCounts = {}; // 파트별 스캔 횟수 추적
         
-        updateTime();
-        setInterval(updateTime, 1000);
+        function initializeSupabase() {
+            try {
+                console.log('=== Supabase 초기화 시작 ===');
+                console.log('window.getCurrentConfig 존재 여부:', !!window.getCurrentConfig);
+                console.log('window.supabase 존재 여부:', !!window.supabase);
+                
+                if (!window.getCurrentConfig) {
+                    console.error('getCurrentConfig 함수를 찾을 수 없습니다. config.js가 로드되었는지 확인하세요.');
+                    console.log('window 객체 확인:', Object.keys(window).filter(key => key.includes('config')));
+                    return false;
+                }
+                
+                const config = window.getCurrentConfig();
+                console.log('설정 로드됨:', config);
+                console.log('config.url:', config.url);
+                console.log('config.anonKey 길이:', config.anonKey ? config.anonKey.length : 'undefined');
+                
+                if (!window.supabase) {
+                    console.error('Supabase 라이브러리가 로드되지 않았습니다.');
+                    console.log('window 객체 확인:', Object.keys(window).filter(key => key.includes('supabase')));
+                    return false;
+                }
+                
+                console.log('Supabase 클라이언트 생성 시작...');
+                supabase = window.supabase.createClient(config.url, config.anonKey);
+                console.log('Supabase 클라이언트 초기화 성공');
+                console.log('supabase 객체:', supabase);
+                return true;
+            } catch (error) {
+                console.error('Supabase 클라이언트 초기화 실패:', error);
+                console.error('오류 상세:', error.message, error.stack);
+                return false;
+            }
+        }
 
         // 날짜 및 차수 선택 시 정보 업데이트
         function updateOutboundInfo() {
             const date = document.getElementById('dateSelect').value;
             const shift = document.getElementById('shiftSelect').value;
             
+            console.log('updateOutboundInfo 호출됨:', { date, shift });
+            
             currentDate = date;
             currentShift = shift;
             
             if (date && shift) {
-                document.getElementById('actionButtons').style.display = 'grid';
+                console.log('날짜와 차수가 모두 선택됨, 화면 업데이트 시작');
                 
-                // 차수 선택 완료 후 바코드 입력창에 포커스
-                setTimeout(() => {
-                    document.getElementById('barcodeInput').focus();
-                }, 100);
+                // AS 차수인지 확인
+                if (shift === 'AS') {
+                    console.log('AS 차수 선택됨');
+                    showAsManualSection();
+                    loadMasterParts(); // 마스터 파트 목록 로드
+                    // AS 차수일 때는 기존 출고 데이터를 로드하지 않음
+                    scannedParts = {};
+                } else {
+                    console.log('일반 차수 선택됨:', shift);
+                    hideAsManualSection();
+                    document.getElementById('scanSection').classList.remove('hidden');
+                    // 다른 차수일 때는 기존 출고 데이터 로드 (비동기)
+                    loadOutboundParts().then(() => {
+                        console.log('출고 파트 로드 완료');
+                        // 파트 목록 렌더링
+                        renderPartsList();
+                    }).catch(error => {
+                        console.error('출고 파트 로드 오류:', error);
+                    });
+                }
+                
+                document.getElementById('partsSection').classList.remove('hidden');
+                
+                // AS가 아닌 경우에만 바코드 입력창에 포커스
+                if (shift !== 'AS') {
+                    // 바코드 입력창이 표시되도록 강제로 설정
+                    const scanSection = document.getElementById('scanSection');
+                    if (scanSection) {
+                        scanSection.classList.remove('hidden');
+                    }
+                    
+                    setTimeout(() => {
+                        const barcodeInput = document.getElementById('barcodeInput');
+                        if (barcodeInput) {
+                            barcodeInput.focus();
+                            barcodeInput.select();
+                            console.log('바코드 입력창에 포커스 설정됨');
+                        } else {
+                            console.log('바코드 입력창을 찾을 수 없음');
+                        }
+                    }, 300); // 시간을 더 늘림
+                }
+                
+                console.log('화면 업데이트 완료');
             } else {
-                document.getElementById('actionButtons').style.display = 'none';
+                console.log('날짜 또는 차수가 선택되지 않음, 화면 숨김');
+                document.getElementById('scanSection').classList.add('hidden');
+                document.getElementById('partsSection').classList.add('hidden');
+                document.getElementById('confirmationSection').classList.add('hidden');
+                hideAsManualSection();
             }
         }
 
-        // 파트 리스트 렌더링
+        // 파트 목록 렌더링
         function renderPartsList() {
             const partsList = document.getElementById('partsList');
             partsList.innerHTML = '';
 
             Object.keys(scannedParts).forEach(partNumber => {
                 const part = scannedParts[partNumber];
-                const partRow = document.createElement('div');
-                partRow.className = 'part-row p-4 incomplete';
-                partRow.innerHTML = `
-                    <div class="grid grid-cols-3 gap-4 items-center">
-                        <div class="col-span-1">
-                            <div class="font-bold text-gray-800">${partNumber}</div>
-                            <div class="text-xs text-gray-500">${translations[currentLanguage].partNumber}</div>
+                const partItem = document.createElement('tr');
+                partItem.className = 'hover:bg-gray-50 transition-colors duration-200';
+                partItem.id = `part-${partNumber}`;
+                
+                // 출고 등록에서는 스캔된 수량이 0보다 크면 완료로 간주
+                const isCompleted = part.scannedQuantity > 0;
+
+                // 스캔된 파트는 빨간색 배경
+                if (isCompleted) {
+                    partItem.classList.add('bg-red-100', 'border-l-4', 'border-red-500');
+                }
+
+                partItem.innerHTML = `
+                    <td class="px-4 py-3">
+                        <div>
+                            <div class="font-semibold text-gray-800">${partNumber}</div>
+                            <div class="text-sm text-gray-500">카테고리: ${part.category || 'N/A'}</div>
                         </div>
-                        <div class="col-span-1 text-center">
-                            <div class="text-lg font-bold text-orange-600">${part.quantity || 0}</div>
-                            <div class="text-xs text-gray-500">${translations[currentLanguage].outboundQuantity}</div>
-                        </div>
-                        <div class="col-span-1 text-center">
-                            <button onclick="removePart('${partNumber}')" class="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center">
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
-                        </div>
-                    </div>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="font-medium ${part.scannedQuantity > 0 ? 'text-red-600' : 'text-gray-500'}">${part.scannedQuantity}</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="font-medium ${part.scanCount > 0 ? 'text-blue-600' : 'text-gray-500'}">${part.scanCount || 0}</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="font-medium ${part.scannedQuantity > 0 ? 'text-red-600' : 'text-gray-500'}">
+                            ${part.scannedQuantity > 0 ? '스캔됨' : '대기중'}
+                        </span>
+                    </td>
                 `;
-                partsList.appendChild(partRow);
+
+                partsList.appendChild(partItem);
             });
-
-            updateTotalScanned();
         }
 
-        // 총 스캔된 파트 수 업데이트
-        function updateTotalScanned() {
-            const total = Object.keys(scannedParts).length;
-            document.getElementById('totalScanned').textContent = total;
-            
-            if (total > 0) {
-                document.getElementById('partsSection').style.display = 'block';
+        // 진행 상황 업데이트
+        function updateProgress() {
+            const completedParts = Object.values(scannedParts).filter(part => part.scannedQuantity > 0).length;
+
+            // 스캔된 파트가 있으면 등록 섹션 표시
+            if (completedParts > 0) {
+                document.getElementById('confirmationSection').classList.remove('hidden');
             } else {
-                document.getElementById('partsSection').style.display = 'none';
-            }
-        }
-
-        // 파트 제거
-        function removePart(partNumber) {
-            if (confirm(`${partNumber} ${translations[currentLanguage].removePart}`)) {
-                delete scannedParts[partNumber];
-                renderPartsList();
-            }
-        }
-
-        // 저장
-        function saveOutbound() {
-            if (!currentDate || !currentShift) {
-                showStatus(translations[currentLanguage].selectDateShift, 'error');
-                return;
-            }
-
-            if (Object.keys(scannedParts).length === 0) {
-                showStatus(translations[currentLanguage].noOutboundParts, 'error');
-                return;
-            }
-
-            // 실제로는 API 호출
-            showStatus(translations[currentLanguage].saveSuccess, 'success');
-            
-            // 2초 후 초기화
-            setTimeout(() => {
-                resetOutbound();
-            }, 2000);
-        }
-
-        // 초기화
-        function resetOutbound() {
-            if (confirm(translations[currentLanguage].resetConfirm)) {
-                // 오늘 날짜로 다시 설정
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const day = String(today.getDate()).padStart(2, '0');
-                const todayString = `${year}-${month}-${day}`;
-                
-                document.getElementById('dateSelect').value = todayString;
-                document.getElementById('shiftSelect').value = '';
-                scannedParts = {};
-                currentDate = todayString;
-                currentShift = '';
-                
-                document.getElementById('partsSection').style.display = 'none';
-                document.getElementById('actionButtons').style.display = 'grid'; // 날짜가 있으므로 버튼 표시
-                document.getElementById('statusMessage').style.display = 'none';
-                
-                // 스캔 입력창 초기화
-                document.getElementById('barcodeInput').value = '';
-                
-                // 타이머 클리어
-                if (barcodeInputTimer) {
-                    clearTimeout(barcodeInputTimer);
-                    barcodeInputTimer = null;
-                }
-            }
-        }
-
-        // 홈으로 이동
-        function goHome() {
-            const hasScannedData = Object.keys(scannedParts).length > 0;
-            
-            if (hasScannedData) {
-                if (confirm(translations[currentLanguage].unsavedData)) {
-                    window.location.href = 'index.html';
-                }
-            } else {
-                window.location.href = 'index.html';
+                document.getElementById('confirmationSection').classList.add('hidden');
             }
         }
 
         // 바코드 스캔 처리
-        function handleBarcodeScan(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const barcode = document.getElementById('barcodeInput').value.trim();
+        function handleBarcodeScan(barcode) {
+            console.log('바코드 스캔 처리 시작:', barcode);
+            console.log('현재 스캔된 파트 목록:', Object.keys(scannedParts));
+            
+            // GS1-128 바코드 파싱 시도
+            const parsedData = parseGS1Barcode(barcode);
+            
+            if (parsedData) {
+                console.log('GS1-128 파싱 성공, 파트 번호:', parsedData.partNumber);
+                console.log('추출된 고유코드:', parsedData.uniqueNumber);
                 
-                if (barcode) {
-                    processBarcode(barcode);
-                    document.getElementById('barcodeInput').value = '';
+                // 고유코드 중복 검사
+                if (scannedUniqueCodes.has(parsedData.uniqueNumber)) {
+                    console.log('고유코드 중복 감지:', parsedData.uniqueNumber);
+                    
+                    // 바코드 입력창에 시각적 피드백 제공
+                    const barcodeInput = document.getElementById('barcodeInput');
+                    barcodeInput.style.backgroundColor = '#fee2e2'; // 빨간색 배경
+                    barcodeInput.style.borderColor = '#ef4444'; // 빨간색 테두리
+                    barcodeInput.placeholder = `중복 스캔: ${parsedData.uniqueNumber}`;
+                    
+                    // 1.5초 후 원래 상태로 복원
+                    setTimeout(() => {
+                        barcodeInput.style.backgroundColor = '';
+                        barcodeInput.style.borderColor = '';
+                        barcodeInput.placeholder = i18n.t('scan_barcode_placeholder');
+                        barcodeInput.value = '';
+                        barcodeInput.focus();
+                        barcodeInput.select();
+                    }, 1500);
+                    
+                    return false;
                 }
                 
-                // 포커스 유지
-                setTimeout(() => {
-                    document.getElementById('barcodeInput').focus();
-                }, 50);
-            }
-        }
-
-        // 자동 엔터키 처리 (바코드 스캐너용)
-        let barcodeInputTimer = null;
-        function handleBarcodeInput(event) {
-            const input = event.target;
-            const value = input.value;
-            
-            // 이전 타이머 클리어
-            if (barcodeInputTimer) {
-                clearTimeout(barcodeInputTimer);
-            }
-            
-            // 바코드 패턴 확인 (실제 바코드 형식과 유사한지)
-            const isBarcodePattern = /^[)>*].*P\d{5}S\d{4}.*7Q\d+.*3SP\d+.*\*EOT$/.test(value);
-            
-            // 바코드 길이가 30자 이상이거나 바코드 패턴이 맞으면 자동 엔터
-            if (value.length >= 30 || (value.length >= 20 && isBarcodePattern)) {
-                barcodeInputTimer = setTimeout(() => {
-                    // 엔터키 이벤트 시뮬레이션
-                    const enterEvent = new KeyboardEvent('keypress', {
-                        key: 'Enter',
-                        code: 'Enter',
-                        keyCode: 13,
-                        which: 13,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    input.dispatchEvent(enterEvent);
-                }, 50);
-            }
-        }
-
-        // 바코드 파싱 및 처리
-        function processBarcode(barcode) {
-            try {
-                // 바코드 파싱
-                const parsedData = parseBarcode(barcode);
+                // 파트가 이미 스캔된 목록에 있는지 확인
+                let part = scannedParts[parsedData.partNumber];
                 
-                if (!parsedData) {
-                    showStatus(translations[currentLanguage].invalidBarcode, 'error');
-                    return;
-                }
-
-                const { partNumber, quantity, uniqueNumber } = parsedData;
-                
-                // 유니크 번호 중복 체크
-                for (let existingPart in scannedParts) {
-                    if (scannedParts[existingPart].uniqueNumber === uniqueNumber) {
-                        showStatus(`${translations[currentLanguage].duplicateBox} ${uniqueNumber}`, 'error');
-                        return;
-                    }
-                }
-                
-                // 출고 목록에 추가 (파트는 중복 허용, 유니크 번호는 중복 방지)
-                if (scannedParts[partNumber]) {
-                    // 기존 파트가 있으면 수량을 합산
-                    const currentQuantity = scannedParts[partNumber].quantity || 0;
-                    scannedParts[partNumber].quantity = currentQuantity + quantity;
-                    scannedParts[partNumber].scannedAt = new Date().toLocaleString();
-                    showStatus(`${partNumber} ${translations[currentLanguage].quantityAdded} (${translations[currentLanguage].totalQuantity} ${scannedParts[partNumber].quantity}개)`, 'success');
-                } else {
-                    // 새로운 파트 추가
-                    scannedParts[partNumber] = {
-                        quantity: quantity,
-                        uniqueNumber: uniqueNumber,
-                        scannedAt: new Date().toLocaleString()
+                if (!part) {
+                    // 새로운 파트인 경우 추가
+                    console.log('새로운 파트 추가:', parsedData.partNumber);
+                    scannedParts[parsedData.partNumber] = {
+                        partNumber: parsedData.partNumber,
+                        quantity: parsedData.quantity,
+                        scannedQuantity: 0,
+                        scanCount: 0, // 스캔 횟수 추가
+                        category: '출고 파트'
                     };
-                    showStatus(`${partNumber} ${translations[currentLanguage].outboundRegistered} (${quantity}개)`, 'success');
+                    part = scannedParts[parsedData.partNumber];
+                    scanCounts[parsedData.partNumber] = 0; // 스캔 횟수 초기화
                 }
+                
+                // 고유코드를 스캔된 목록에 추가
+                scannedUniqueCodes.add(parsedData.uniqueNumber);
+                console.log('고유코드 등록됨:', parsedData.uniqueNumber);
+                console.log('현재 스캔된 고유코드 목록:', Array.from(scannedUniqueCodes));
+                
+                // 스캔된 수량을 해당 파트에 추가
+                part.scannedQuantity += parsedData.quantity;
+                // 스캔 횟수 증가 (바코드 QTY와 관계없이 1회씩 증가)
+                part.scanCount += 1;
+                scanCounts[parsedData.partNumber] = part.scanCount;
                 
                 renderPartsList();
+                updateProgress();
                 
-            } catch (error) {
-                showStatus(translations[currentLanguage].barcodeError, 'error');
-                console.error('Barcode processing error:', error);
+                // 스캔 성공 알림 제거 - 연속 스캔을 위해
+                // showNotification(`${parsedData.partNumber} 스캔 완료 (수량: ${parsedData.quantity}, 총 스캔: ${part.scannedQuantity})`, 'success');
+                
+                // 입력 필드 초기화 및 포커스 유지
+                const barcodeInput = document.getElementById('barcodeInput');
+                barcodeInput.value = '';
+                setTimeout(() => {
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                }, 100);
+                
+                return true;
+            } else {
+                console.log('GS1-128 파싱 실패, 직접 파트 번호 입력 시도');
+                
+                // 직접 파트 번호 입력인 경우 - 파트 번호 정리 (관리자 모드와 동일)
+                let cleanPartNumber = barcode.trim();
+                
+                // 5자리 숫자 + 알파벳 + 4자리 숫자 형식인지 확인하고 마지막 알파벳 제거
+                const partMatch = cleanPartNumber.match(/^(\d{5})([A-Za-z])(\d{4})$/);
+                if (partMatch) {
+                    // 마지막 알파벳 제거하고 하이픈 추가
+                    cleanPartNumber = `${partMatch[1]}-${partMatch[2]}${partMatch[3]}`;
+                    console.log('파트 번호 정리됨:', barcode, '->', cleanPartNumber);
+                }
+                
+                let part = scannedParts[cleanPartNumber];
+                
+                if (!part) {
+                    // 새로운 파트인 경우 추가
+                    console.log('새로운 파트 추가 (직접 입력):', cleanPartNumber);
+                    scannedParts[cleanPartNumber] = {
+                        partNumber: cleanPartNumber,
+                        quantity: 1,
+                        scannedQuantity: 0,
+                        scanCount: 0, // 스캔 횟수 추가
+                        category: '출고 파트'
+                    };
+                    part = scannedParts[cleanPartNumber];
+                    scanCounts[cleanPartNumber] = 0; // 스캔 횟수 초기화
+                }
+                
+                // 스캔된 수량을 해당 파트에 추가 (수량 1)
+                part.scannedQuantity += 1;
+                // 스캔 횟수 증가 (직접 입력도 1회씩 증가)
+                part.scanCount += 1;
+                scanCounts[cleanPartNumber] = part.scanCount;
+                
+                renderPartsList();
+                updateProgress();
+                
+                // 스캔 성공 알림 제거 - 연속 스캔을 위해
+                // showNotification(`${cleanPartNumber} 스캔 완료 (수량: 1, 총 스캔: ${part.scannedQuantity})`, 'success');
+                
+                // 입력 필드 초기화 및 포커스 유지
+                const barcodeInput = document.getElementById('barcodeInput');
+                barcodeInput.value = '';
+                setTimeout(() => {
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                }, 100);
+                
+                return true;
             }
         }
 
-        // 바코드 파싱 함수
-        function parseBarcode(barcode) {
-            // 예시: [)>*06:D032125:5K:23L :24L :P49601S9000:7Q80:3SP11000321253583:VP1100*EOT
-            
+        // GS1-128 바코드 파싱 함수 (입고와 동일한 로직)
+        function parseGS1Barcode(barcode) {
             try {
-                // 파트 번호 추출 (P49601S9000 -> P49601S9000) - 원본 그대로 사용
-                const partMatch = barcode.match(/P\d{5}S\d{4}/);
+                console.log('바코드 파싱 시작:', barcode);
+                
+                // GS1-128 형식: [)>*06:D032125:5K:23L :24L :P49560l3010:7Q50:3SP11000321253583:VP1100*EOT
+                
+                // 파트 번호 추출 (P49560l3010) - 소문자 l도 포함
+                const partMatch = barcode.match(/P\d{5}[a-zA-Z]\d{4}/);
                 if (!partMatch) {
+                    console.log('파트 번호 매칭 실패');
                     return null;
                 }
-                const partNumber = partMatch[0]; // P와 S를 포함한 원본 파트 번호
+                let partNumber = partMatch[0];
+                console.log('추출된 파트 번호 (P 포함):', partNumber);
                 
-                // 수량 추출 (7Q80 -> 80)
+                // P 접두사 제거 (P49560l3010 -> 49560l3010)
+                if (partNumber.startsWith('P')) {
+                    partNumber = partNumber.substring(1);
+                    console.log('P 접두사 제거 후:', partNumber);
+                }
+                
+                // 마지막 알파벳 제거 (49560l3010 -> 49560l3010, 49560L3010 -> 49560L3010)
+                // 숫자로 끝나는지 확인하고, 알파벳으로 끝나면 제거
+                if (!partNumber.match(/\d$/)) {
+                    partNumber = partNumber.replace(/[a-zA-Z]$/, '');
+                    console.log('마지막 알파벳 제거 후:', partNumber);
+                }
+                
+                // DB 형식에 맞게 하이픈 추가 (49560L3010 -> 49560-L3010)
+                // 5자리 숫자 + 알파벳 + 4자리 숫자 형식인지 확인
+                const hyphenMatch = partNumber.match(/^(\d{5})([A-Za-z])(\d{4})$/);
+                if (hyphenMatch) {
+                    partNumber = `${hyphenMatch[1]}-${hyphenMatch[2]}${hyphenMatch[3]}`;
+                    console.log('하이픈 추가 후:', partNumber);
+                }
+                
+                // 수량 추출 (7Q50 -> 50)
                 const quantityMatch = barcode.match(/7Q(\d+)/);
                 if (!quantityMatch) {
+                    console.log('수량 매칭 실패');
                     return null;
                 }
                 const quantity = parseInt(quantityMatch[1]);
+                console.log('추출된 수량:', quantity);
                 
-                // 유니크 넘버 추출 (3SP11000321253583:VP1100 -> P11000321253583)
-                const uniqueMatch = barcode.match(/3S(P\d+)/);
+                // 유니크 넘버 추출 (3SP11000321253583 -> P11000321253583)
+                // 3S 다음부터 다음 : 까지가 고유코드
+                const uniqueMatch = barcode.match(/3S([^:]+)/);
                 if (!uniqueMatch) {
+                    console.log('유니크 넘버 매칭 실패');
                     return null;
                 }
                 const uniqueNumber = uniqueMatch[1];
+                console.log('추출된 유니크 넘버:', uniqueNumber);
                 
-                return {
+                const result = {
                     partNumber,
                     quantity,
                     uniqueNumber
                 };
                 
+                console.log('최종 파싱 결과:', result);
+                return result;
+                
             } catch (error) {
-                console.error('Barcode parsing error:', error);
+                console.error('GS1 바코드 파싱 오류:', error);
                 return null;
             }
         }
 
-        // 바코드 입력창 초기화
-        function clearBarcodeInput() {
-            document.getElementById('barcodeInput').value = '';
-            document.getElementById('barcodeInput').focus();
+        // 바코드 스캔 시뮬레이션
+        function scanBarcode() {
+            const input = document.getElementById('barcodeInput');
+            const barcode = input.value.trim();
+            
+            if (barcode) {
+                handleBarcodeScan(barcode);
+            } else {
+                showNotification('바코드를 입력하거나 스캔하세요.', 'warning');
+            }
         }
 
-        // 상태 메시지 표시
-        function showStatus(message, type) {
-            const statusMessage = document.getElementById('statusMessage');
-            const statusText = document.getElementById('statusText');
+        // 스캔 초기화
+        function clearScan() {
+            // 모든 데이터 초기화
+            scannedParts = {}; // 파트 목록 전체 초기화
+            scannedUniqueCodes.clear(); // 고유코드 목록 초기화
+            scanCounts = {}; // 스캔 횟수 초기화
             
-            statusText.textContent = message;
-            statusMessage.className = `glass-card p-4 rounded-xl text-center ${type === 'success' ? 'bg-green-100 border-green-500' : 'bg-red-100 border-red-500'}`;
-            statusMessage.style.display = 'block';
+            // UI 초기화
+            renderPartsList();
+            updateProgress();
+            document.getElementById('barcodeInput').value = '';
             
+            // 확인 섹션 숨기기
+            document.getElementById('confirmationSection').classList.add('hidden');
+            
+            showNotification('스캔이 초기화되었습니다.', 'info');
+        }
+
+        // 출고 확정 (관리자 모드와 동일한 방식으로 PENDING 상태로 등록)
+        async function confirmOutbound() {
+            console.log('=== PDA 출고 등록 함수 시작 ===');
+            console.log('currentDate:', currentDate);
+            console.log('currentShift:', currentShift);
+            console.log('scannedParts:', scannedParts);
+            
+            if (!currentDate || !currentShift) {
+                console.error('날짜와 차수가 선택되지 않음');
+                showNotification('날짜와 차수를 선택해주세요.', 'error');
+                return;
+            }
+
+            // 스캔된 파트가 있는지 확인
+            const hasScannedParts = Object.values(scannedParts).some(part => part.scannedQuantity > 0);
+            console.log('hasScannedParts:', hasScannedParts);
+            console.log('파트별 스캔 상태:', Object.entries(scannedParts).map(([partNum, part]) => ({part: partNum, scanned: part.scannedQuantity, quantity: part.quantity})));
+            
+            if (!hasScannedParts) {
+                console.error('스캔된 파트가 없음');
+                showNotification('스캔된 파트가 없습니다. 바코드를 스캔해주세요.', 'error');
+                return;
+            }
+
+            try {
+                console.log('PDA 출고 등록 시작:', currentDate, currentShift);
+                
+                // 0. 동일한 날짜와 차수의 중복 확인 (관리자 모드와 동일)
+                const sequenceNumber = `${currentDate.replace(/-/g, '')}-${currentShift}`;
+                const { data: existingSequence, error: checkError } = await supabase
+                    .from('outbound_sequences')
+                    .select('id, sequence_number, outbound_date, status')
+                    .eq('outbound_date', currentDate)
+                    .eq('sequence_number', sequenceNumber)
+                    .maybeSingle();
+
+                if (checkError) {
+                    console.error('중복 확인 오류:', checkError);
+                    throw checkError;
+                }
+
+                if (existingSequence) {
+                    showNotification(`이미 등록된 차수입니다: ${existingSequence.sequence_number}`, 'error');
+                    return;
+                }
+                
+                // 1. 출고 차수 생성 (관리자 모드와 동일한 형식)
+                const sequenceData = {
+                    sequence_number: sequenceNumber,
+                    outbound_date: currentDate,
+                    status: 'PENDING'
+                };
+
+                console.log('출고 차수 데이터:', sequenceData);
+                const { data: newSequence, error: sequenceError } = await supabase
+                    .from('outbound_sequences')
+                    .insert(sequenceData)
+                    .select()
+                    .single();
+
+                if (sequenceError) {
+                    console.error('출고 차수 생성 오류:', sequenceError);
+                    showNotification(`출고 차수 생성 오류: ${sequenceError.message}`, 'error');
+                    throw sequenceError;
+                }
+
+                console.log('출고 차수 생성 성공:', newSequence);
+
+                // 2. 출고 파트들 생성 (관리자 모드와 동일한 형식)
+                const partsData = Object.entries(scannedParts)
+                    .filter(([partNumber, part]) => part.scannedQuantity > 0) // 스캔된 파트만 저장
+                    .map(([partNumber, part]) => ({
+                        sequence_id: newSequence.id,
+                        part_number: partNumber,
+                        planned_qty: currentShift === 'AS' ? 0 : (part.quantity || 0), // AS는 계획 수량 0
+                        scanned_qty: part.scannedQuantity, // 실제 스캔된 수량
+                        actual_qty: part.scannedQuantity, // PDA에서는 스캔된 수량 = 실제 출고 수량
+                        status: 'PENDING'
+                    }));
+
+                console.log('출고 파트 데이터:', partsData);
+                const { error: partsError } = await supabase
+                    .from('outbound_parts')
+                    .insert(partsData);
+
+                if (partsError) {
+                    console.error('출고 파트 생성 오류:', partsError);
+                    showNotification(`출고 파트 생성 오류: ${partsError.message}`, 'error');
+                    throw partsError;
+                }
+
+                console.log('출고 파트 생성 성공');
+
+                const totalScannedQuantity = Object.values(scannedParts).reduce((sum, part) => sum + part.scannedQuantity, 0);
+                console.log('PDA 출고 등록 완료:', {
+                    sequenceId: newSequence.id,
+                    sequenceNumber: sequenceNumber,
+                    date: currentDate,
+                    shift: currentShift,
+                    totalScannedQuantity,
+                    partsCount: partsData.length
+                });
+                showNotification(`출고가 성공적으로 등록되었습니다. (${sequenceNumber}, 총 스캔 수량: ${totalScannedQuantity})`, 'success');
+                
+                // 페이지 초기화
+                setTimeout(() => {
+                    resetPage();
+                }, 2000);
+
+            } catch (error) {
+                console.error('PDA 출고 등록 오류:', error);
+                showNotification(`출고 등록 중 오류가 발생했습니다: ${error.message}`, 'error');
+            }
+        }
+
+        // 출고 취소
+        function cancelOutbound() {
+            // 모든 데이터 초기화 (초기화 버튼과 동일)
+            scannedParts = {}; // 파트 목록 전체 초기화
+            scannedUniqueCodes.clear(); // 고유코드 목록 초기화
+            scanCounts = {}; // 스캔 횟수 초기화
+            
+            // UI 초기화
+            renderPartsList();
+            updateProgress();
+            document.getElementById('barcodeInput').value = '';
+            document.getElementById('confirmationSection').classList.add('hidden');
+            
+            showNotification('출고가 취소되었습니다.', 'info');
+        }
+
+        // 페이지 초기화
+        function resetPage() {
+            scannedParts = {};
+            scannedUniqueCodes.clear();
+            scanCounts = {}; // 스캔 횟수 초기화
+            
+            document.getElementById('dateSelect').value = '';
+            document.getElementById('shiftSelect').value = '';
+            document.getElementById('scanSection').classList.add('hidden');
+            document.getElementById('partsSection').classList.add('hidden');
+            document.getElementById('confirmationSection').classList.add('hidden');
+            document.getElementById('partsList').innerHTML = '';
+            
+            currentDate = '';
+            currentShift = '';
+        }
+
+        // 알림 표시
+        function showNotification(message, type = 'info') {
+            // 간단한 알림 구현
+            alert(message);
+        }
+
+        // 현재 시간 업데이트
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZone: 'America/Chicago'
+            });
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        // 전역 바코드 입력 버퍼
+        let globalBarcodeBuffer = '';
+        let globalBarcodeTimer = null;
+        const BARCODE_TIMEOUT = 100; // 바코드 입력 완료 판단 시간 (ms)
+
+        // 전역 바코드 입력 상태 표시
+        function showGlobalBarcodeStatus() {
+            // 상태 표시 요소 생성
+            const statusElement = document.createElement('div');
+            statusElement.id = 'globalBarcodeStatus';
+            statusElement.className = 'fixed top-20 right-4 bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded-lg text-sm z-50';
+            statusElement.innerHTML = '<i class="fas fa-barcode mr-2"></i>전역 바코드 스캔 활성화';
+            document.body.appendChild(statusElement);
+            
+            // 3초 후 자동 숨김
             setTimeout(() => {
-                statusMessage.style.display = 'none';
+                if (statusElement) {
+                    statusElement.style.opacity = '0.5';
+                }
             }, 3000);
         }
 
-        // 인증 확인
-        function checkAuth() {
-            const authToken = localStorage.getItem('authToken');
-            const userMode = localStorage.getItem('userMode');
-            
-            if (!authToken) {
-                window.location.href = '../login.html';
-                return;
-            }
-            
-            if (userMode !== 'pda') {
-                localStorage.removeItem('userMode');
-                window.location.href = '../login.html';
-                return;
+        // 바코드 입력 중 시각적 피드백
+        function showBarcodeInputFeedback() {
+            const barcodeInput = document.getElementById('barcodeInput');
+            if (barcodeInput) {
+                // 입력창에 시각적 피드백 제공
+                barcodeInput.style.backgroundColor = '#fef3c7'; // 노란색 배경
+                barcodeInput.style.borderColor = '#f59e0b'; // 주황색 테두리
+                
+                // 0.5초 후 원래 상태로 복원
+                setTimeout(() => {
+                    barcodeInput.style.backgroundColor = '';
+                    barcodeInput.style.borderColor = '';
+                }, 500);
             }
         }
 
+        // 출고 파트 목록 로드 함수
+        async function loadOutboundParts() {
+            try {
+                const selectedShift = document.getElementById('shiftSelect').value;
+                console.log('출고 파트 로드 시작, 선택된 차수:', selectedShift);
+                
+                if (!selectedShift || selectedShift === 'AS') {
+                    console.log('AS 차수이거나 차수가 선택되지 않음 - 출고 파트 로드 안함');
+                    return Promise.resolve();
+                }
+
+                // 선택된 차수에 해당하는 출고 시퀀스 찾기
+                const { data: sequences, error: sequencesError } = await supabase
+                    .from('outbound_sequences')
+                    .select('id, sequence_name, shift')
+                    .eq('shift', selectedShift)
+                    .eq('status', 'PENDING')
+                    .order('created_at', { ascending: false });
+
+                if (sequencesError) {
+                    console.error('출고 시퀀스 조회 오류:', sequencesError);
+                    throw sequencesError;
+                }
+
+                if (!sequences || sequences.length === 0) {
+                    console.log('해당 차수의 출고 시퀀스가 없음');
+                    return Promise.resolve();
+                }
+
+                const sequenceId = sequences[0].id;
+                console.log('출고 시퀀스 ID:', sequenceId);
+
+                // 해당 시퀀스의 출고 파트 목록 조회
+                const { data: outboundParts, error: partsError } = await supabase
+                    .from('outbound_parts')
+                    .select(`
+                        id,
+                        part_number,
+                        planned_qty,
+                        actual_qty,
+                        status,
+                        master_parts (
+                            part_name,
+                            part_description
+                        )
+                    `)
+                    .eq('sequence_id', sequenceId)
+                    .order('created_at', { ascending: true });
+
+                if (partsError) {
+                    console.error('출고 파트 조회 오류:', partsError);
+                    throw partsError;
+                }
+
+                console.log('출고 파트 목록 로드 완료:', outboundParts);
+                
+                // 전역 변수에 저장
+                window.outboundParts = outboundParts || [];
+                
+                return Promise.resolve();
+            } catch (error) {
+                console.error('출고 파트 로드 중 오류:', error);
+                return Promise.reject(error);
+            }
+        }
+
+        // 전역 바코드 입력 처리 함수
+        function handleGlobalBarcodeInput(e) {
+            // 특수 키는 무시 (Shift, Ctrl, Alt, Tab, Escape 등)
+            if (e.key.length > 1 && !['Enter', 'Backspace'].includes(e.key)) {
+                return;
+            }
+
+            // Enter 키로 바코드 입력 완료
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                
+                if (globalBarcodeBuffer.trim().length > 0) {
+                    console.log('전역 바코드 입력 완료:', globalBarcodeBuffer);
+                    
+                    // 바코드 입력창에 값 설정하고 스캔 실행
+                    const barcodeInput = document.getElementById('barcodeInput');
+                    if (barcodeInput) {
+                        barcodeInput.value = globalBarcodeBuffer;
+                        scanBarcode();
+                    }
+                    
+                    // 버퍼 초기화
+                    globalBarcodeBuffer = '';
+                }
+                return;
+            }
+
+            // Backspace 키 처리
+            if (e.key === 'Backspace') {
+                e.preventDefault();
+                globalBarcodeBuffer = globalBarcodeBuffer.slice(0, -1);
+                return;
+            }
+
+            // 일반 문자 입력
+            if (e.key.length === 1) {
+                e.preventDefault();
+                globalBarcodeBuffer += e.key;
+                
+                // 바코드 입력 중 시각적 피드백
+                showBarcodeInputFeedback();
+                
+                // 타이머 리셋 (연속 입력 중)
+                if (globalBarcodeTimer) {
+                    clearTimeout(globalBarcodeTimer);
+                }
+                
+                // GS1-128 바코드 패턴 확인 (정확한 패턴)
+                const isGS1BarcodePattern = /^\[\)>\*06:D\d+:5K:23L:24L:P\d{5}[a-zA-Z]\d{4}:7Q\d+:3S[^:]+:VP\d+\*EOT$/.test(globalBarcodeBuffer);
+                
+                // 바코드 길이가 30자 이상이거나 GS1 패턴이 맞으면 자동 엔터
+                if (globalBarcodeBuffer.length >= 30 || (globalBarcodeBuffer.length >= 20 && isGS1BarcodePattern)) {
+                    globalBarcodeTimer = setTimeout(() => {
+                        // 엔터키 이벤트 시뮬레이션
+                        const enterEvent = new KeyboardEvent('keydown', {
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        document.dispatchEvent(enterEvent);
+                    }, 50);
+                } else {
+                    // 일반적인 경우 타이머 설정
+                    globalBarcodeTimer = setTimeout(() => {
+                        if (globalBarcodeBuffer.trim().length > 0) {
+                            console.log('전역 바코드 입력 완료 (타이머):', globalBarcodeBuffer);
+                            
+                            // 바코드 입력창에 값 설정하고 스캔 실행
+                            const barcodeInput = document.getElementById('barcodeInput');
+                            if (barcodeInput) {
+                                barcodeInput.value = globalBarcodeBuffer;
+                                scanBarcode();
+                            }
+                            
+                            // 버퍼 초기화
+                            globalBarcodeBuffer = '';
+                        }
+                    }, BARCODE_TIMEOUT);
+                }
+            }
+        }
+
+        // 이벤트 리스너 설정
+        function setupEventListeners() {
+            // 날짜 및 차수 선택 이벤트
+            document.getElementById('dateSelect').addEventListener('change', updateOutboundInfo);
+            document.getElementById('shiftSelect').addEventListener('change', updateOutboundInfo);
+
+            // 전역 키보드 이벤트 리스너 (바코드 스캐너용)
+            document.addEventListener('keydown', function(e) {
+                // 입력 필드가 포커스되어 있지 않은 경우에만 전역 처리
+                const activeElement = document.activeElement;
+                const isInputFocused = activeElement && (
+                    activeElement.tagName === 'INPUT' || 
+                    activeElement.tagName === 'SELECT' || 
+                    activeElement.tagName === 'TEXTAREA' ||
+                    activeElement.contentEditable === 'true'
+                );
+                
+                if (!isInputFocused) {
+                    handleGlobalBarcodeInput(e);
+                }
+            });
+
+            // 전역 바코드 입력 상태 표시
+            showGlobalBarcodeStatus();
+
+            // 바코드 입력 이벤트
+            document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    scanBarcode();
+                }
+            });
+
+            // 바코드 입력 필드 포커스
+            document.getElementById('barcodeInput').addEventListener('focus', function() {
+                this.select();
+            });
+
+            // 자동 엔터키 처리 (바코드 스캐너용)
+            let barcodeInputTimer = null;
+            document.getElementById('barcodeInput').addEventListener('input', function(e) {
+                const input = e.target;
+                const value = input.value;
+                
+                // 이전 타이머 클리어
+                if (barcodeInputTimer) {
+                    clearTimeout(barcodeInputTimer);
+                }
+                
+                // GS1-128 바코드 패턴 확인 (정확한 패턴)
+                const isGS1BarcodePattern = /^\[\)>\*06:D\d+:5K:23L:24L:P\d{5}[a-zA-Z]\d{4}:7Q\d+:3S[^:]+:VP\d+\*EOT$/.test(value);
+                
+                // 바코드 길이가 30자 이상이거나 GS1 패턴이 맞으면 자동 엔터
+                if (value.length >= 30 || (value.length >= 20 && isGS1BarcodePattern)) {
+                    barcodeInputTimer = setTimeout(() => {
+                        // 엔터키 이벤트 시뮬레이션
+                        const enterEvent = new KeyboardEvent('keypress', {
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        input.dispatchEvent(enterEvent);
+                    }, 50);
+                }
+            });
+
+            // 포커스 유지 기능
+            document.addEventListener('click', function(event) {
+                // 바코드 입력창이나 관련 요소 클릭 시 포커스 유지하지 않음
+                if (event.target.closest('#barcodeInput') || 
+                    event.target.closest('#dateSelect') ||
+                    event.target.closest('#shiftSelect') ||
+                    event.target.closest('button')) {
+                    return;
+                }
+                
+                // 다른 곳 클릭 시 바코드 입력창에 포커스
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (barcodeInput && !barcodeInput.classList.contains('hidden')) {
+                    setTimeout(() => {
+                        barcodeInput.focus();
+                        barcodeInput.select();
+                    }, 100);
+                }
+            });
+
+            // 키보드 이벤트로 포커스 유지
+            document.addEventListener('keydown', function(event) {
+                // 특정 키나 요소에서 포커스 유지하지 않음
+                if (event.target.closest('#dateSelect') || 
+                    event.target.closest('#shiftSelect') ||
+                    event.target.closest('button') ||
+                    event.key === 'Tab') {
+                    return;
+                }
+                
+                // 다른 키 입력 시 바코드 입력창에 포커스
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (barcodeInput && !barcodeInput.classList.contains('hidden') && 
+                    event.target.id !== 'barcodeInput') {
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                }
+            });
+        }
+
         // 페이지 로드 시 초기화
-        function initializePage() {
-            // 언어 설정 초기화
-            updateLanguage();
+        document.addEventListener('DOMContentLoaded', function() {
+            // Supabase 초기화
+            if (initializeSupabase()) {
+                console.log('Supabase 초기화 성공');
+            } else {
+                console.error('Supabase 초기화 실패');
+            }
+            
+            // 이벤트 리스너 설정
+            setupEventListeners();
+            
+            // 시간 업데이트 시작
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
             
             // 오늘 날짜를 기본값으로 설정
             const today = new Date();
@@ -793,216 +1337,97 @@
             
             document.getElementById('dateSelect').value = todayString;
             currentDate = todayString;
-            
-            // 액션 버튼 표시 (날짜가 설정되었으므로)
-            document.getElementById('actionButtons').style.display = 'grid';
-            
-            // 인증 확인
-            checkAuth();
+        });
+
+        // AS 수동 입력 섹션 표시/숨김
+        function showAsManualSection() {
+            document.getElementById('asManualSection').classList.remove('hidden');
+            document.getElementById('scanSection').classList.add('hidden');
         }
-
-        // 페이지 로드 시 초기화 실행
-        initializePage();
-
-        // 터치 피드백 개선
-        document.addEventListener('touchstart', function() {}, {passive: true});
-        document.addEventListener('touchmove', function() {}, {passive: true});
-
-        // 포커스 유지 기능 (드롭다운 제외)
-        document.addEventListener('click', function(event) {
-            // 드롭다운이나 관련 요소 클릭 시 포커스 이동 방지
-            if (event.target.id === 'dateSelect' || 
-                event.target.id === 'shiftSelect' || 
-                event.target.closest('select') || 
-                event.target.closest('input[type="date"]')) {
-                return;
+        
+        function hideAsManualSection() {
+            document.getElementById('asManualSection').classList.add('hidden');
+        }
+        
+        // 마스터 파트 목록 로드
+        async function loadMasterParts() {
+            try {
+                const { data, error } = await supabase
+                    .from('parts')
+                    .select('part_number, category')
+                    .order('part_number');
+                
+                if (error) throw error;
+                
+                const select = document.getElementById('asPartSelect');
+                select.innerHTML = `<option value="">${i18n.t('select_part_manual')}</option>`;
+                
+                data.forEach(part => {
+                    const option = document.createElement('option');
+                    option.value = part.part_number;
+                    option.textContent = `${part.part_number} - ${part.category || 'N/A'}`;
+                    select.appendChild(option);
+                });
+                
+                console.log('마스터 파트 목록 로드 완료:', data.length, '개');
+            } catch (error) {
+                console.error('마스터 파트 로드 오류:', error);
+                alert(i18n.t('error_prefix') + '마스터 파트 목록을 불러올 수 없습니다.');
             }
+        }
+        
+        // AS 파트 추가
+        function addAsPart() {
+            const partSelect = document.getElementById('asPartSelect');
+            const quantityInput = document.getElementById('asQuantityInput');
             
-            // 드롭다운이나 날짜 입력이 포커스된 상태가 아닐 때만 바코드 입력창에 포커스
-            const shiftSelect = document.getElementById('shiftSelect');
-            const dateSelect = document.getElementById('dateSelect');
-            if (!shiftSelect.dataset.dropdownFocused && !dateSelect.dataset.dateFocused) {
-                setTimeout(() => {
-                    document.getElementById('barcodeInput').focus();
-                }, 100);
-            }
-        });
-
-        // 키보드 이벤트로 포커스 유지 (드롭다운 제외)
-        document.addEventListener('keydown', function(event) {
-            // 드롭다운이나 날짜 입력이 포커스된 상태가 아닐 때만 바코드 입력창에 포커스
-            const shiftSelect = document.getElementById('shiftSelect');
-            const dateSelect = document.getElementById('dateSelect');
-            if (!shiftSelect.dataset.dropdownFocused && 
-                !dateSelect.dataset.dateFocused && 
-                event.target.id !== 'barcodeInput' && 
-                event.target.id !== 'dateSelect' && 
-                event.target.id !== 'shiftSelect') {
-                document.getElementById('barcodeInput').focus();
-            }
-        });
-
-        // 페이지 로드 시 바코드 입력창에 포커스
-        setTimeout(() => {
-            document.getElementById('barcodeInput').focus();
-        }, 500);
-
-        // 드롭다운 이벤트 처리
-        document.getElementById('shiftSelect').addEventListener('focus', function() {
-            // 드롭다운에 포커스가 있을 때는 바코드 입력창 포커스 방지
-            this.dataset.dropdownFocused = 'true';
-        });
-
-        document.getElementById('shiftSelect').addEventListener('blur', function() {
-            // 드롭다운에서 포커스가 벗어나면 바코드 입력창에 포커스
-            delete this.dataset.dropdownFocused;
-            setTimeout(() => {
-                if (!this.dataset.dropdownFocused) {
-                    document.getElementById('barcodeInput').focus();
-                }
-            }, 200);
-        });
-
-        // 날짜 입력 이벤트 처리
-        document.getElementById('dateSelect').addEventListener('focus', function() {
-            // 날짜 입력에 포커스가 있을 때는 바코드 입력창 포커스 방지
-            this.dataset.dateFocused = 'true';
-        });
-
-        document.getElementById('dateSelect').addEventListener('blur', function() {
-            // 날짜 입력에서 포커스가 벗어나면 바코드 입력창에 포커스
-            delete this.dataset.dateFocused;
-            setTimeout(() => {
-                if (!this.dataset.dateFocused) {
-                    document.getElementById('barcodeInput').focus();
-                }
-            }, 200);
-        });
-
-        // AS Modal Functions
-        function openASModal() {
-            document.getElementById('asModal').style.display = 'flex';
-            document.getElementById('asPartNumber').focus();
-            updateLanguage(); // 모달 내 텍스트도 번역 적용
-        }
-
-        function closeASModal() {
-            document.getElementById('asModal').style.display = 'none';
-            // 입력 필드 초기화
-            document.getElementById('asPartNumber').value = '';
-            document.getElementById('asQuantity').value = '';
-            // AS 파트 목록 초기화
-            asParts = [];
-            renderASPartsList();
-            // 바코드 입력창에 포커스 복원
-            setTimeout(() => {
-                document.getElementById('barcodeInput').focus();
-            }, 100);
-        }
-
-        function addASPart() {
-            const partNumber = document.getElementById('asPartNumber').value.trim();
-            const quantity = parseInt(document.getElementById('asQuantity').value);
-
-            // 유효성 검사
+            const partNumber = partSelect.value;
+            const quantity = parseInt(quantityInput.value);
+            
             if (!partNumber) {
-                showStatus(translations[currentLanguage].invalidPartNumber, 'error');
+                alert(i18n.t('error_prefix') + i18n.t('select_part_required'));
                 return;
             }
-
+            
             if (!quantity || quantity <= 0) {
-                showStatus(translations[currentLanguage].invalidQuantity, 'error');
+                alert(i18n.t('error_prefix') + i18n.t('quantity_required'));
                 return;
             }
-
-            // AS 파트 목록에 추가
-            asParts.push({
-                partNumber: partNumber,
-                quantity: quantity,
-                addedAt: new Date().toLocaleString()
-            });
-
-            // 입력 필드 초기화
-            document.getElementById('asPartNumber').value = '';
-            document.getElementById('asQuantity').value = '';
-            document.getElementById('asPartNumber').focus();
-
-            // 목록 업데이트
-            renderASPartsList();
-
-            showStatus(translations[currentLanguage].partAdded, 'success');
-        }
-
-        function renderASPartsList() {
-            const asPartsList = document.getElementById('asPartsList');
-            asPartsList.innerHTML = '';
-
-            asParts.forEach((part, index) => {
-                const partRow = document.createElement('div');
-                partRow.className = 'bg-gray-100 p-3 rounded-lg flex items-center justify-between';
-                partRow.innerHTML = `
-                    <div class="flex-1 flex items-center space-x-4">
-                        <div class="font-bold text-gray-800 min-w-0 flex-1">${part.partNumber}</div>
-                        <div class="text-sm text-gray-600 font-medium bg-white px-2 py-1 rounded border">
-                            ${translations[currentLanguage].quantity}: ${part.quantity || 0}
-                        </div>
-                    </div>
-                    <button onclick="removeASPart(${index})" class="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center ml-2">
-                        <i class="fas fa-trash text-sm"></i>
-                    </button>
-                `;
-                asPartsList.appendChild(partRow);
-            });
-        }
-
-        function removeASPart(index) {
-            asParts.splice(index, 1);
-            renderASPartsList();
-        }
-
-        function saveASParts() {
-            if (asParts.length === 0) {
-                showStatus(translations[currentLanguage].noASParts, 'error');
-                return;
+            
+            // 스캔된 파트에 추가
+            if (scannedParts[partNumber]) {
+                scannedParts[partNumber].scannedQuantity += quantity;
+            } else {
+                scannedParts[partNumber] = {
+                    partNumber: partNumber,
+                    registeredQuantity: 0, // AS는 등록된 수량이 없음
+                    scannedQuantity: quantity,
+                    remainingQuantity: 0,
+                    cart: 1
+                };
             }
-
-            // AS 파트들을 scannedParts에 추가
-            asParts.forEach(part => {
-                if (scannedParts[part.partNumber]) {
-                    // 기존 파트가 있으면 수량을 합산
-                    const currentQuantity = scannedParts[part.partNumber].quantity || 0;
-                    scannedParts[part.partNumber].quantity = currentQuantity + part.quantity;
-                    scannedParts[part.partNumber].scannedAt = new Date().toLocaleString();
-                } else {
-                    // 새로운 파트 추가
-                    scannedParts[part.partNumber] = {
-                        quantity: part.quantity,
-                        uniqueNumber: `AS_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // AS용 유니크 번호 생성
-                        scannedAt: new Date().toLocaleString()
-                    };
-                }
-            });
-
+            
             // 파트 목록 업데이트
             renderPartsList();
-
-            // 모달 닫기
-            closeASModal();
-
-            showStatus(translations[currentLanguage].asPartsSaved, 'success');
+            
+            // 입력 필드 초기화
+            clearAsInput();
+            
+            // 확인 섹션 표시
+            document.getElementById('confirmationSection').classList.remove('hidden');
+            
+            console.log('AS 파트 추가:', partNumber, quantity);
         }
-
-        // Enter 키로 AS 파트 추가
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter' && document.getElementById('asModal').style.display === 'flex') {
-                const activeElement = document.activeElement;
-                if (activeElement.id === 'asPartNumber') {
-                    document.getElementById('asQuantity').focus();
-                } else if (activeElement.id === 'asQuantity') {
-                    addASPart();
-                }
-            }
-        });
+        
+        // AS 입력 초기화
+        function clearAsInput() {
+            document.getElementById('asPartSelect').value = '';
+            document.getElementById('asQuantityInput').value = '';
+        }
+        
+        // 터치 이벤트 최적화
+        document.addEventListener('touchstart', function() {}, {passive: true});
+        document.addEventListener('touchmove', function() {}, {passive: true});
     </script>
 </body>
 </html> 

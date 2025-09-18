@@ -67,13 +67,14 @@ class AdminDashboard {
         const timeElement = document.getElementById('currentTime');
         if (timeElement) {
             const now = new Date();
-            const timeString = now.toLocaleString('ko-KR', {
+            const timeString = now.toLocaleString('en-US', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
                 hour: '2-digit',
                 minute: '2-digit',
-                second: '2-digit'
+                second: '2-digit',
+                timeZone: 'America/Chicago'
             });
             timeElement.textContent = timeString;
         }

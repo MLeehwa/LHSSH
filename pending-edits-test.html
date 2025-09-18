@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pending Edits 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .highlight {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pending Edits 기능 테스트 가이드</h1>
+    
+    <div class="test-section">
+        <h2>🔧 최신 수정사항 (2024년 최신)</h2>
+        <div class="highlight">
+            <strong>주요 수정사항:</strong>
+            <ul>
+                <li><strong>확정된 항목 보호:</strong> 확정된 항목은 더 이상 수정할 수 없도록 비활성화</li>
+                <li><strong>데이터베이스 트리거 수정:</strong> adjusted_stock 필드 대신 physical_stock 필드를 사용하도록 트리거 함수 수정</li>
+                <li><strong>확정 상태 관리:</strong> confirmed_at 필드를 추가하여 확정 시간 기록</li>
+                <li><strong>시각적 피드백 개선:</strong> 확정된 항목은 파란색 배경으로 표시</li>
+                <li><strong>노란색 하이라이트 강화:</strong> 인라인 스타일을 추가하여 CSS 로드 문제 해결</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>⚠️ 중요: 데이터베이스 스키마 수정 필요</h2>
+        <div class="warning">
+            <h3>확정 기능을 위해 다음 단계를 수행해야 합니다:</h3>
+            <ol>
+                <li><strong>Supabase 대시보드</strong>에서 SQL 편집기로 이동</li>
+                <li><code>fix_physical_inventory_trigger.sql</code> 파일의 내용을 복사</li>
+                <li>SQL 편집기에서 실행하여 트리거와 스키마를 수정</li>
+                <li>실행 후 "Physical inventory trigger has been updated successfully!" 메시지 확인</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 테스트 단계</h2>
+        
+        <div class="step">
+            <h3>1단계: 데이터베이스 스키마 수정</h3>
+            <ol>
+                <li>Supabase 대시보드 → SQL 편집기</li>
+                <li><code>fix_physical_inventory_trigger.sql</code> 파일 내용 복사</li>
+                <li>SQL 실행 후 성공 메시지 확인</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>2단계: 기본 기능 확인</h3>
+            <ol>
+                <li>관리자 페이지에서 실사 세션을 선택하세요</li>
+                <li>실사 세션 상세에서 실사 재고 수량을 변경해보세요</li>
+                <li><strong>예상 결과:</strong> 해당 행이 노란색으로 하이라이트되어야 합니다</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>3단계: 비고 필드 테스트</h3>
+            <ol>
+                <li>비고 필드에 텍스트를 입력해보세요</li>
+                <li>다른 필드를 클릭하거나 Enter를 눌러보세요</li>
+                <li><strong>예상 결과:</strong> 입력한 내용이 유지되고 행이 노란색으로 하이라이트되어야 합니다</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>4단계: 확정 버튼 테스트</h3>
+            <ol>
+                <li>수정한 항목의 "확정" 버튼을 클릭해보세요</li>
+                <li><strong>예상 결과:</strong> 성공 메시지가 표시되고 파란색 배경으로 변경되어야 합니다</li>
+                <li>입력 필드가 비활성화되고 "✓ 확정됨" 표시가 나타나야 합니다</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>5단계: 확정된 항목 보호 테스트</h3>
+            <ol>
+                <li>확정된 항목의 입력 필드를 클릭해보세요</li>
+                <li><strong>예상 결과:</strong> "이미 확정된 항목은 수정할 수 없습니다" 경고 메시지가 표시되어야 합니다</li>
+                <li>확정 버튼이 사라지고 "✓ 확정됨" 표시만 남아있어야 합니다</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>6단계: 디버깅 도구 사용</h3>
+            <ol>
+                <li>브라우저 개발자 도구를 열고 콘솔 탭으로 이동하세요</li>
+                <li>콘솔에서 <code>debugInventory()</code>를 입력하고 Enter를 누르세요</li>
+                <li><strong>예상 결과:</strong> 현재 상태 정보가 콘솔에 출력됩니다</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 문제 해결</h2>
+        
+        <div class="error">
+            <h3>문제: 확정 버튼 클릭 시 "adjusted_stock" 오류 발생</h3>
+            <p><strong>해결 방법:</strong></p>
+            <ol>
+                <li><strong>데이터베이스 트리거 수정이 필요합니다:</strong></li>
+                <li>Supabase 대시보드 → SQL 편집기로 이동</li>
+                <li><code>fix_physical_inventory_trigger.sql</code> 파일 내용을 복사하여 실행</li>
+                <li>성공 메시지 확인 후 다시 테스트</li>
+            </ol>
+        </div>
+
+        <div class="error">
+            <h3>문제: 확정된 항목을 수정하려고 할 때 경고가 나타나지 않음</h3>
+            <p><strong>해결 방법:</strong></p>
+            <ol>
+                <li>브라우저에서 Ctrl+F5로 강제 새로고침을 시도해보세요</li>
+                <li>데이터베이스 스키마가 올바르게 수정되었는지 확인해보세요</li>
+                <li>개발자 도구에서 <code>debugInventory()</code>를 실행하여 confirmed_at 상태를 확인해보세요</li>
+            </ol>
+        </div>
+
+        <div class="error">
+            <h3>문제: 노란색 하이라이트가 나타나지 않음</h3>
+            <p><strong>해결 방법:</strong></p>
+            <ol>
+                <li>브라우저에서 Ctrl+F5로 강제 새로고침을 시도해보세요</li>
+                <li>개발자 도구에서 <code>debugInventory()</code>를 실행하여 pendingEdits 상태를 확인해보세요</li>
+                <li>콘솔에서 "인라인 스타일 적용됨" 메시지를 확인해보세요</li>
+            </ol>
+        </div>
+
+        <div class="error">
+            <h3>문제: 입력한 값이 원상복구됨</h3>
+            <p><strong>해결 방법:</strong></p>
+            <ol>
+                <li>페이지를 새로고침한 후 다시 시도해보세요</li>
+                <li>다른 세션을 선택한 후 다시 원래 세션을 선택해보세요</li>
+                <li>브라우저 캐시를 지워보세요</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 예상 동작</h2>
+        
+        <div class="success">
+            <h3>정상 동작 시나리오:</h3>
+            <ol>
+                <li><strong>수정:</strong> 실사 재고나 비고를 변경하면 즉시 노란색 하이라이트</li>
+                <li><strong>지속성:</strong> 다른 필드를 클릭해도 수정한 값이 유지됨</li>
+                <li><strong>확정:</strong> 확정 버튼 클릭 시 데이터베이스에 저장되고 파란색 배경으로 변경</li>
+                <li><strong>보호:</strong> 확정된 항목은 더 이상 수정할 수 없음 (입력 필드 비활성화)</li>
+                <li><strong>피드백:</strong> 성공/실패 메시지가 명확하게 표시됨</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 기술적 세부사항</h2>
+        
+        <div class="highlight">
+            <h3>주요 개선사항:</h3>
+            <ul>
+                <li><strong>확정 상태 관리:</strong> confirmed_at 필드로 확정 시간 기록</li>
+                <li><strong>데이터베이스 트리거 수정:</strong> adjusted_stock → physical_stock 필드 사용</li>
+                <li><strong>입력 필드 보호:</strong> 확정된 항목은 disabled 속성으로 비활성화</li>
+                <li><strong>시각적 피드백:</strong> 확정된 항목은 파란색 배경으로 구분</li>
+                <li><strong>인라인 스타일 적용:</strong> CSS 로드 문제를 해결하기 위해 인라인 스타일 강제 적용</li>
+                <li><strong>타이밍 개선:</strong> setTimeout을 사용하여 DOM 업데이트 후 스타일 적용</li>
+                <li><strong>오류 처리 강화:</strong> 더 구체적인 오류 메시지와 상세한 로깅</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 디버깅 명령어</h2>
+        
+        <div class="highlight">
+            <p><strong>브라우저 콘솔에서 사용할 수 있는 명령어:</strong></p>
+            <ul>
+                <li><code>debugInventory()</code> - 현재 상태 정보 출력</li>
+                <li><code>console.log(window.physicalInventoryAdmin)</code> - 인스턴스 확인</li>
+                <li><code>console.log(window.physicalInventoryAdmin.pendingEdits)</code> - pending edits 상태 확인</li>
+                <li><code>console.log(window.physicalInventoryAdmin.inventoryItems)</code> - 확정 상태 확인</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>⚠️ 주의사항</h2>
+        
+        <div class="error">
+            <ul>
+                <li><strong>중요:</strong> 데이터베이스 스키마 수정이 반드시 필요합니다!</li>
+                <li>확정된 항목은 더 이상 수정할 수 없습니다</li>
+                <li>확정된 항목을 삭제하려면 "삭제" 버튼을 사용하세요</li>
+                <li>서버를 재시작한 후 테스트해보세요</li>
+                <li>브라우저 캐시를 지우고 강제 새로고침을 시도해보세요</li>
+                <li>개발자 도구의 콘솔에서 오류 메시지를 확인해보세요</li>
+                <li>데이터베이스 연결이 정상인지 확인해보세요</li>
+                <li>인라인 스타일이 적용되었는지 확인해보세요</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        console.log('Pending Edits 테스트 페이지 로드됨');
+        console.log('테스트를 시작하려면 관리자 페이지로 이동하세요: admin/physical-inventory.html');
+        console.log('중요: 데이터베이스 스키마 수정이 필요합니다!');
+        console.log('새로운 기능: 확정된 항목은 더 이상 수정할 수 없습니다!');
+    </script>
+</body>
+</html> 

@@ -1059,10 +1059,7 @@ class InventoryStatus {
         // 미국 중부 시간 기준으로 현재 시간 표시
         const now = new Date();
         
-        // 미국 중부 시간대 (CST/CDT)로 변환
-        const centralTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-        
-        const timeString = centralTime.toLocaleString('ko-KR', {
+        const timeString = now.toLocaleString('en-US', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -1074,7 +1071,7 @@ class InventoryStatus {
         
         const timeElement = document.getElementById('currentTime');
         if (timeElement) {
-            timeElement.textContent = timeString + ' (CST/CDT)';
+            timeElement.textContent = timeString;
         }
     }
 
@@ -1277,7 +1274,7 @@ class InventoryStatus {
     renderFilePreview(data) {
         const preview = document.getElementById('filePreview');
         if (data.length === 0) {
-            preview.innerHTML = '<p class="text-red-500">파일에서 데이터를 읽을 수 없습니다.</p>';
+            preview.innerHTML = `<p class="text-red-500">${i18n.t('file_read_error')}</p>`;
             return;
         }
 
@@ -1411,7 +1408,7 @@ class InventoryStatus {
             // 2. 재고 업데이트
             const { data: inventoryData, error: inventoryError } = await this.supabase
                 .from('inventory')
-                .select('current_stock, today_inbound')
+                .select('current_stock')
                 .eq('part_number', partNumber)
                 .single();
 
@@ -1420,9 +1417,7 @@ class InventoryStatus {
             }
 
             const currentStock = inventoryData ? inventoryData.current_stock : 0;
-            const todayInbound = inventoryData ? inventoryData.today_inbound : 0;
             const newStock = currentStock + quantity;
-            const newTodayInbound = todayInbound + quantity;
 
             // 3. 재고 테이블 업데이트 또는 생성
             if (inventoryData) {
@@ -1430,7 +1425,6 @@ class InventoryStatus {
                     .from('inventory')
                     .update({
                         current_stock: newStock,
-                        today_inbound: newTodayInbound,
                         last_updated: new Date().toISOString()
                     })
                     .eq('part_number', partNumber);
@@ -1440,7 +1434,8 @@ class InventoryStatus {
                     .insert({
                         part_number: partNumber,
                         current_stock: newStock,
-                        today_inbound: newTodayInbound
+                        status: 'in_stock',
+                        last_updated: new Date().toISOString()
                     });
             }
 
@@ -1576,7 +1571,7 @@ class InventoryStatus {
             const partSelects = document.querySelectorAll('[name^="partNumber_"]');
             partSelects.forEach(select => {
                 const currentValue = select.value;
-                select.innerHTML = '<option value="">파트 선택</option>' + 
+                select.innerHTML = `<option value="">${i18n.t('select_part_option')}</option>` + 
                     this.masterParts.map(part => `<option value="${part.part_number}">${part.part_number}</option>`).join('');
                 select.value = currentValue;
             });

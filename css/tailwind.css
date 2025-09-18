@@ -17,6 +17,14 @@
         @apply px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200;
     }
     
+    .btn-success {
+        @apply px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200;
+    }
+    
+    .btn-warning {
+        @apply px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors duration-200;
+    }
+    
     .input-field {
         @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
     }
@@ -35,6 +43,43 @@
     
     .sidebar-link-active {
         @apply flex items-center px-4 py-3 text-gray-700 bg-blue-50 border-r-2 border-blue-600;
+    }
+    
+    /* Admin 페이지 공통 스타일 */
+    .admin-gradient-bg {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+    
+    .admin-glass-effect {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .admin-glass-sidebar {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(15px);
+        border-right: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .admin-nav-item {
+        @apply flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200;
+    }
+    
+    .admin-nav-item.active {
+        background: rgba(59, 130, 246, 0.1);
+        border-right: 3px solid #3b82f6;
+        @apply text-gray-800;
+    }
+    
+    .admin-nav-item i {
+        @apply w-5 h-5 mr-3 text-gray-500;
+    }
+    
+    .admin-nav-item.active i {
+        @apply text-blue-600;
     }
 }
 
@@ -98,6 +143,28 @@
 
 .table-cell {
     @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+}
+
+/* Pending edit row styling */
+.pending-edit-row {
+    @apply bg-yellow-50 border-l-4 border-yellow-400 !important;
+    background-color: #fefce8 !important;
+    border-left-color: #facc15 !important;
+}
+
+.pending-edit-row:hover {
+    @apply bg-yellow-100 !important;
+    background-color: #fef3c7 !important;
+}
+
+.pending-edit-row td {
+    @apply bg-yellow-50 !important;
+    background-color: #fefce8 !important;
+}
+
+.pending-edit-row:hover td {
+    @apply bg-yellow-100 !important;
+    background-color: #fef3c7 !important;
 }
 
 /* 상태 배지 */

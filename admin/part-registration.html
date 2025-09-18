@@ -81,17 +81,19 @@
     </script>
     <style>
         .glass-effect {
-            background: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
         .glass-sidebar {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(15px);
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
         }
         .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         }
         .card-shadow {
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -103,8 +105,8 @@
             transform: translateX(5px);
         }
         .nav-item.active {
-            background: rgba(255, 255, 255, 0.3);
-            border-right: 3px solid white;
+            background: rgba(59, 130, 246, 0.1);
+            border-right: 3px solid #3b82f6;
         }
     </style>
 </head>
@@ -113,74 +115,86 @@
         <!-- Sidebar -->
         <div class="w-64 glass-sidebar">
             <!-- Logo -->
-            <div class="p-6 border-b border-white/20">
-                <h1 class="text-xl font-bold text-white flex items-center animate-bounce-in">
-                    <i class="fas fa-barcode mr-2 text-white"></i>
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-gray-800 flex items-center animate-bounce-in">
+                    <i class="fas fa-barcode mr-2 text-gray-800"></i>
                     바코드 시스템
                 </h1>
-                <p class="text-sm text-white/80 mt-1">관리자 패널</p>
+                <p class="text-sm text-gray-800/80 mt-1">관리자 패널</p>
             </div>
 
             <!-- Navigation Menu -->
             <nav class="mt-6">
                 <div class="px-4">
-                    <h3 class="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">메뉴</h3>
+                    <h3 class="text-xs font-semibold text-gray-800/60 uppercase tracking-wider mb-3">메뉴</h3>
                 </div>
                 
                 <div class="space-y-1">
                     <!-- Dashboard -->
-                    <a href="index.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                    <a href="index.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
                         <span>대시보드</span>
                     </a>
 
                     <!-- Part Registration -->
-                    <a href="part-registration.html" class="nav-item active flex items-center px-4 py-3 text-white hover:bg-white/20 transition-all duration-200">
+                    <a href="part-registration.html" class="nav-item active flex items-center px-4 py-3 text-gray-800 hover:bg-gray-100 transition-all duration-200">
                         <i class="fas fa-plus w-5 h-5 mr-3"></i>
                         <span class="font-medium">파트 등록</span>
                     </a>
 
                     <!-- Inbound Status -->
-                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
                         <span>입고 현황</span>
                     </a>
 
                     <!-- Outbound Status -->
-                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
                         <span>출고 현황</span>
                     </a>
 
                     <!-- Inventory Status -->
-                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-boxes w-5 h-5 mr-3"></i>
                         <span>재고 현황</span>
                     </a>
 
                     <!-- Outbound Summary -->
-                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
                         <span>출하 현황</span>
                     </a>
 
                     <!-- Physical Inventory -->
-                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200">
+                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
                         <span>실사 관리</span>
+                    </a>
+
+                    <!-- Daily Inventory -->
+                    <a href="daily-inventory-enhanced.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-calendar-day w-5 h-5 mr-3"></i>
+                        <span>일일 재고</span>
+                    </a>
+
+                    <!-- Initial Inventory Setup -->
+                    <a href="initial-inventory-setup.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                        <i class="fas fa-database w-5 h-5 mr-3"></i>
+                        <span>초기 재고 설정</span>
                     </a>
                 </div>
             </nav>
 
             <!-- User Info & Current Time -->
-            <div class="absolute bottom-0 w-64 p-4 border-t border-white/20">
+            <div class="absolute bottom-0 w-64 p-4 border-t border-gray-200">
                 <div class="flex items-center mb-3">
-                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                        <i class="fas fa-user text-white text-sm"></i>
+                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-gray-800 text-sm"></i>
                     </div>
                     <div class="ml-3">
-                        <p class="text-sm font-medium text-white">관리자</p>
-                        <button onclick="logout()" class="text-xs text-white/80 hover:text-white transition-colors">
+                        <p class="text-sm font-medium text-gray-800">관리자</p>
+                        <button onclick="logout()" class="text-xs text-gray-800/80 hover:text-gray-800 transition-colors">
                             <i class="fas fa-sign-out-alt mr-1"></i>로그아웃
                         </button>
                     </div>
@@ -191,15 +205,15 @@
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
             <!-- Header -->
-            <header class="glass-effect border-b border-white/20">
+            <header class="glass-effect border-b border-gray-200">
                 <div class="px-6 py-4">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h1 class="text-2xl font-bold text-white">파트 등록</h1>
-                            <p class="text-sm text-white/80">새로운 파트 등록 및 관리</p>
+                            <h1 class="text-2xl font-bold text-gray-800">파트 등록</h1>
+                            <p class="text-sm text-gray-800/80">새로운 파트 등록 및 관리</p>
                         </div>
                         <div class="flex items-center space-x-4">
-                            <button id="refreshBtn" class="flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors">
+                            <button id="refreshBtn" class="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-white/30 transition-colors">
                                 <i class="fas fa-sync-alt mr-2"></i>
                                 새로고침
                             </button>
@@ -218,8 +232,8 @@
                                 <i class="fas fa-box text-blue-300 text-xl"></i>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-white/80">총 파트 수</p>
-                                <p class="text-2xl font-semibold text-white" id="totalParts">0</p>
+                                <p class="text-sm font-medium text-gray-800/80">총 파트 수</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="totalParts">0</p>
                             </div>
                         </div>
                     </div>
@@ -230,8 +244,8 @@
                                 <i class="fas fa-check-circle text-green-300 text-xl"></i>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-white/80">활성 파트</p>
-                                <p class="text-2xl font-semibold text-white" id="activeParts">0</p>
+                                <p class="text-sm font-medium text-gray-800/80">활성 파트</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="activeParts">0</p>
                             </div>
                         </div>
                     </div>
@@ -242,8 +256,8 @@
                                 <i class="fas fa-pause-circle text-orange-300 text-xl"></i>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-white/80">비활성 파트</p>
-                                <p class="text-2xl font-semibold text-white" id="inactiveParts">0</p>
+                                <p class="text-sm font-medium text-gray-800/80">비활성 파트</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="inactiveParts">0</p>
                             </div>
                         </div>
                     </div>
@@ -254,8 +268,8 @@
                                 <i class="fas fa-tags text-purple-300 text-xl"></i>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-white/80">카테고리</p>
-                                <p class="text-2xl font-semibold text-white" id="totalCategories">0</p>
+                                <p class="text-sm font-medium text-gray-800/80">카테고리</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="totalCategories">0</p>
                             </div>
                         </div>
                     </div>
@@ -265,31 +279,29 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Registration Form -->
                     <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.4s;">
-                        <h2 class="text-lg font-semibold text-white mb-4">새 파트 등록</h2>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">새 파트 등록</h2>
                         <form id="partForm" class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-white/80 mb-2">파트 번호 *</label>
+                                    <label class="block text-sm font-medium text-gray-800/80 mb-2">파트 번호 *</label>
                                     <input type="text" id="partNumber" name="partNumber" required 
-                                           class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                                           class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                            placeholder="예: 49560-12345">
-                                    <p class="mt-1 text-xs text-white/60">파트 번호를 입력하면 카테고리가 자동으로 설정됩니다.</p>
+                                    <p class="mt-1 text-xs text-gray-800/60">파트 번호를 입력하면 카테고리가 자동으로 설정됩니다.</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-white/80 mb-2">카테고리 *</label>
-                                    <select id="category" name="category" required 
-                                            class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
-                                        <option value="">카테고리 선택</option>
-                                        <option value="REAR">REAR</option>
-                                        <option value="INNER">INNER</option>
-                                    </select>
+                                    <label class="block text-sm font-medium text-gray-800/80 mb-2">카테고리 *</label>
+                                    <div class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-800">
+                                        <span id="categoryDisplay" class="text-sm">파트 번호를 입력하면 자동으로 설정됩니다</span>
+                                    </div>
+                                    <input type="hidden" id="category" name="category" value="UNKNOWN">
                                 </div>
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-medium text-white/80 mb-2">상태 *</label>
+                                <label class="block text-sm font-medium text-gray-800/80 mb-2">상태 *</label>
                                 <select id="status" name="status" required 
-                                        class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <option value="active">활성</option>
                                     <option value="inactive">비활성</option>
                                     <option value="discontinued">단종</option>
@@ -298,11 +310,11 @@
                             
                             <div class="flex space-x-3">
                                 <button type="submit" 
-                                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                        class="flex-1 bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                                     <i class="fas fa-save mr-2"></i>등록
                                 </button>
                                 <button type="button" id="resetBtn"
-                                        class="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                                        class="flex-1 bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                                     <i class="fas fa-undo mr-2"></i>초기화
                                 </button>
                             </div>
@@ -311,30 +323,30 @@
 
                     <!-- Search and Filter -->
                     <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.5s;">
-                        <h2 class="text-lg font-semibold text-white mb-4">검색 및 필터</h2>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">검색 및 필터</h2>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-white/80 mb-2">검색</label>
+                                <label class="block text-sm font-medium text-gray-800/80 mb-2">검색</label>
                                 <input type="text" id="searchInput" 
-                                       class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                                       class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                        placeholder="파트 번호, 설명으로 검색...">
                             </div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-white/80 mb-2">카테고리 필터</label>
+                                    <label class="block text-sm font-medium text-gray-800/80 mb-2">카테고리 필터</label>
                                     <select id="categoryFilter" 
-                                            class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                                            class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="">모든 카테고리</option>
-                                        <option value="REAR">REAR</option>
                                         <option value="INNER">INNER</option>
+                                        <option value="REAR">REAR</option>
                                         <option value="OUTER">OUTER</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-white/80 mb-2">상태 필터</label>
+                                    <label class="block text-sm font-medium text-gray-800/80 mb-2">상태 필터</label>
                                     <select id="statusFilter" 
-                                            class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                                            class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="">모든 상태</option>
                                         <option value="active">활성</option>
                                         <option value="inactive">비활성</option>
@@ -347,15 +359,15 @@
 
                 <!-- Parts Table -->
                 <div class="glass-effect rounded-xl p-6 mt-6 animate-slide-up" style="animation-delay: 0.6s;">
-                    <h2 class="text-lg font-semibold text-white mb-4">파트 목록</h2>
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">파트 목록</h2>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead>
-                                <tr class="border-b border-white/20">
-                                    <th class="text-left py-3 px-4 text-white/80 font-medium">파트 번호</th>
-                                    <th class="text-left py-3 px-4 text-white/80 font-medium">카테고리</th>
-                                    <th class="text-left py-3 px-4 text-white/80 font-medium">상태</th>
-                                    <th class="text-left py-3 px-4 text-white/80 font-medium">작업</th>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-left py-3 px-4 text-gray-800/80 font-medium">파트 번호</th>
+                                    <th class="text-left py-3 px-4 text-gray-800/80 font-medium">카테고리</th>
+                                    <th class="text-left py-3 px-4 text-gray-800/80 font-medium">상태</th>
+                                    <th class="text-left py-3 px-4 text-gray-800/80 font-medium">작업</th>
                                 </tr>
                             </thead>
                             <tbody id="partsTableBody">
@@ -381,17 +393,17 @@
                     <i class="fas fa-exclamation-triangle text-red-300 text-xl"></i>
                 </div>
                 <div class="mt-3 text-center">
-                    <h3 class="text-lg font-medium text-white">파트 삭제 확인</h3>
+                    <h3 class="text-lg font-medium text-gray-800">파트 삭제 확인</h3>
                     <div class="mt-2 px-7 py-3">
-                        <p class="text-sm text-white/80">
+                        <p class="text-sm text-gray-800/80">
                             이 파트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
                         </p>
                     </div>
                     <div class="flex justify-center space-x-4">
-                        <button id="cancelDelete" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                        <button id="cancelDelete" class="bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                             취소
                         </button>
-                        <button id="confirmDelete" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                        <button id="confirmDelete" class="bg-red-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
                             삭제
                         </button>
                     </div>
@@ -405,8 +417,8 @@
         <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <div class="glass-effect p-6 rounded-xl shadow-lg">
                 <div class="flex items-center">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                    <span class="ml-3 text-white">로딩 중...</span>
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                    <span class="ml-3 text-gray-800">로딩 중...</span>
                 </div>
             </div>
         </div>
