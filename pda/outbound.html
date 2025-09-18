@@ -502,6 +502,23 @@
             </div>
         </div>
 
+        <!-- Scan Progress Indicator -->
+        <div id="scanProgressSection" class="glass-card rounded-2xl p-4 animate-slide-up hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
+                    <div>
+                        <h3 class="text-base font-semibold text-blue-800" data-i18n="scanning_in_progress">스캔 진행 중...</h3>
+                        <p class="text-sm text-blue-600" id="scanProgressText">바코드를 스캔하세요</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-2xl font-bold text-blue-600" id="scannedCount">0</div>
+                    <div class="text-xs text-gray-500">스캔됨</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Parts List -->
         <div id="partsSection" class="glass-card rounded-2xl p-4 animate-slide-up hidden">
             <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="outbound_parts_list">스캔된 파트 목록</h2>
@@ -689,11 +706,33 @@
         // 진행 상황 업데이트
         function updateProgress() {
             const completedParts = Object.values(scannedParts).filter(part => part.scannedQuantity > 0).length;
+            const totalParts = Object.keys(scannedParts).length;
 
-            // 스캔된 파트가 있으면 컨펌 버튼 표시
+            // 스캔된 파트 수 업데이트
+            document.getElementById('scannedCount').textContent = completedParts;
+
             if (completedParts > 0) {
-                document.getElementById('confirmationButtons').classList.remove('hidden');
+                // 스캔 진행 중 인디케이터 표시
+                document.getElementById('scanProgressSection').classList.remove('hidden');
+                
+                // 진행 상황 텍스트 업데이트
+                const progressText = document.getElementById('scanProgressText');
+                if (totalParts > 0) {
+                    progressText.textContent = `${completedParts}/${totalParts} 항목 스캔됨`;
+                } else {
+                    progressText.textContent = `${completedParts} 항목 스캔됨`;
+                }
+
+                // 모든 항목이 스캔 완료되었을 때만 컨펌 버튼 표시
+                if (completedParts === totalParts && totalParts > 0) {
+                    document.getElementById('confirmationButtons').classList.remove('hidden');
+                    document.getElementById('scanProgressSection').classList.add('hidden');
+                } else {
+                    document.getElementById('confirmationButtons').classList.add('hidden');
+                }
             } else {
+                // 스캔된 항목이 없으면 모든 인디케이터 숨김
+                document.getElementById('scanProgressSection').classList.add('hidden');
                 document.getElementById('confirmationButtons').classList.add('hidden');
             }
         }
@@ -925,7 +964,8 @@
             updateProgress();
             document.getElementById('barcodeInput').value = '';
             
-            // 확인 버튼 숨기기
+            // 진행 상황 및 확인 버튼 숨기기
+            document.getElementById('scanProgressSection').classList.add('hidden');
             document.getElementById('confirmationButtons').classList.add('hidden');
             
             showNotification('스캔이 초기화되었습니다.', 'info');
@@ -1071,6 +1111,7 @@
             document.getElementById('dateSelect').value = '';
             document.getElementById('shiftSelect').value = '';
             document.getElementById('partsSection').classList.add('hidden');
+            document.getElementById('scanProgressSection').classList.add('hidden');
             document.getElementById('confirmationButtons').classList.add('hidden');
             document.getElementById('partsList').innerHTML = '';
             
