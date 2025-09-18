@@ -406,68 +406,34 @@
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="p-4 space-y-6">
-        <!-- Welcome Message -->
-        <div class="glass-card rounded-2xl p-6 text-center animate-slide-up">
-            <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 floating-icon">
-                <i class="fas fa-mobile-alt text-white text-2xl"></i>
-            </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-2" data-i18n="hello">안녕하세요!</h2>
-            <p class="text-gray-600 text-sm" data-i18n="select_work_mode">작업할 모드를 선택하세요</p>
-        </div>
-
-        <!-- Main Action Buttons -->
-        <div class="grid grid-cols-1 gap-4 animate-slide-up" style="animation-delay: 0.1s;">
+    <!-- Main Action Buttons -->
+    <main class="p-4">
+        <div class="grid grid-cols-3 gap-4 animate-slide-up">
             <!-- Inbound Button -->
             <button onclick="window.location.href='inbound.html'" 
-                    class="action-button inbound-btn p-6 text-white menu-item">
-                <div class="flex items-center">
-                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
-                        <i class="fas fa-arrow-down text-white text-xl"></i>
-                    </div>
-                    <div class="text-left">
-                        <h3 class="text-lg font-bold" data-i18n="inbound_work">입고 작업</h3>
-                        <p class="text-sm opacity-90" data-i18n="new_item_inbound">새로운 물품 입고 처리</p>
-                    </div>
-                    <div class="ml-auto">
-                        <i class="fas fa-chevron-right text-white/60"></i>
-                    </div>
+                    class="action-button inbound-btn aspect-square flex flex-col items-center justify-center text-white menu-item rounded-2xl">
+                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                    <i class="fas fa-arrow-down text-white text-2xl"></i>
                 </div>
+                <h3 class="text-sm font-bold text-center" data-i18n="inbound_work">입고 작업</h3>
             </button>
 
             <!-- Outbound Button -->
             <button onclick="window.location.href='outbound.html'" 
-                    class="action-button outbound-btn p-6 text-white menu-item">
-                <div class="flex items-center">
-                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
-                        <i class="fas fa-arrow-up text-white text-xl"></i>
-                    </div>
-                    <div class="text-left">
-                        <h3 class="text-lg font-bold" data-i18n="outbound_work">출고 작업</h3>
-                        <p class="text-sm opacity-90" data-i18n="item_outbound_delivery">물품 출고 및 배송 처리</p>
-                    </div>
-                    <div class="ml-auto">
-                        <i class="fas fa-chevron-right text-white/60"></i>
-                    </div>
+                    class="action-button outbound-btn aspect-square flex flex-col items-center justify-center text-white menu-item rounded-2xl">
+                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                    <i class="fas fa-arrow-up text-white text-2xl"></i>
                 </div>
+                <h3 class="text-sm font-bold text-center" data-i18n="outbound_work">출고 작업</h3>
             </button>
 
             <!-- Physical Inventory Button -->
             <button onclick="window.location.href='physical-inventory.html'" 
-                    class="action-button physical-inventory-btn p-6 text-white menu-item">
-                <div class="flex items-center">
-                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
-                        <i class="fas fa-clipboard-check text-white text-xl"></i>
-                    </div>
-                    <div class="text-left">
-                        <h3 class="text-lg font-bold" data-i18n="physical_inventory">실사 재고</h3>
-                        <p class="text-sm opacity-90" data-i18n="physical_inventory_desc">바코드 스캔 및 수동 등록</p>
-                    </div>
-                    <div class="ml-auto">
-                        <i class="fas fa-chevron-right text-white/60"></i>
-                    </div>
+                    class="action-button physical-inventory-btn aspect-square flex flex-col items-center justify-center text-white menu-item rounded-2xl">
+                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                    <i class="fas fa-clipboard-check text-white text-2xl"></i>
                 </div>
+                <h3 class="text-sm font-bold text-center" data-i18n="physical_inventory">실사 재고</h3>
             </button>
         </div>
     </main>

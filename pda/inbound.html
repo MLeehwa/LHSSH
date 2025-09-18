@@ -107,22 +107,21 @@
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
-                // 바코드 입력 시 키보드 숨김
+                // 바코드 입력 시 키보드 숨김 (입력 완료 후)
                 barcodeInput.addEventListener('input', function() {
-                    setTimeout(hideKeyboard, 100);
+                    // 입력이 완료된 후 키보드 숨김
+                    setTimeout(hideKeyboard, 500);
                 });
                 
                 // 바코드 입력 완료 시 키보드 숨김
                 barcodeInput.addEventListener('keypress', function(e) {
                     if (e.key === 'Enter') {
-                        setTimeout(hideKeyboard, 100);
+                        setTimeout(hideKeyboard, 200);
                     }
                 });
                 
-                // 바코드 입력 필드 포커스 시에도 키보드 숨김
-                barcodeInput.addEventListener('focus', function() {
-                    setTimeout(hideKeyboard, 100);
-                });
+                // 바코드 입력 필드 포커스는 자유롭게 허용
+                // (스캔을 위해 포커스 제어하지 않음)
             }
         }
         
