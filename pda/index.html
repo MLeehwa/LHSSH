@@ -15,6 +15,73 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- 키보드 숨김 기능 -->
+    <script>
+        // 강화된 키보드 숨김 함수
+        function hideKeyboard() {
+            // 1. 모든 입력 필드에서 포커스 제거
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                input.blur();
+                input.setAttribute('readonly', 'readonly');
+                setTimeout(() => {
+                    input.removeAttribute('readonly');
+                }, 100);
+            });
+            
+            // 2. 화면을 터치하여 키보드 숨김
+            document.body.click();
+            
+            // 3. 모바일에서 키보드 숨김을 위한 추가 처리
+            if (window.scrollTo) {
+                window.scrollTo(0, 0);
+            }
+            
+            // 4. 가상 키보드 숨김을 위한 추가 처리
+            document.activeElement && document.activeElement.blur();
+            
+            // 5. 포커스를 body로 이동
+            document.body.focus();
+            
+            // 6. 입력 필드 비활성화 후 재활성화
+            inputs.forEach(input => {
+                input.disabled = true;
+                setTimeout(() => {
+                    input.disabled = false;
+                }, 50);
+            });
+        }
+        
+        // 페이지 로드 시 키보드 숨김
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(hideKeyboard, 100);
+            setTimeout(hideKeyboard, 500);
+            setTimeout(hideKeyboard, 1000);
+        });
+        
+        // 화면 터치 시 키보드 숨김
+        document.addEventListener('touchstart', function(e) {
+            if (!e.target.matches('input, textarea, select, button')) {
+                hideKeyboard();
+            }
+        });
+        
+        // 포커스 이벤트 시 키보드 숨김
+        document.addEventListener('focusin', function(e) {
+            if (!e.target.matches('input, textarea, select')) {
+                hideKeyboard();
+            }
+        });
+        
+        // 키보드 이벤트 시 키보드 숨김
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideKeyboard();
+            }
+        });
+    </script>
+    
     <script>
         // Tailwind 설정은 CDN 로드 후에 실행
         function configureTailwind() {
@@ -299,6 +366,9 @@
                 <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
                     <i class="fas fa-user text-gray-600 text-sm"></i>
                 </div>
+                <button onclick="hideKeyboard()" class="text-gray-600 hover:text-gray-800 transition-colors" title="키보드 숨김">
+                    <i class="fas fa-keyboard text-sm"></i>
+                </button>
                 <button onclick="logout()" class="text-gray-600 hover:text-gray-800 transition-colors">
                     <i class="fas fa-sign-out-alt text-sm"></i>
                 </button>
