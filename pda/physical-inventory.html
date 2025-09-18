@@ -18,6 +18,39 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- 키보드 숨김 기능 -->
+    <script>
+        // 키보드 숨김 함수
+        function hideKeyboard() {
+            // 모든 입력 필드에서 포커스 제거
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                input.blur();
+            });
+            
+            // 화면을 터치하여 키보드 숨김
+            document.body.click();
+            
+            // 모바일에서 키보드 숨김을 위한 추가 처리
+            if (window.scrollTo) {
+                window.scrollTo(0, 0);
+            }
+        }
+        
+        // 페이지 로드 시 키보드 숨김
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(hideKeyboard, 100);
+        });
+        
+        // 화면 터치 시 키보드 숨김
+        document.addEventListener('touchstart', function(e) {
+            if (!e.target.matches('input, textarea, select')) {
+                hideKeyboard();
+            }
+        });
+    </script>
+    
     <script>
         // Tailwind 설정은 CDN 로드 후에 실행
         function configureTailwind() {
@@ -533,10 +566,16 @@
 
     <div class="physical-inventory-container">
         <!-- 메인 메뉴 버튼 -->
-        <button onclick="window.location.href='index.html'" class="main-menu-btn">
-            <i class="fas fa-home mr-2"></i>
-            <span data-i18n="main_menu">메인 메뉴</span>
-        </button>
+        <div class="flex gap-3 mb-4">
+            <button onclick="window.location.href='index.html'" class="main-menu-btn">
+                <i class="fas fa-home mr-2"></i>
+                <span data-i18n="main_menu">메인 메뉴</span>
+            </button>
+            <button onclick="hideKeyboard()" class="main-menu-btn" title="키보드 숨김">
+                <i class="fas fa-keyboard mr-2"></i>
+                <span data-i18n="hide_keyboard">키보드 숨김</span>
+            </button>
+        </div>
         
         <h1 class="text-3xl font-bold text-white mb-6" data-i18n="physical_inventory_title">실사 재고</h1>
         

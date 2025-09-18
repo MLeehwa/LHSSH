@@ -23,6 +23,7 @@ const i18n = {
             success: '성공',
             warning: '경고',
             info: '정보',
+            hide_keyboard: '키보드 숨김',
             
             // PDA System
             pda_system: 'PDA 시스템',
@@ -180,6 +181,7 @@ const i18n = {
             success: 'Success',
             warning: 'Warning',
             info: 'Info',
+            hide_keyboard: 'Hide Keyboard',
             
             // PDA System
             pda_system: 'PDA System',
@@ -337,6 +339,7 @@ const i18n = {
             success: 'Éxito',
             warning: 'Advertencia',
             info: 'Información',
+            hide_keyboard: 'Ocultar Teclado',
             
             // PDA System
             pda_system: 'Sistema PDA',
