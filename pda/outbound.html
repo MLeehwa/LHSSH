@@ -60,46 +60,57 @@
         
         // 입력 필드 포커스 방지 함수
         function preventInputFocus() {
-            // 일반 입력 필드만 포커스 방지 (드롭다운과 날짜 선택은 제외)
-            const inputs = document.querySelectorAll('input[type="text"], input[type="number"], textarea');
-            inputs.forEach(input => {
-                // 바코드 입력 필드는 제외 (스캔 기능을 위해)
-                if (input.id === 'barcodeInput') {
+            // 바코드 입력 필드와 드롭다운, 날짜 선택은 완전히 제외
+            const allowedIds = ['barcodeInput', 'shiftSelect', 'asPartSelect', 'dateSelect'];
+            
+            // 모든 입력 요소를 찾아서 허용된 ID가 아닌 것만 제어
+            const allInputs = document.querySelectorAll('input, textarea, select');
+            allInputs.forEach(input => {
+                // 허용된 ID는 완전히 제외
+                if (allowedIds.includes(input.id)) {
                     return;
                 }
                 
-                // 포커스 이벤트 방지
-                input.addEventListener('focus', function(e) {
-                    e.preventDefault();
-                    e.target.blur();
-                    hideKeyboard();
-                });
-                
-                // 클릭 이벤트 방지
-                input.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.target.blur();
-                    hideKeyboard();
-                });
-                
-                // 터치 이벤트 방지
-                input.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    e.target.blur();
-                    hideKeyboard();
-                });
+                // input[type="text"], input[type="number"], textarea만 포커스 방지
+                if (input.tagName === 'INPUT' && 
+                    (input.type === 'text' || input.type === 'number') ||
+                    input.tagName === 'TEXTAREA') {
+                    
+                    // 포커스 이벤트 방지
+                    input.addEventListener('focus', function(e) {
+                        e.preventDefault();
+                        e.target.blur();
+                        hideKeyboard();
+                    });
+                    
+                    // 클릭 이벤트 방지
+                    input.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.target.blur();
+                        hideKeyboard();
+                    });
+                    
+                    // 터치 이벤트 방지
+                    input.addEventListener('touchstart', function(e) {
+                        e.preventDefault();
+                        e.target.blur();
+                        hideKeyboard();
+                    });
+                }
             });
             
-            // select 요소와 날짜 선택은 키보드만 숨김
-            const selectAndDateInputs = document.querySelectorAll('select, input[type="date"]');
-            selectAndDateInputs.forEach(element => {
-                element.addEventListener('focus', function(e) {
-                    setTimeout(hideKeyboard, 100);
-                });
-                
-                element.addEventListener('change', function(e) {
-                    setTimeout(hideKeyboard, 100);
-                });
+            // 허용된 요소들은 키보드만 숨김
+            allowedIds.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('focus', function(e) {
+                        setTimeout(hideKeyboard, 100);
+                    });
+                    
+                    element.addEventListener('change', function(e) {
+                        setTimeout(hideKeyboard, 100);
+                    });
+                }
             });
         }
         
