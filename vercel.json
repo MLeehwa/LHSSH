@@ -8,6 +8,10 @@
   ],
   "routes": [
     {
+      "src": "/",
+      "dest": "/login.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
