@@ -58,10 +58,15 @@
             });
         }
         
-        // 포커스 제어 함수 (드롭다운과 날짜 선택은 완전히 허용)
+        // 포커스 제어 함수 (차수 선택 후에만 적용)
         function preventInputFocus() {
-            // 드롭다운과 날짜 선택, 바코드 입력은 완전히 허용
-            // 이들에 대해서는 어떤 포커스 제어도 하지 않음
+            // 차수가 선택되지 않은 경우 아무것도 하지 않음
+            if (!currentShift) {
+                console.log('차수가 선택되지 않아 포커스 제어를 적용하지 않음');
+                return;
+            }
+            
+            console.log('차수 선택 후 포커스 제어 적용:', currentShift);
             
             // 일반 텍스트 입력 필드만 포커스 방지 (드롭다운은 제외)
             const textInputs = document.querySelectorAll('input[type="text"]:not(#barcodeInput):not(#dateSelect), input[type="number"], textarea');
@@ -116,12 +121,17 @@
             setTimeout(hideKeyboard, 100);
             setTimeout(hideKeyboard, 500);
             setTimeout(hideKeyboard, 1000);
-            setTimeout(preventInputFocus, 200);
+            // preventInputFocus는 차수 선택 후에만 호출
             setTimeout(setupBarcodeInput, 300);
         });
         
-        // 화면 터치 시 키보드 숨김
+        // 화면 터치 시 키보드 숨김 (차수 선택 전에는 드롭다운 방해하지 않음)
         document.addEventListener('touchstart', function(e) {
+            // 차수가 선택되지 않은 경우 드롭다운은 완전히 자유롭게
+            if (!currentShift) {
+                return;
+            }
+            
             // 드롭다운과 날짜 선택, 바코드 입력은 제외
             if (!e.target.matches('input, textarea, select, button') || 
                 e.target.matches('#shiftSelect, #asPartSelect, #dateSelect, #barcodeInput')) {
@@ -129,8 +139,13 @@
             }
         });
         
-        // 포커스 이벤트 시 키보드 숨김
+        // 포커스 이벤트 시 키보드 숨김 (차수 선택 전에는 드롭다운 방해하지 않음)
         document.addEventListener('focusin', function(e) {
+            // 차수가 선택되지 않은 경우 드롭다운은 완전히 자유롭게
+            if (!currentShift) {
+                return;
+            }
+            
             // 드롭다운과 날짜 선택, 바코드 입력은 제외
             if (!e.target.matches('input, textarea, select') || 
                 e.target.matches('#shiftSelect, #asPartSelect, #dateSelect, #barcodeInput')) {
