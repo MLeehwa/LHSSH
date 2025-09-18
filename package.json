@@ -5,7 +5,7 @@
   "main": "index.html",
   "scripts": {
     "dev": "npx http-server -p 8000",
-    "build": "echo 'Build process for production'",
+    "build": "echo 'Static site - no build needed'",
     "start": "npx http-server -p 8000",
     "deploy": "gh-pages -d ."
   },
