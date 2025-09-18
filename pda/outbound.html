@@ -473,23 +473,8 @@
         </div>
 
 
-        <!-- Scan Section -->
-        <div id="scanSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
-            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="barcode_scan">바코드 스캔</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="part_number_scan">파트 번호 스캔</label>
-                    <input type="text" id="barcodeInput" class="scan-input w-full" 
-                           data-i18n-placeholder="scan_barcode_placeholder"
-                           placeholder="바코드를 스캔하거나 파트 번호를 입력하세요" autocomplete="off">
-                </div>
-                <div class="flex justify-end">
-                    <button onclick="clearScan()" class="action-button cancel-btn px-6 py-3 text-white">
-                        <i class="fas fa-times mr-2"></i><span data-i18n="clear">초기화</span>
-                    </button>
-                </div>
-            </div>
-        </div>
+        <!-- Hidden Barcode Input (for global scanning) -->
+        <input type="text" id="barcodeInput" class="hidden" autocomplete="off">
 
         <!-- AS Manual Input Section (only visible for AS shift) -->
         <div id="asManualSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
@@ -518,16 +503,16 @@
         </div>
 
         <!-- Parts List -->
-        <div id="partsSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
-            <h2 class="text-xl font-bold text-gray-800 mb-6" data-i18n="outbound_parts_list">출고 파트 목록</h2>
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div id="partsSection" class="glass-card rounded-2xl p-4 animate-slide-up hidden">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="outbound_parts_list">스캔된 파트 목록</h2>
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden max-h-96 overflow-y-auto">
                 <table class="w-full">
-                    <thead class="bg-gray-50">
+                    <thead class="bg-gray-50 sticky top-0">
                         <tr>
-                            <th class="px-4 py-4 text-left text-base font-semibold text-gray-700" data-i18n="part_number">파트 번호</th>
-                            <th class="px-4 py-4 text-center text-base font-semibold text-gray-700" data-i18n="scanned_quantity">스캔 수량</th>
-                            <th class="px-4 py-4 text-center text-base font-semibold text-gray-700">CART</th>
-                            <th class="px-4 py-4 text-center text-base font-semibold text-gray-700" data-i18n="status">상태</th>
+                            <th class="px-3 py-3 text-left text-sm font-semibold text-gray-700" data-i18n="part_number">파트 번호</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" data-i18n="scanned_quantity">수량</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700">CART</th>
+                            <th class="px-3 py-3 text-center text-sm font-semibold text-gray-700" data-i18n="status">상태</th>
                         </tr>
                     </thead>
                     <tbody id="partsList" class="divide-y divide-gray-200">
@@ -643,7 +628,6 @@
                 } else {
                     console.log('일반 차수 선택됨:', shift);
                     hideAsManualSection();
-                    document.getElementById('scanSection').classList.remove('hidden');
                     // 다른 차수일 때는 기존 출고 데이터 로드 (비동기)
                     loadOutboundParts().then(() => {
                         console.log('출고 파트 로드 완료');
@@ -656,30 +640,11 @@
                 
                 document.getElementById('partsSection').classList.remove('hidden');
                 
-                // AS가 아닌 경우에만 바코드 입력창에 포커스
-                if (shift !== 'AS') {
-                    // 바코드 입력창이 표시되도록 강제로 설정
-                    const scanSection = document.getElementById('scanSection');
-                    if (scanSection) {
-                        scanSection.classList.remove('hidden');
-                    }
-                    
-                    setTimeout(() => {
-                        const barcodeInput = document.getElementById('barcodeInput');
-                        if (barcodeInput) {
-                            barcodeInput.focus();
-                            barcodeInput.select();
-                            console.log('바코드 입력창에 포커스 설정됨');
-                        } else {
-                            console.log('바코드 입력창을 찾을 수 없음');
-                        }
-                    }, 300); // 시간을 더 늘림
-                }
+                // 전역 바코드 스캔이 활성화되어 있으므로 별도 포커스 불필요
                 
                 console.log('화면 업데이트 완료');
             } else {
                 console.log('날짜 또는 차수가 선택되지 않음, 화면 숨김');
-                document.getElementById('scanSection').classList.add('hidden');
                 document.getElementById('partsSection').classList.add('hidden');
                 document.getElementById('confirmationButtons').classList.add('hidden');
                 hideAsManualSection();
@@ -706,21 +671,21 @@
                 }
 
                 partItem.innerHTML = `
-                    <td class="px-4 py-4">
+                    <td class="px-3 py-3">
                         <div>
-                            <div class="text-lg font-bold text-gray-800">${partNumber}</div>
-                            <div class="text-sm text-gray-500">카테고리: ${part.category || 'N/A'}</div>
+                            <div class="text-base font-bold text-gray-800">${partNumber}</div>
+                            <div class="text-xs text-gray-500">${part.category || 'N/A'}</div>
                         </div>
                     </td>
-                    <td class="px-4 py-4 text-center">
-                        <span class="text-lg font-bold ${part.scannedQuantity > 0 ? 'text-red-600' : 'text-gray-500'}">${part.scannedQuantity}</span>
+                    <td class="px-3 py-3 text-center">
+                        <span class="text-base font-bold ${part.scannedQuantity > 0 ? 'text-red-600' : 'text-gray-500'}">${part.scannedQuantity}</span>
                     </td>
-                    <td class="px-4 py-4 text-center">
-                        <span class="text-lg font-bold ${part.scanCount > 0 ? 'text-blue-600' : 'text-gray-500'}">${part.scanCount || 0}</span>
+                    <td class="px-3 py-3 text-center">
+                        <span class="text-base font-bold ${part.scanCount > 0 ? 'text-blue-600' : 'text-gray-500'}">${part.scanCount || 0}</span>
                     </td>
-                    <td class="px-4 py-4 text-center">
-                        <span class="text-lg font-bold ${part.scannedQuantity > 0 ? 'text-red-600' : 'text-gray-500'}">
-                            ${part.scannedQuantity > 0 ? '✓ 스캔됨' : '⏳ 대기중'}
+                    <td class="px-3 py-3 text-center">
+                        <span class="text-sm font-bold ${part.scannedQuantity > 0 ? 'text-red-600' : 'text-gray-500'}">
+                            ${part.scannedQuantity > 0 ? '✓' : '⏳'}
                         </span>
                     </td>
                 `;
@@ -968,8 +933,8 @@
             updateProgress();
             document.getElementById('barcodeInput').value = '';
             
-            // 확인 섹션 숨기기
-            document.getElementById('confirmationSection').classList.add('hidden');
+            // 확인 버튼 숨기기
+            document.getElementById('confirmationButtons').classList.add('hidden');
             
             showNotification('스캔이 초기화되었습니다.', 'info');
         }
@@ -1113,9 +1078,8 @@
             
             document.getElementById('dateSelect').value = '';
             document.getElementById('shiftSelect').value = '';
-            document.getElementById('scanSection').classList.add('hidden');
             document.getElementById('partsSection').classList.add('hidden');
-            document.getElementById('confirmationSection').classList.add('hidden');
+            document.getElementById('confirmationButtons').classList.add('hidden');
             document.getElementById('partsList').innerHTML = '';
             
             currentDate = '';
