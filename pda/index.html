@@ -25,8 +25,10 @@
             inputs.forEach(input => {
                 input.blur();
                 input.setAttribute('readonly', 'readonly');
+                input.setAttribute('tabindex', '-1');
                 setTimeout(() => {
                     input.removeAttribute('readonly');
+                    input.removeAttribute('tabindex');
                 }, 100);
             });
             
@@ -53,11 +55,39 @@
             });
         }
         
+        // 입력 필드 포커스 방지 함수
+        function preventInputFocus() {
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                // 포커스 이벤트 방지
+                input.addEventListener('focus', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+                
+                // 클릭 이벤트 방지
+                input.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+                
+                // 터치 이벤트 방지
+                input.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+            });
+        }
+        
         // 페이지 로드 시 키보드 숨김
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(hideKeyboard, 100);
             setTimeout(hideKeyboard, 500);
             setTimeout(hideKeyboard, 1000);
+            setTimeout(preventInputFocus, 200);
         });
         
         // 화면 터치 시 키보드 숨김

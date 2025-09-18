@@ -28,8 +28,10 @@
             inputs.forEach(input => {
                 input.blur();
                 input.setAttribute('readonly', 'readonly');
+                input.setAttribute('tabindex', '-1');
                 setTimeout(() => {
                     input.removeAttribute('readonly');
+                    input.removeAttribute('tabindex');
                 }, 100);
             });
             
@@ -56,11 +58,68 @@
             });
         }
         
+        // 입력 필드 포커스 방지 함수
+        function preventInputFocus() {
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                // 바코드 입력 필드는 제외 (스캔 기능을 위해)
+                if (input.id === 'barcodeInput') {
+                    return;
+                }
+                
+                // 포커스 이벤트 방지
+                input.addEventListener('focus', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+                
+                // 클릭 이벤트 방지
+                input.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+                
+                // 터치 이벤트 방지
+                input.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+            });
+        }
+        
+        // 바코드 입력 필드 특별 처리
+        function setupBarcodeInput() {
+            const barcodeInput = document.getElementById('barcodeInput');
+            if (barcodeInput) {
+                // 바코드 입력 시 키보드 숨김
+                barcodeInput.addEventListener('input', function() {
+                    setTimeout(hideKeyboard, 100);
+                });
+                
+                // 바코드 입력 완료 시 키보드 숨김
+                barcodeInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        setTimeout(hideKeyboard, 100);
+                    }
+                });
+                
+                // 바코드 입력 필드 포커스 시에도 키보드 숨김
+                barcodeInput.addEventListener('focus', function() {
+                    setTimeout(hideKeyboard, 100);
+                });
+            }
+        }
+        
         // 페이지 로드 시 키보드 숨김
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(hideKeyboard, 100);
             setTimeout(hideKeyboard, 500);
             setTimeout(hideKeyboard, 1000);
+            setTimeout(preventInputFocus, 200);
+            setTimeout(setupBarcodeInput, 300);
         });
         
         // 화면 터치 시 키보드 숨김
