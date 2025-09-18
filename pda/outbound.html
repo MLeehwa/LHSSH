@@ -617,6 +617,13 @@
             if (date && shift) {
                 console.log('날짜와 차수가 모두 선택됨, 화면 업데이트 시작');
                 
+                // 전역 바코드 스캔 활성화
+                isGlobalBarcodeEnabled = true;
+                console.log('전역 바코드 스캔 활성화됨');
+                
+                // 전역 바코드 상태 표시
+                showGlobalBarcodeStatus();
+                
                 // 차수 선택 후 포커스 제어 적용
                 setTimeout(preventInputFocus, 100);
                 
@@ -1134,9 +1141,15 @@
         let globalBarcodeBuffer = '';
         let globalBarcodeTimer = null;
         const BARCODE_TIMEOUT = 100; // 바코드 입력 완료 판단 시간 (ms)
+        let isGlobalBarcodeEnabled = false; // 차수 선택 후에만 활성화
 
         // 전역 바코드 입력 상태 표시
         function showGlobalBarcodeStatus() {
+            // 전역 바코드가 비활성화된 경우 표시하지 않음
+            if (!isGlobalBarcodeEnabled) {
+                return;
+            }
+            
             // 상태 표시 요소 생성
             const statusElement = document.createElement('div');
             statusElement.id = 'globalBarcodeStatus';
@@ -1236,6 +1249,11 @@
 
         // 전역 바코드 입력 처리 함수
         function handleGlobalBarcodeInput(e) {
+            // 전역 바코드가 비활성화된 경우 무시
+            if (!isGlobalBarcodeEnabled) {
+                return;
+            }
+            
             // 특수 키는 무시 (Shift, Ctrl, Alt, Tab, Escape 등)
             if (e.key.length > 1 && !['Enter', 'Backspace'].includes(e.key)) {
                 return;
@@ -1341,8 +1359,8 @@
                 }
             });
 
-            // 전역 바코드 입력 상태 표시
-            showGlobalBarcodeStatus();
+            // 전역 바코드 입력 상태는 차수 선택 후에만 표시
+            // showGlobalBarcodeStatus(); // 차수 선택 전에는 표시하지 않음
 
             // 바코드 입력 이벤트
             document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
