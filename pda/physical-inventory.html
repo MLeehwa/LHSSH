@@ -21,31 +21,65 @@
     
     <!-- 키보드 숨김 기능 -->
     <script>
-        // 키보드 숨김 함수
+        // 강화된 키보드 숨김 함수
         function hideKeyboard() {
-            // 모든 입력 필드에서 포커스 제거
+            // 1. 모든 입력 필드에서 포커스 제거
             const inputs = document.querySelectorAll('input, textarea, select');
             inputs.forEach(input => {
                 input.blur();
+                input.setAttribute('readonly', 'readonly');
+                setTimeout(() => {
+                    input.removeAttribute('readonly');
+                }, 100);
             });
             
-            // 화면을 터치하여 키보드 숨김
+            // 2. 화면을 터치하여 키보드 숨김
             document.body.click();
             
-            // 모바일에서 키보드 숨김을 위한 추가 처리
+            // 3. 모바일에서 키보드 숨김을 위한 추가 처리
             if (window.scrollTo) {
                 window.scrollTo(0, 0);
             }
+            
+            // 4. 가상 키보드 숨김을 위한 추가 처리
+            document.activeElement && document.activeElement.blur();
+            
+            // 5. 포커스를 body로 이동
+            document.body.focus();
+            
+            // 6. 입력 필드 비활성화 후 재활성화
+            inputs.forEach(input => {
+                input.disabled = true;
+                setTimeout(() => {
+                    input.disabled = false;
+                }, 50);
+            });
         }
         
         // 페이지 로드 시 키보드 숨김
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(hideKeyboard, 100);
+            setTimeout(hideKeyboard, 500);
+            setTimeout(hideKeyboard, 1000);
         });
         
         // 화면 터치 시 키보드 숨김
         document.addEventListener('touchstart', function(e) {
+            if (!e.target.matches('input, textarea, select, button')) {
+                hideKeyboard();
+            }
+        });
+        
+        // 포커스 이벤트 시 키보드 숨김
+        document.addEventListener('focusin', function(e) {
             if (!e.target.matches('input, textarea, select')) {
+                hideKeyboard();
+            }
+        });
+        
+        // 키보드 이벤트 시 키보드 숨김
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
                 hideKeyboard();
             }
         });
