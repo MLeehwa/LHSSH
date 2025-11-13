@@ -69,16 +69,16 @@
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
-                // 입고 작업 시에는 바코드 스캐너를 사용하므로 키보드 비활성화
-                // 하지만 readonly는 사용하지 않음 (스캐너 입력을 위해)
-                barcodeInput.setAttribute('inputmode', 'none');
+                // 스캐너 입력을 위해 readonly와 inputmode를 모두 제거
+                // 스캐너는 키보드 입력을 시뮬레이션하므로 inputmode="none"이 문제가 될 수 있음
+                barcodeInput.removeAttribute('readonly');
+                barcodeInput.removeAttribute('inputmode');
                 
-                // 포커스 시에도 키보드가 나타나지 않도록 처리
+                // 포커스 시에도 키보드가 나타나지 않도록 처리 (하지만 스캐너 입력은 허용)
                 barcodeInput.addEventListener('focus', function() {
-                    // inputmode="none"으로 키보드 비활성화 (readonly는 사용하지 않음)
-                    this.setAttribute('inputmode', 'none');
-                    // 스캐너 입력을 위해 readonly는 제거
+                    // readonly와 inputmode를 제거하여 스캐너 입력 허용
                     this.removeAttribute('readonly');
+                    this.removeAttribute('inputmode');
                 });
                 
                 // 클릭/터치 시에도 키보드가 나타나지 않도록
@@ -95,7 +95,7 @@
                 });
                 
                 // 바코드 입력 필드 포커스는 허용하되 키보드는 비활성화
-                // (스캐너 입력을 위해 readonly는 사용하지 않음, inputmode="none"으로 키보드만 비활성화)
+                // (스캐너 입력을 위해 readonly와 inputmode를 모두 제거)
             }
         }
         
@@ -885,6 +885,8 @@
                 if (part) {
                     console.log('파트 매칭 성공:', part);
                     console.log('선택한 컨테이너:', selectedContainer?.arn_number, '파트 번호:', part.part_number);
+                    console.log('현재 스캔 수량 (증가 전):', part.scannedQuantity);
+                    console.log('추가할 수량:', parsedData.quantity);
                     
                     // 고유코드가 있으면 먼저 DB에 저장 시도 (중복 방지)
                     if (parsedData.uniqueNumber) {
@@ -970,6 +972,7 @@
                                 
                                 // DB 저장 성공 시에만 수량 추가 (중복 스캔 방지)
                                 part.scannedQuantity += parsedData.quantity;
+                                console.log('수량 증가 완료 (고유코드 있음):', part.scannedQuantity);
                             }
                         } catch (saveError) {
                             console.error('고유번호 저장 중 오류:', saveError);
@@ -995,9 +998,15 @@
                         console.log('고유코드 없음 (중복 검사 건너뜀)');
                         // 고유코드가 없는 경우에만 수량 추가
                         part.scannedQuantity += parsedData.quantity;
+                        console.log('수량 증가 완료 (고유코드 없음):', part.scannedQuantity);
                     }
                     
+                    console.log('renderPartsList 호출 전, containerParts:', containerParts.map(p => ({
+                        part_number: p.part_number,
+                        scannedQuantity: p.scannedQuantity
+                    })));
                     renderPartsList();
+                    console.log('renderPartsList 호출 완료');
                     updateProgress();
                     
                     // 입력 필드 초기화 및 포커스 유지
@@ -1159,6 +1168,8 @@
                 
                 if (part) {
                     console.log('직접 파트 번호 매칭 성공:', part);
+                    console.log('현재 스캔 수량 (증가 전):', part.scannedQuantity);
+                    console.log('추가할 수량: 1 (직접 입력)');
                     
                     // 먼저 메모리 Set에 추가 (race condition 방지)
                     if (scannedUniqueCodes.has(barcode)) {
@@ -1242,6 +1253,7 @@
                             
                             // DB 저장 성공 시에만 수량 추가 (중복 스캔 방지)
                             part.scannedQuantity += 1;
+                            console.log('수량 증가 완료 (직접 입력):', part.scannedQuantity);
                         }
                     } catch (saveError) {
                         console.error('바코드 저장 중 오류:', saveError);
@@ -1452,11 +1464,23 @@
         // 바코드 스캔 시뮬레이션
         function scanBarcode() {
             const input = document.getElementById('barcodeInput');
+            if (!input) {
+                console.error('바코드 입력 필드를 찾을 수 없습니다.');
+                return;
+            }
+            
             const barcode = input.value.trim();
+            console.log('scanBarcode 호출됨, 바코드:', barcode);
             
             if (barcode) {
-                handleBarcodeScan(barcode);
+                console.log('handleBarcodeScan 호출 시작');
+                handleBarcodeScan(barcode).then(result => {
+                    console.log('handleBarcodeScan 완료, 결과:', result);
+                }).catch(error => {
+                    console.error('handleBarcodeScan 오류:', error);
+                });
             } else {
+                console.log('바코드가 비어있음');
                 showNotification('바코드를 입력하거나 스캔하세요.', 'warning');
             }
         }
@@ -2132,34 +2156,43 @@
 
             // 자동 엔터키 처리 (바코드 스캐너용)
             let barcodeInputTimer = null;
-            document.getElementById('barcodeInput').addEventListener('input', function(e) {
-                const input = e.target;
-                const value = input.value;
-                
-                // 이전 타이머 클리어
-                if (barcodeInputTimer) {
-                    clearTimeout(barcodeInputTimer);
-                }
-                
-                // GS1-128 바코드 패턴 확인 (소문자 l도 포함)
-                const isGS1BarcodePattern = /^[)>*].*P\d{5}[a-zA-Z]\d{4}.*7Q\d+.*3SP\d+.*\*EOT$/.test(value);
-                
-                // 바코드 길이가 30자 이상이거나 GS1 패턴이 맞으면 자동 엔터
-                if (value.length >= 30 || (value.length >= 20 && isGS1BarcodePattern)) {
-                    barcodeInputTimer = setTimeout(() => {
-                        // 엔터키 이벤트 시뮬레이션
-                        const enterEvent = new KeyboardEvent('keypress', {
-                            key: 'Enter',
-                            code: 'Enter',
-                            keyCode: 13,
-                            which: 13,
-                            bubbles: true,
-                            cancelable: true
-                        });
-                        input.dispatchEvent(enterEvent);
-                    }, 50);
-                }
-            });
+            const barcodeInput = document.getElementById('barcodeInput');
+            if (barcodeInput) {
+                barcodeInput.addEventListener('input', function(e) {
+                    const input = e.target;
+                    const value = input.value;
+                    
+                    console.log('바코드 입력 이벤트 발생:', value, '길이:', value.length);
+                    
+                    // 이전 타이머 클리어
+                    if (barcodeInputTimer) {
+                        clearTimeout(barcodeInputTimer);
+                    }
+                    
+                    // GS1-128 바코드 패턴 확인 (소문자 l도 포함)
+                    const isGS1BarcodePattern = /^[)>*].*P\d{5}[a-zA-Z]\d{4}.*7Q\d+.*3SP\d+.*\*EOT$/.test(value);
+                    
+                    console.log('GS1 패턴 매칭:', isGS1BarcodePattern);
+                    
+                    // 바코드 길이가 30자 이상이거나 GS1 패턴이 맞으면 자동 엔터
+                    if (value.length >= 30 || (value.length >= 20 && isGS1BarcodePattern)) {
+                        console.log('자동 스캔 트리거 (길이 또는 패턴 매칭)');
+                        barcodeInputTimer = setTimeout(() => {
+                            console.log('자동 스캔 실행:', value);
+                            // 직접 scanBarcode 호출 (더 안정적)
+                            scanBarcode();
+                        }, 50);
+                    } else if (value.length > 0) {
+                        // 짧은 바코드도 일정 시간 후 자동 처리
+                        barcodeInputTimer = setTimeout(() => {
+                            if (input.value.trim().length > 0) {
+                                console.log('타이머 기반 자동 스캔 실행:', input.value);
+                                scanBarcode();
+                            }
+                        }, 500); // 500ms 후 자동 스캔
+                    }
+                });
+            }
 
             // 포커스 유지 기능 비활성화 (깜빡임 방지)
             // 자동 포커스는 바코드 스캔 후에만 설정
