@@ -65,37 +65,37 @@
             return;
         }
         
-        // 바코드 입력 필드 특별 처리 (입고 작업 시 키보드 비활성화)
+        // 바코드 입력 필드 특별 처리 (입고 작업 시 키보드 비활성화, 스캐너 입력은 허용)
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
                 // 입고 작업 시에는 바코드 스캐너를 사용하므로 키보드 비활성화
-                // 포커스는 허용하되 키보드는 나타나지 않도록 설정
-                barcodeInput.setAttribute('readonly', 'readonly');
+                // 하지만 readonly는 사용하지 않음 (스캐너 입력을 위해)
                 barcodeInput.setAttribute('inputmode', 'none');
                 
                 // 포커스 시에도 키보드가 나타나지 않도록 처리
                 barcodeInput.addEventListener('focus', function() {
-                    // readonly 유지하여 키보드 비활성화
-                    this.setAttribute('readonly', 'readonly');
+                    // inputmode="none"으로 키보드 비활성화 (readonly는 사용하지 않음)
                     this.setAttribute('inputmode', 'none');
+                    // 스캐너 입력을 위해 readonly는 제거
+                    this.removeAttribute('readonly');
                 });
                 
                 // 클릭/터치 시에도 키보드가 나타나지 않도록
                 barcodeInput.addEventListener('click', function(e) {
-                    e.preventDefault();
+                    // 포커스는 허용하되 키보드는 나타나지 않음
                     this.focus();
                     this.select();
                 });
                 
                 barcodeInput.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
+                    // 포커스는 허용하되 키보드는 나타나지 않음
                     this.focus();
                     this.select();
                 });
                 
                 // 바코드 입력 필드 포커스는 허용하되 키보드는 비활성화
-                // (스캔을 위해 포커스 제어하지 않음, 하지만 키보드는 나타나지 않음)
+                // (스캐너 입력을 위해 readonly는 사용하지 않음, inputmode="none"으로 키보드만 비활성화)
             }
         }
         
