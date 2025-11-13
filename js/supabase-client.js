@@ -15,6 +15,20 @@ const initializeSupabase = () => {
                 anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
             };
             
+            // URL 유효성 검사
+            if (!config.url || !config.url.startsWith('https://')) {
+                throw new Error('Supabase URL이 올바르지 않습니다.');
+            }
+            
+            if (!config.anonKey) {
+                throw new Error('Supabase API 키가 설정되지 않았습니다.');
+            }
+            
+            console.log('Supabase 클라이언트 생성 시도:', {
+                url: config.url,
+                hasKey: !!config.anonKey
+            });
+            
             supabaseClient = window.supabase.createClient(
                 config.url,
                 config.anonKey,
@@ -34,7 +48,14 @@ const initializeSupabase = () => {
                     }
                 }
             );
+            
             console.log('Supabase 클라이언트 초기화 성공');
+            
+            // 간단한 연결 테스트 (비동기, 에러 발생 시에도 계속 진행)
+            testSupabaseConnection(supabaseClient).catch(err => {
+                console.warn('Supabase 연결 테스트 실패 (계속 진행):', err);
+            });
+            
         } catch (error) {
             console.error('Supabase 클라이언트 초기화 실패:', error);
             throw error;
@@ -45,6 +66,39 @@ const initializeSupabase = () => {
     }
     return supabaseClient;
 };
+
+// Supabase 연결 테스트 함수
+async function testSupabaseConnection(client) {
+    try {
+        console.log('Supabase 연결 테스트 시작...');
+        const { data, error } = await client
+            .from('parts')
+            .select('count')
+            .limit(1);
+        
+        if (error) {
+            console.warn('Supabase 연결 테스트 실패:', error);
+            
+            // 프로젝트가 일시 중지된 경우를 감지
+            if (error.message && (
+                error.message.includes('paused') ||
+                error.message.includes('suspended') ||
+                error.message.includes('inactive')
+            )) {
+                console.error('⚠️ Supabase 프로젝트가 일시 중지된 상태입니다. 대시보드에서 프로젝트를 재개해주세요.');
+            }
+        } else {
+            console.log('✅ Supabase 연결 테스트 성공 - 프로젝트가 활성화되어 있습니다.');
+        }
+    } catch (error) {
+        console.warn('Supabase 연결 테스트 중 예외 발생:', error);
+        
+        // 네트워크 오류인 경우
+        if (error.message && error.message.includes('Failed to fetch')) {
+            console.warn('⚠️ 네트워크 오류: Supabase 프로젝트가 일시 중지되었을 수 있습니다.');
+        }
+    }
+}
 
 // 개발 환경용 더미 Supabase 클라이언트
 const createDummySupabase = () => {
@@ -130,7 +184,18 @@ class DatabaseService {
     // 에러 처리 공통 메서드
     handleError(error, context = '') {
         console.error(`Database error in ${context}:`, error);
-        throw new Error(`데이터베이스 오류: ${error.message}`);
+        
+        // 원본 에러 메시지가 있으면 포함
+        let errorMessage = `데이터베이스 오류`;
+        if (error.message) {
+            errorMessage += `: ${error.message}`;
+        } else if (error.originalError && error.originalError.message) {
+            errorMessage += `: ${error.originalError.message}`;
+        }
+        
+        const enhancedError = new Error(errorMessage);
+        enhancedError.originalError = error;
+        throw enhancedError;
     }
 
     // 알림 표시 공통 메서드
@@ -146,17 +211,111 @@ class DatabaseService {
 
 // 파트 관련 서비스
 class PartService extends DatabaseService {
-    async getAllParts() {
+    async getAllParts(retryCount = 0) {
+        const maxRetries = 2;
+        
         try {
-            const { data, error } = await this.supabase
+            // Supabase 클라이언트 확인
+            if (!this.supabase) {
+                throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.');
+            }
+
+            console.log(`Supabase 클라이언트 확인 완료, parts 테이블 조회 시작... (시도 ${retryCount + 1}/${maxRetries + 1})`);
+            
+            // Supabase 쿼리 실행
+            const queryPromise = this.supabase
                 .from('parts')
                 .select('*')
                 .order('created_at', { ascending: false });
             
-            if (error) throw error;
-            return data;
+            const { data, error } = await queryPromise;
+            
+            if (error) {
+                console.error('Supabase 쿼리 오류:', error);
+                
+                // 특정 오류에 대해 재시도
+                if (retryCount < maxRetries && (
+                    error.message?.includes('Failed to fetch') ||
+                    error.message?.includes('network') ||
+                    error.code === 'PGRST116' // PostgREST connection error
+                )) {
+                    console.log(`재시도 중... (${retryCount + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 지수 백오프
+                    return this.getAllParts(retryCount + 1);
+                }
+                
+                throw error;
+            }
+            
+            console.log('파트 데이터 조회 성공, 개수:', data?.length || 0);
+            
+            // 성공 시 로컬 스토리지에 캐시 저장
+            if (data && Array.isArray(data)) {
+                try {
+                    localStorage.setItem('parts_cache', JSON.stringify(data));
+                    localStorage.setItem('parts_cache_time', Date.now().toString());
+                } catch (e) {
+                    console.warn('로컬 스토리지 저장 실패:', e);
+                }
+            }
+            
+            return data || [];
         } catch (error) {
-            this.handleError(error, 'getAllParts');
+            console.error('getAllParts 오류 상세:', {
+                message: error.message,
+                name: error.name,
+                code: error.code,
+                retryCount: retryCount
+            });
+            
+            // 네트워크 오류인 경우 로컬 캐시 확인
+            if (error.message && (
+                error.message.includes('Failed to fetch') ||
+                error.message.includes('ERR_NAME_NOT_RESOLVED') ||
+                error.message.includes('network') ||
+                error.message.includes('시간이 초과')
+            )) {
+                console.warn('네트워크 오류 발생, 로컬 캐시 확인 중...');
+                
+                // 로컬 스토리지에서 캐시된 데이터 확인 (24시간 이내)
+                try {
+                    const cacheTime = localStorage.getItem('parts_cache_time');
+                    const cacheData = localStorage.getItem('parts_cache');
+                    
+                    if (cacheTime && cacheData) {
+                        const age = Date.now() - parseInt(cacheTime);
+                        const maxAge = 24 * 60 * 60 * 1000; // 24시간
+                        
+                        if (age < maxAge) {
+                            console.log('로컬 캐시에서 데이터 로드 (오프라인 모드)');
+                            const cachedParts = JSON.parse(cacheData);
+                            console.warn(`⚠️ 오프라인 모드: 캐시된 데이터 사용 (${cachedParts.length}개 항목, ${Math.round(age / 1000 / 60)}분 전 데이터)`);
+                            return cachedParts;
+                        } else {
+                            console.log('로컬 캐시가 만료되었습니다.');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('로컬 캐시 읽기 실패:', e);
+                }
+                
+                // 캐시가 없거나 만료된 경우 에러 발생
+                let errorMessage = '❌ 네트워크 연결 실패 - Supabase 서버에 접근할 수 없습니다.\n\n';
+                errorMessage += '🔍 확인 사항:\n';
+                errorMessage += '1. Supabase 프로젝트가 활성화되어 있는지 확인 (https://app.supabase.com)\n';
+                errorMessage += '   ⚠️ 프로젝트가 일시 중지(paused) 상태일 수 있습니다!\n';
+                errorMessage += '2. 인터넷 연결 상태 확인\n';
+                errorMessage += '3. diagnose-connection.html 파일로 상세 진단 실행\n';
+                errorMessage += '4. 방화벽/프록시 설정 확인\n\n';
+                errorMessage += '💡 Supabase 대시보드에서 프로젝트를 재개(resume)해주세요.';
+                
+                const networkError = new Error(errorMessage);
+                networkError.originalError = error;
+                networkError.isNetworkError = true;
+                this.handleError(networkError, 'getAllParts');
+            } else {
+                this.handleError(error, 'getAllParts');
+            }
         }
     }
 
@@ -186,6 +345,32 @@ class PartService extends DatabaseService {
             return data[0];
         } catch (error) {
             this.handleError(error, 'updatePart');
+        }
+    }
+
+    async updatePartByPartNumber(partNumber, partData) {
+        try {
+            // product_type 유효성 검사
+            if (partData.product_type && partData.product_type !== 'PRODUCTION' && partData.product_type !== 'AS') {
+                throw new Error(`Invalid product_type: ${partData.product_type}. Must be 'PRODUCTION' or 'AS'`);
+            }
+            
+            // product_type이 없으면 기본값 설정하지 않음 (기존 값 유지)
+            const updateData = { ...partData };
+            if (!updateData.product_type) {
+                delete updateData.product_type; // 기존 값 유지를 위해 필드 제거
+            }
+            
+            const { data, error } = await this.supabase
+                .from('parts')
+                .update(updateData)
+                .eq('part_number', partNumber)
+                .select();
+            
+            if (error) throw error;
+            return data[0];
+        } catch (error) {
+            this.handleError(error, 'updatePartByPartNumber');
         }
     }
 

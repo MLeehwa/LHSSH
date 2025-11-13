@@ -240,15 +240,9 @@
                     </a>
 
                     <!-- Physical Inventory -->
-                    <a href="physical-inventory.html" class="nav-item active flex items-center px-4 py-3 text-gray-800">
-                        <i class="fas fa-clipboard-check w-5 h-5 mr-3 text-blue-300"></i>
-                        <span class="font-medium">실사재고</span>
-                    </a>
-
-                    <!-- Daily Inventory -->
-                    <a href="daily-inventory-enhanced.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
-                        <i class="fas fa-calendar-day w-5 h-5 mr-3"></i>
-                        <span>일일 재고</span>
+                    <a href="physical-inventory.html" class="nav-item active flex items-center px-4 py-3 bg-orange-100 border-l-4 border-orange-600 text-orange-800">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3 text-orange-600"></i>
+                        <span class="font-bold">실사재고</span>
                     </a>
 
                     <!-- Initial Inventory Setup -->
@@ -412,7 +406,7 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">실사 날짜</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">상태</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">생성일시</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">생성자</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">작업</th>
                                 </tr>
                             </thead>
                             <tbody id="sessionsTableBody" class="bg-white/5 divide-y divide-white/20">
@@ -460,6 +454,7 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">차이</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">상태</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider w-48">비고</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">작업</th>
                                 </tr>
                             </thead>
                             <tbody id="inventoryItemsTableBody" class="bg-white/5 divide-y divide-white/20">

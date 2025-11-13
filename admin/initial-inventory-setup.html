@@ -18,6 +18,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../js/config.js"></script>
     <script src="../js/supabase-client.js"></script>
+    
+    <!-- i18n 스크립트 -->
+    <script src="../js/i18n.js"></script>
 </head>
 <body class="admin-gradient-bg min-h-screen">
     <div class="flex h-screen">
@@ -76,15 +79,9 @@
                     </a>
 
                     <!-- Physical Inventory -->
-                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
-                        <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
+                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 bg-orange-50 border-l-4 border-orange-500 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition-all duration-200 font-semibold">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3 text-orange-600"></i>
                         <span>실사재고</span>
-                    </a>
-
-                    <!-- Daily Inventory -->
-                    <a href="daily-inventory-enhanced.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
-                        <i class="fas fa-calendar-day w-5 h-5 mr-3"></i>
-                        <span>일일 재고</span>
                     </a>
 
                     <!-- Initial Inventory Setup -->
@@ -134,16 +131,28 @@
             <!-- Main Content Area -->
             <div class="flex-1 overflow-y-auto p-6">
                 <!-- Warning Notice -->
-                <div class="admin-glass-effect rounded-xl border-2 border-yellow-200 mb-6 card-shadow bg-yellow-50">
+                <div class="admin-glass-effect rounded-xl border-2 border-red-300 mb-6 card-shadow bg-red-50">
                     <div class="p-6">
                         <div class="flex items-center">
-                            <i class="fas fa-exclamation-triangle text-yellow-600 text-xl mr-3"></i>
+                            <i class="fas fa-exclamation-triangle text-red-600 text-xl mr-3"></i>
                             <div>
-                                <h3 class="text-lg font-semibold text-yellow-800">주의사항</h3>
-                                <p class="text-yellow-700 mt-1">
-                                    이 페이지는 시스템 초기 설정을 위한 페이지입니다. 
-                                    기존 재고 데이터가 있다면 덮어쓰게 됩니다. 
-                                    신중하게 진행해주세요.
+                                <h3 class="text-lg font-semibold text-red-800">⚠️ 매우 중요한 경고</h3>
+                                <p class="text-red-700 mt-2 font-semibold">
+                                    이 기능은 <strong>모든 기존 재고 데이터와 거래 내역을 완전히 삭제</strong>하고, 
+                                    입력한 파트들만 새로 생성합니다.
+                                </p>
+                                <ul class="text-red-700 mt-2 list-disc list-inside space-y-1">
+                                    <li>✅ <strong>inventory 테이블의 모든 데이터 삭제</strong></li>
+                                    <li>✅ <strong>inventory_transactions 테이블의 모든 거래 내역 삭제</strong></li>
+                                    <li>✅ <strong>physical_inventory_items 테이블의 모든 실사 항목 삭제</strong></li>
+                                    <li>✅ <strong>physical_inventory_sessions 테이블의 모든 실사 세션 삭제</strong></li>
+                                    <li>✅ <strong>arn_parts 테이블의 모든 입고 파트 데이터 삭제</strong></li>
+                                    <li>✅ <strong>arn_containers 테이블의 모든 입고 컨테이너 데이터 삭제</strong></li>
+                                    <li>✅ <strong>daily_inventory_summary 테이블의 모든 일별 재고 요약 삭제</strong></li>
+                                    <li>✅ 입력한 파트들만 새로 생성</li>
+                                </ul>
+                                <p class="text-red-800 mt-3 font-bold">
+                                    ⚠️ 이 작업은 되돌릴 수 없습니다. 신중하게 진행해주세요!
                                 </p>
                             </div>
                         </div>

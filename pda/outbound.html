@@ -887,72 +887,167 @@
             }
         }
 
-        // GS1-128 바코드 파싱 함수 (입고와 동일한 로직)
+        // GS1-128 바코드 파싱 함수 (출고 작업 라벨 형식 지원)
         function parseGS1Barcode(barcode) {
             try {
-                console.log('바코드 파싱 시작:', barcode);
+                console.log('출고 바코드 파싱 시작:', barcode);
                 console.log('바코드 길이:', barcode.length);
                 
-                // GS1-128 형식: [)>*06:D032125:5K:23L :24L :P49560l3010:7Q50:3SP11000321253583:VP1100*EOT
-                
-                // 파트 번호 추출 (P49560l3010) - 소문자 l도 포함
-                const partMatch = barcode.match(/P\d{5}[a-zA-Z]\d{4}/);
-                if (!partMatch) {
-                    console.log('파트 번호 매칭 실패 - 바코드:', barcode);
-                    console.log('P로 시작하는 부분들:', barcode.match(/P[^:]*/g));
-                    return null;
+                // ===== 형식 1: GS1-128 표준 형식 (출고 라벨) =====
+                // [)>*06:D032125:5K:23L:24L:P49560l3010:7Q50:3SP11000321253583:VP1100*EOT
+                // [)>*06:D082225:5K:23L:24L:P49560CW150:7Q80:3SP1100082225460:VP1100*EOT
+                if (barcode.includes('[)>*06:') || barcode.includes('*EOT')) {
+                    console.log('GS1-128 표준 형식 감지 (출고 라벨)');
+                    
+                    // 파트 번호 추출 - 다양한 형식 지원
+                    // P49560L3010 (5자리 숫자 + 알파벳 1개 + 4자리 숫자)
+                    // P49560CW150 (5자리 숫자 + 알파벳 2개 + 3자리 숫자)
+                    // P49560l3010 (소문자 포함)
+                    const partMatch = barcode.match(/P\d{5}[a-zA-Z]+\d{3,4}/);
+                    if (!partMatch) {
+                        console.log('GS1-128 파트 번호 매칭 실패 - 바코드:', barcode);
+                        console.log('P로 시작하는 부분들:', barcode.match(/P[^:]*/g));
+                        return null;
+                    }
+                    let partNumber = partMatch[0];
+                    console.log('추출된 파트 번호 (P 포함):', partNumber);
+                    
+                    // P 접두사 제거 (P49560CW150 -> 49560CW150)
+                    if (partNumber.startsWith('P')) {
+                        partNumber = partNumber.substring(1);
+                        console.log('P 접두사 제거 후:', partNumber);
+                    }
+                    
+                    // DB 형식에 맞게 하이픈 추가
+                    // 49560L3010 -> 49560-L3010 (알파벳 1개 + 숫자 4자리)
+                    // 49560CW150 -> 49560-CW150 (알파벳 2개 + 숫자 3자리)
+                    // 49560l3010 -> 49560-L3010 (소문자 포함)
+                    const hyphenMatch1 = partNumber.match(/^(\d{5})([A-Za-z])(\d{4})$/); // 알파벳 1개 + 숫자 4자리
+                    const hyphenMatch2 = partNumber.match(/^(\d{5})([A-Za-z]{2})(\d{3})$/); // 알파벳 2개 + 숫자 3자리
+                    const hyphenMatch3 = partNumber.match(/^(\d{5})([A-Za-z]+)(\d{3,4})$/); // 일반적인 경우
+                    
+                    if (hyphenMatch1) {
+                        partNumber = `${hyphenMatch1[1]}-${hyphenMatch1[2]}${hyphenMatch1[3]}`;
+                        console.log('하이픈 추가 후 (패턴1):', partNumber);
+                    } else if (hyphenMatch2) {
+                        partNumber = `${hyphenMatch2[1]}-${hyphenMatch2[2]}${hyphenMatch2[3]}`;
+                        console.log('하이픈 추가 후 (패턴2):', partNumber);
+                    } else if (hyphenMatch3) {
+                        // 알파벳과 숫자 사이에 하이픈 추가
+                        const letters = hyphenMatch3[2].toUpperCase(); // 소문자를 대문자로 변환
+                        partNumber = `${hyphenMatch3[1]}-${letters}${hyphenMatch3[3]}`;
+                        console.log('하이픈 추가 후 (패턴3):', partNumber);
+                    }
+                    
+                    // 수량 추출 (7Q50 -> 50)
+                    const quantityMatch = barcode.match(/7Q(\d+)/);
+                    if (!quantityMatch) {
+                        console.log('GS1-128 수량 매칭 실패');
+                        return null;
+                    }
+                    const quantity = parseInt(quantityMatch[1]);
+                    console.log('추출된 수량:', quantity);
+                    
+                    // 유니크 넘버 추출 (3SP11000321253583 -> P11000321253583 또는 3SP11000321253583)
+                    // 패턴 1: 3SP로 시작하는 경우 (3SP11000321253583)
+                    let uniqueMatch = barcode.match(/3SP([^:*]+)/);
+                    let uniqueNumber = null;
+                    
+                    if (uniqueMatch) {
+                        // P 접두사 포함하여 저장 (P11000321253583)
+                        uniqueNumber = 'P' + uniqueMatch[1];
+                        console.log('추출된 유니크 넘버 (패턴1):', uniqueNumber);
+                    } else {
+                        // 패턴 2: 3S로 시작하는 경우 (3S 뒤의 값)
+                        uniqueMatch = barcode.match(/3S([^:*]+)/);
+                        if (uniqueMatch) {
+                            uniqueNumber = uniqueMatch[1];
+                            console.log('추출된 유니크 넘버 (패턴2):', uniqueNumber);
+                        } else {
+                            console.log('GS1-128 유니크 넘버 매칭 실패, 전체 바코드를 고유코드로 사용');
+                            // 고유코드가 없으면 전체 바코드를 고유코드로 사용
+                            uniqueNumber = barcode;
+                        }
+                    }
+                    
+                    return {
+                        partNumber,
+                        quantity,
+                        uniqueNumber
+                    };
                 }
-                let partNumber = partMatch[0];
-                console.log('추출된 파트 번호 (P 포함):', partNumber);
                 
-                // P 접두사 제거 (P49560l3010 -> 49560l3010)
-                if (partNumber.startsWith('P')) {
-                    partNumber = partNumber.substring(1);
-                    console.log('P 접두사 제거 후:', partNumber);
+                // ===== 형식 2: QR 코드 또는 라벨 텍스트 형식 (출고 라벨) =====
+                // 예: "49601-S9000:80:P1100082225460" 또는 "Part:49601-S9000 Qty:80 Tag:P1100082225460"
+                console.log('GS1-128 표준 형식 아님, 라벨 텍스트 형식 시도 (출고 라벨)');
+                
+                // 패턴 1: "파트번호:수량:태그번호" 형식
+                const pattern1 = barcode.match(/^(\d{5}-[A-Za-z]+\d{3,4}):(\d+):(P\d+)$/);
+                if (pattern1) {
+                    console.log('패턴 1 매칭 성공:', pattern1);
+                    return {
+                        partNumber: pattern1[1], // 49601-S9000
+                        quantity: parseInt(pattern1[2]), // 80
+                        uniqueNumber: pattern1[3] // P1100082225460
+                    };
                 }
                 
-                // 마지막 알파벳 제거 (49560l3010 -> 49560l3010, 49560L3010 -> 49560L3010)
-                // 숫자로 끝나는지 확인하고, 알파벳으로 끝나면 제거
-                if (!partNumber.match(/\d$/)) {
-                    partNumber = partNumber.replace(/[a-zA-Z]$/, '');
-                    console.log('마지막 알파벳 제거 후:', partNumber);
+                // 패턴 2: "파트번호:수량" 형식 (태그번호 없음)
+                const pattern2 = barcode.match(/^(\d{5}-[A-Za-z]+\d{3,4}):(\d+)$/);
+                if (pattern2) {
+                    console.log('패턴 2 매칭 성공:', pattern2);
+                    return {
+                        partNumber: pattern2[1], // 49601-S9000
+                        quantity: parseInt(pattern2[2]), // 80
+                        uniqueNumber: null // 태그번호 없음
+                    };
                 }
                 
-                // DB 형식에 맞게 하이픈 추가 (49560L3010 -> 49560-L3010)
-                // 5자리 숫자 + 알파벳 + 4자리 숫자 형식인지 확인
-                const hyphenMatch = partNumber.match(/^(\d{5})([A-Za-z])(\d{4})$/);
-                if (hyphenMatch) {
-                    partNumber = `${hyphenMatch[1]}-${hyphenMatch[2]}${hyphenMatch[3]}`;
-                    console.log('하이픈 추가 후:', partNumber);
+                // 패턴 3: 하이픈 포함 파트 번호만 (수량 1, 태그번호 없음)
+                const pattern3 = barcode.match(/^(\d{5}-[A-Za-z]+\d{3,4})$/);
+                if (pattern3) {
+                    console.log('패턴 3 매칭 성공 (파트 번호만):', pattern3);
+                    return {
+                        partNumber: pattern3[1], // 49601-S9000
+                        quantity: 1, // 기본값
+                        uniqueNumber: null
+                    };
                 }
                 
-                // 수량 추출 (7Q50 -> 50)
-                const quantityMatch = barcode.match(/7Q(\d+)/);
-                if (!quantityMatch) {
-                    console.log('수량 매칭 실패');
-                    return null;
+                // 패턴 4: "Part:49601-S9000 Qty:80 Tag:P1100082225460" 형식
+                const partMatch4 = barcode.match(/Part[:\s]+(\d{5}-[A-Za-z]+\d{3,4})/i);
+                const qtyMatch4 = barcode.match(/Qty[:\s]+(\d+)/i);
+                const tagMatch4 = barcode.match(/Tag[:\s]+(P\d+)/i);
+                
+                if (partMatch4) {
+                    console.log('패턴 4 매칭 성공:', { part: partMatch4[1], qty: qtyMatch4?.[1], tag: tagMatch4?.[1] });
+                    return {
+                        partNumber: partMatch4[1],
+                        quantity: qtyMatch4 ? parseInt(qtyMatch4[1]) : 1,
+                        uniqueNumber: tagMatch4 ? tagMatch4[1] : null
+                    };
                 }
-                const quantity = parseInt(quantityMatch[1]);
-                console.log('추출된 수량:', quantity);
                 
-                // 유니크 넘버 추출 (3SP11000321253583 -> P11000321253583)
-                // 3S 다음부터 다음 : 까지가 고유코드
-                const uniqueMatch = barcode.match(/3S([^:]+)/);
-                if (!uniqueMatch) {
-                    console.log('유니크 넘버 매칭 실패');
-                    return null;
+                // 패턴 5: QR 코드가 여러 줄로 나뉘어 있는 경우
+                // "49601-S9000\n80\nP1100082225460" 형식
+                const lines = barcode.split('\n').map(l => l.trim()).filter(l => l);
+                if (lines.length >= 2) {
+                    const partLine = lines.find(l => /^\d{5}-[A-Za-z]+\d{3,4}$/.test(l));
+                    const qtyLine = lines.find(l => /^\d+$/.test(l));
+                    const tagLine = lines.find(l => /^P\d+$/.test(l));
+                    
+                    if (partLine) {
+                        console.log('패턴 5 매칭 성공 (여러 줄):', { part: partLine, qty: qtyLine, tag: tagLine });
+                        return {
+                            partNumber: partLine,
+                            quantity: qtyLine ? parseInt(qtyLine) : 1,
+                            uniqueNumber: tagLine || null
+                        };
+                    }
                 }
-                const uniqueNumber = uniqueMatch[1];
-                console.log('추출된 유니크 넘버:', uniqueNumber);
                 
-                const result = {
-                    partNumber,
-                    quantity,
-                    uniqueNumber
-                };
-                
-                console.log('최종 파싱 결과:', result);
-                return result;
+                console.log('모든 패턴 매칭 실패 - 바코드:', barcode);
+                return null;
                 
             } catch (error) {
                 console.error('GS1 바코드 파싱 오류:', error);
@@ -1208,18 +1303,28 @@
         async function loadOutboundParts() {
             try {
                 const selectedShift = document.getElementById('shiftSelect').value;
-                console.log('출고 파트 로드 시작, 선택된 차수:', selectedShift);
+                const selectedDate = document.getElementById('dateSelect').value;
+                console.log('출고 파트 로드 시작, 선택된 차수:', selectedShift, '날짜:', selectedDate);
                 
                 if (!selectedShift || selectedShift === 'AS') {
                     console.log('AS 차수이거나 차수가 선택되지 않음 - 출고 파트 로드 안함');
                     return Promise.resolve();
                 }
 
+                if (!selectedDate) {
+                    console.log('날짜가 선택되지 않음 - 출고 파트 로드 안함');
+                    return Promise.resolve();
+                }
+
+                // sequence_number 형식: YYYYMMDD-차수 (예: 20251110-1)
+                const sequenceNumber = `${selectedDate.replace(/-/g, '')}-${selectedShift}`;
+                console.log('조회할 sequence_number:', sequenceNumber);
+
                 // 선택된 차수에 해당하는 출고 시퀀스 찾기
                 const { data: sequences, error: sequencesError } = await supabase
                     .from('outbound_sequences')
-                    .select('id, sequence_name, shift')
-                    .eq('shift', selectedShift)
+                    .select('id, sequence_number, outbound_date')
+                    .eq('sequence_number', sequenceNumber)
                     .eq('status', 'PENDING')
                     .order('created_at', { ascending: false });
 
@@ -1244,10 +1349,11 @@
                         part_number,
                         planned_qty,
                         actual_qty,
+                        scanned_qty,
                         status,
-                        master_parts (
-                            part_name,
-                            part_description
+                        parts (
+                            description,
+                            category
                         )
                     `)
                     .eq('sequence_id', sequenceId)
@@ -1366,19 +1472,95 @@
             document.getElementById('dateSelect').addEventListener('change', updateOutboundInfo);
             document.getElementById('shiftSelect').addEventListener('change', updateOutboundInfo);
 
-            // 전역 키보드 이벤트 리스너 (바코드 스캐너용)
+            // 전역 키보드 이벤트 리스너 (바코드 스캐너용) - 항상 활성화
             document.addEventListener('keydown', function(e) {
-                // 입력 필드가 포커스되어 있지 않은 경우에만 전역 처리
+                // 날짜/차수 선택 드롭다운이나 버튼에 포커스가 있으면 무시
                 const activeElement = document.activeElement;
-                const isInputFocused = activeElement && (
-                    activeElement.tagName === 'INPUT' || 
-                    activeElement.tagName === 'SELECT' || 
-                    activeElement.tagName === 'TEXTAREA' ||
-                    activeElement.contentEditable === 'true'
-                );
+                if (activeElement && (
+                    activeElement.id === 'dateSelect' ||
+                    activeElement.id === 'shiftSelect' ||
+                    activeElement.closest('button')
+                )) {
+                    return;
+                }
                 
-                if (!isInputFocused) {
-                    handleGlobalBarcodeInput(e);
+                // 파트 섹션이 보일 때만 전역 바코드 입력 처리
+                const partsSection = document.getElementById('partsSection');
+                if (partsSection && !partsSection.classList.contains('hidden')) {
+                    // Ctrl+V (붙여넣기) 처리
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const barcodeInput = document.getElementById('barcodeInput');
+                        if (barcodeInput) {
+                            barcodeInput.focus();
+                            barcodeInput.select();
+                            // 클립보드에서 붙여넣기 (비동기)
+                            navigator.clipboard.readText().then(text => {
+                                console.log('클립보드에서 붙여넣기:', text);
+                                barcodeInput.value = text;
+                                // 바코드가 입력되면 자동 스캔
+                                setTimeout(() => {
+                                    if (barcodeInput.value.trim().length > 0) {
+                                        console.log('붙여넣기 후 자동 스캔:', barcodeInput.value);
+                                        scanBarcode();
+                                    }
+                                }, 150);
+                            }).catch(err => {
+                                console.error('클립보드 읽기 실패:', err);
+                                // 폴백: paste 이벤트가 처리할 것임
+                            });
+                        }
+                        return;
+                    }
+                    
+                    // 입력 필드가 포커스되어 있지 않은 경우에만 전역 처리
+                    const isInputFocused = activeElement && (
+                        activeElement.tagName === 'INPUT' || 
+                        activeElement.tagName === 'SELECT' || 
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.contentEditable === 'true'
+                    );
+                    
+                    if (!isInputFocused) {
+                        handleGlobalBarcodeInput(e);
+                    }
+                }
+            });
+            
+            // 붙여넣기 이벤트 리스너 추가 (모든 경우 처리)
+            document.addEventListener('paste', function(e) {
+                const partsSection = document.getElementById('partsSection');
+                if (!partsSection || partsSection.classList.contains('hidden')) {
+                    return;
+                }
+                
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (!barcodeInput || barcodeInput.classList.contains('hidden')) {
+                    return;
+                }
+                
+                // 바코드 입력창이 아닌 곳에서 붙여넣기 시 자동으로 바코드 입력창으로 이동
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.id !== 'barcodeInput') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                    
+                    // 클립보드 데이터 가져오기
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    if (pastedText) {
+                        console.log('붙여넣기 이벤트:', pastedText);
+                        barcodeInput.value = pastedText;
+                        // 바코드가 입력되면 자동 스캔
+                        setTimeout(() => {
+                            if (barcodeInput.value.trim().length > 0) {
+                                console.log('붙여넣기 후 자동 스캔:', barcodeInput.value);
+                                scanBarcode();
+                            }
+                        }, 150);
+                    }
                 }
             });
 

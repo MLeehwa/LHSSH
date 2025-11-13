@@ -8,6 +8,7 @@ class PartRegistration {
         this.currentPage = 1;
         this.itemsPerPage = 10;
         this.deletingPart = null;
+        this.editingPart = null; // 수정 중인 파트 정보
         this.init();
     }
 
@@ -54,16 +55,72 @@ class PartRegistration {
             }
 
             console.log('partService 사용하여 데이터 로드...');
-            this.parts = await window.partService.getAllParts();
-            console.log('로드된 파트 데이터:', this.parts);
             
-            this.filteredParts = [...this.parts];
-            this.renderParts();
-            this.updateStats();
+            try {
+                this.parts = await window.partService.getAllParts();
+                console.log('로드된 파트 데이터:', this.parts);
+                
+                // 데이터가 배열인지 확인
+                if (!Array.isArray(this.parts)) {
+                    console.warn('파트 데이터가 배열이 아닙니다:', typeof this.parts);
+                    this.parts = [];
+                }
+                
+                this.filteredParts = [...this.parts];
+                this.renderParts();
+                this.updateStats();
+                
+                if (this.parts.length === 0) {
+                    console.log('파트 데이터가 없습니다. (빈 배열)');
+                }
+            } catch (dbError) {
+                console.error('데이터베이스 조회 오류:', dbError);
+                
+                // 네트워크 오류인 경우
+                if (dbError.isNetworkError || (dbError.message && (
+                    dbError.message.includes('네트워크') ||
+                    dbError.message.includes('Failed to fetch') ||
+                    dbError.message.includes('ERR_NAME_NOT_RESOLVED')
+                ))) {
+                    const errorMsg = dbError.message || '네트워크 연결에 실패했습니다.';
+                    
+                    // 사용자에게 명확한 안내
+                    this.showNotification(
+                        '⚠️ Supabase 서버에 연결할 수 없습니다. 인터넷 연결과 Supabase 프로젝트 상태를 확인해주세요.',
+                        'error'
+                    );
+                    
+                    // 콘솔에 상세 정보 출력
+                    console.error('=== 연결 실패 상세 정보 ===');
+                    console.error('오류:', errorMsg);
+                    console.error('해결 방법:');
+                    console.error('1. diagnose-connection.html 파일 실행');
+                    console.error('2. Supabase 대시보드에서 프로젝트 상태 확인');
+                    console.error('3. 네트워크 연결 확인');
+                    console.error('========================');
+                } else {
+                    this.showNotification(
+                        `파트 목록을 불러오는데 실패했습니다: ${dbError.message || '알 수 없는 오류'}`,
+                        'error'
+                    );
+                }
+                
+                // 빈 배열로 초기화하여 UI가 깨지지 않도록
+                this.parts = [];
+                this.filteredParts = [];
+                this.renderParts();
+                this.updateStats();
+            }
             
         } catch (error) {
-            console.error('파트 데이터 로드 중 오류:', error);
+            console.error('파트 데이터 로드 중 예상치 못한 오류:', error);
             this.showNotification('파트 목록을 불러오는데 실패했습니다.', 'error');
+            
+            // 빈 배열로 초기화
+            this.parts = [];
+            this.filteredParts = [];
+            this.renderParts();
+            this.updateStats();
         }
     }
 
@@ -111,6 +168,14 @@ class PartRegistration {
             this.filterParts();
         });
 
+        // Product type filter
+        const productTypeFilter = document.getElementById('productTypeFilter');
+        if (productTypeFilter) {
+            productTypeFilter.addEventListener('change', (e) => {
+                this.filterParts();
+            });
+        }
+
         // Status filter
         document.getElementById('statusFilter').addEventListener('change', (e) => {
             this.filterParts();
@@ -120,6 +185,37 @@ class PartRegistration {
         document.getElementById('refreshBtn').addEventListener('click', () => {
             this.loadParts();
         });
+
+        // Edit modal events
+        const editPartForm = document.getElementById('editPartForm');
+        const cancelEditBtn = document.getElementById('cancelEdit');
+        
+        if (editPartForm) {
+            editPartForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.submitEditPart();
+            });
+        }
+        
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', () => {
+                document.getElementById('editModal').classList.add('hidden');
+            });
+        }
+        
+        // Edit part number input - 카테고리 자동 설정
+        const editPartNumberInput = document.getElementById('editPartNumber');
+        if (editPartNumberInput) {
+            editPartNumberInput.addEventListener('input', (e) => {
+                const partNumber = e.target.value.trim();
+                const category = this.getCategoryFromPartNumber(partNumber);
+                const editCategorySelect = document.getElementById('editCategory');
+                
+                if (editCategorySelect) {
+                    editCategorySelect.value = category;
+                }
+            });
+        }
 
         // Modal events
         const cancelDeleteBtn = document.getElementById('cancelDelete');
@@ -225,10 +321,19 @@ class PartRegistration {
             console.log('$ 기호 변환:', formData.get('partNumber').trim(), '→', partNumber);
         }
         
+        const productType = formData.get('productType') || 'PRODUCTION';
+        
+        // product_type 유효성 검사
+        if (productType !== 'PRODUCTION' && productType !== 'AS') {
+            this.showNotification('제품 유형이 올바르지 않습니다. (PRODUCTION 또는 AS만 가능)', 'error');
+            return;
+        }
+        
         const partData = {
             part_number: partNumber,
             category: this.getCategoryFromPartNumber(partNumber), // 파트 번호에 따라 자동 분류
-            status: formData.get('status').toUpperCase() // 소문자를 대문자로 변환
+            status: formData.get('status').toUpperCase(), // 소문자를 대문자로 변환
+            product_type: productType // 제품 유형
         };
 
         // Validation
@@ -315,6 +420,136 @@ class PartRegistration {
     }
 
 
+    showEditModal(partNumber) {
+        console.log('수정 모달 표시:', partNumber);
+        
+        // 해당 파트 찾기
+        const part = this.parts.find(p => p.part_number === partNumber);
+        if (!part) {
+            this.showNotification('파트를 찾을 수 없습니다.', 'error');
+            return;
+        }
+        
+        // 현재 파트 정보 저장
+        this.editingPart = part;
+        
+        // 모달 필드에 현재 값 설정
+        document.getElementById('editPartNumber').value = part.part_number;
+        document.getElementById('editCategory').value = part.category || 'UNKNOWN';
+        document.getElementById('editStatus').value = part.status?.toLowerCase() || 'active';
+        const editProductType = document.getElementById('editProductType');
+        if (editProductType) {
+            editProductType.value = part.product_type || 'PRODUCTION';
+        }
+        
+        // 모달 표시
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    async submitEditPart() {
+        const partNumber = document.getElementById('editPartNumber').value.trim();
+        const category = document.getElementById('editCategory').value;
+        const status = document.getElementById('editStatus').value.toUpperCase();
+        const productType = document.getElementById('editProductType')?.value || 'PRODUCTION';
+        
+        // product_type 유효성 검사
+        if (productType !== 'PRODUCTION' && productType !== 'AS') {
+            this.showNotification('제품 유형이 올바르지 않습니다. (PRODUCTION 또는 AS만 가능)', 'error');
+            return;
+        }
+        
+        if (!partNumber || !category || !status) {
+            this.showNotification('모든 필드를 입력해주세요.', 'error');
+            return;
+        }
+        
+        if (!this.editingPart) {
+            this.showNotification('수정할 파트 정보가 없습니다.', 'error');
+            return;
+        }
+        
+        const originalPartNumber = this.editingPart.part_number;
+        
+        // 파트 번호가 변경된 경우 중복 체크
+        if (partNumber !== originalPartNumber) {
+            const isDuplicate = this.parts.some(p => p.part_number === partNumber && p.part_number !== originalPartNumber);
+            if (isDuplicate) {
+                this.showNotification('이미 등록된 파트 번호입니다.', 'error');
+                return;
+            }
+        }
+        
+        try {
+            this.showLoading(true);
+            
+            const updateData = {
+                category: category,
+                status: status,
+                product_type: productType
+            };
+            
+            // 파트 번호가 변경된 경우
+            if (partNumber !== originalPartNumber) {
+                // 기존 파트 삭제 후 새 파트 번호로 생성
+                // 또는 파트 번호 업데이트 (parts 테이블의 part_number가 PK이므로)
+                // Supabase에서는 PK를 직접 업데이트할 수 없으므로 삭제 후 재생성
+                
+                // 1. 새 파트 번호로 파트 생성
+                const newPartData = {
+                    part_number: partNumber,
+                    category: category,
+                    status: status,
+                    product_type: productType
+                };
+                
+                await window.partService.createPart(newPartData);
+                
+                // 2. 기존 파트 삭제
+                await window.partService.deletePart(originalPartNumber);
+                
+                // 3. 로컬 배열 업데이트
+                this.parts = this.parts.filter(p => p.part_number !== originalPartNumber);
+                this.parts.push({
+                    part_number: partNumber,
+                    category: category,
+                    status: status,
+                    product_type: productType
+                });
+                
+                this.showNotification('파트 번호와 정보가 성공적으로 수정되었습니다.', 'success');
+            } else {
+                // 파트 번호가 변경되지 않은 경우 - 카테고리와 상태만 업데이트
+                await window.partService.updatePartByPartNumber(originalPartNumber, updateData);
+                
+                // 로컬 배열 업데이트
+                const partIndex = this.parts.findIndex(p => p.part_number === originalPartNumber);
+                if (partIndex !== -1) {
+                    this.parts[partIndex] = {
+                        ...this.parts[partIndex],
+                        ...updateData
+                    };
+                }
+                
+                this.showNotification('파트 정보가 성공적으로 수정되었습니다.', 'success');
+            }
+            
+            // 목록 새로고침
+            this.filteredParts = [...this.parts];
+            this.renderParts();
+            this.updateStats();
+            
+            // 모달 닫기
+            document.getElementById('editModal').classList.add('hidden');
+            this.editingPart = null;
+            
+        } catch (error) {
+            console.error('Error updating part:', error);
+            this.showNotification('파트 수정에 실패했습니다.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
     showDeleteModal(partNumber) {
         console.log('삭제 모달 표시:', partNumber);
         this.deletingPart = partNumber;
@@ -355,6 +590,7 @@ class PartRegistration {
     filterParts() {
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const categoryFilter = document.getElementById('categoryFilter').value;
+        const productTypeFilter = document.getElementById('productTypeFilter')?.value || '';
         const statusFilter = document.getElementById('statusFilter').value;
 
         this.filteredParts = this.parts.filter(part => {
@@ -364,10 +600,13 @@ class PartRegistration {
             const matchesCategory = !categoryFilter || 
                 part.category === categoryFilter;
             
+            const matchesProductType = !productTypeFilter || 
+                (part.product_type || 'PRODUCTION') === productTypeFilter;
+            
             const matchesStatus = !statusFilter || 
                 part.status.toLowerCase() === statusFilter.toLowerCase();
             
-            return matchesSearch && matchesCategory && matchesStatus;
+            return matchesSearch && matchesCategory && matchesProductType && matchesStatus;
         });
 
         this.currentPage = 1;
@@ -397,7 +636,7 @@ class PartRegistration {
             console.log('표시할 파트가 없습니다. 빈 메시지 표시');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" class="text-center py-8 text-gray-500">
+                    <td colspan="5" class="text-center py-8 text-gray-500">
                         ${this.filteredParts.length === 0 ? '등록된 파트가 없습니다.' : '검색 결과가 없습니다.'}
                     </td>
                 </tr>
@@ -410,10 +649,19 @@ class PartRegistration {
         tbody.innerHTML = pageParts.map(part => {
             console.log('개별 파트 데이터:', part);
             console.log('파트 ID:', part.id);
+            const productType = part.product_type || 'PRODUCTION';
+            const productTypeText = productType === 'PRODUCTION' ? '양산' : 'AS';
             return `
             <tr class="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                 <td class="py-3 px-4 text-gray-800">${part.part_number}</td>
                 <td class="py-3 px-4 text-gray-800">${part.category}</td>
+                <td class="py-3 px-4">
+                    <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                        productType === 'PRODUCTION' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                    }">
+                        ${productTypeText}
+                    </span>
+                </td>
                 <td class="py-3 px-4">
                     <span class="px-2 py-1 rounded-full text-xs font-medium ${
                         part.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
@@ -425,8 +673,12 @@ class PartRegistration {
                 </td>
                 <td class="py-3 px-4">
                     <div class="flex space-x-2">
+                        <button onclick="window.partRegistration.showEditModal('${part.part_number}')" 
+                                class="text-blue-600 hover:text-blue-800 transition-colors" title="수정">
+                            <i class="fas fa-edit"></i>
+                        </button>
                         <button onclick="console.log('삭제 버튼 클릭, 파트 번호:', '${part.part_number}'); window.partRegistration.showDeleteModal('${part.part_number}')" 
-                                class="text-red-600 hover:text-red-800 transition-colors">
+                                class="text-red-600 hover:text-red-800 transition-colors" title="삭제">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>

@@ -17,10 +17,15 @@ CREATE TABLE parts (
     description VARCHAR(255),
     category VARCHAR(100) DEFAULT 'UNKNOWN',
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
+    product_type VARCHAR(20) DEFAULT 'PRODUCTION' CHECK (product_type IN ('PRODUCTION', 'AS')),
     min_stock INTEGER DEFAULT 0,
     max_stock INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 인덱스 추가 (성능 향상)
+CREATE INDEX idx_parts_product_type ON parts(product_type);
+CREATE INDEX idx_parts_status_product_type ON parts(status, product_type);
 
 -- 재고 현황 테이블 (단순화)
 CREATE TABLE inventory (
@@ -39,7 +44,10 @@ CREATE TABLE inventory_transactions (
     transaction_date DATE NOT NULL DEFAULT CURRENT_DATE,
     part_number VARCHAR(50) NOT NULL,
     transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('INBOUND', 'OUTBOUND', 'ADJUSTMENT')),
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    quantity INTEGER NOT NULL CHECK (
+        (transaction_type IN ('INBOUND', 'OUTBOUND') AND quantity > 0) OR
+        (transaction_type = 'ADJUSTMENT' AND quantity != 0)
+    ),
     reference_id VARCHAR(255), -- ARN 번호, 출고 시퀀스 ID 등
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

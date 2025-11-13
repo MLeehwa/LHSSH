@@ -32,52 +32,68 @@ class InboundStatus {
         try {
             // 입력된 날짜가 유효한지 확인
             if (!koreanDate || koreanDate.trim() === '') {
-                return new Date().toISOString().split('T')[0];
+                // 오늘 날짜를 로컬 시간 기준으로 반환
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
             }
             
-            // 다양한 날짜 형식 처리
-            let date;
             const cleanDate = koreanDate.trim();
             
-            // YYYY-MM-DD 형식인 경우
+            // YYYY-MM-DD 형식인 경우 (날짜만 있는 경우) - 그대로 반환
             if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
-                date = new Date(cleanDate + 'T00:00:00+09:00');
+                return cleanDate; // 날짜만 저장하므로 타임존 변환 불필요
             }
+            
             // YYYY/MM/DD 형식인 경우
-            else if (/^\d{4}\/\d{2}\/\d{2}$/.test(cleanDate)) {
+            if (/^\d{4}\/\d{2}\/\d{2}$/.test(cleanDate)) {
                 const parts = cleanDate.split('/');
-                date = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00+09:00`);
+                return `${parts[0]}-${parts[1]}-${parts[2]}`;
             }
+            
             // MM/DD/YYYY 형식인 경우
-            else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDate)) {
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDate)) {
                 const parts = cleanDate.split('/');
                 const month = parts[0].padStart(2, '0');
                 const day = parts[1].padStart(2, '0');
-                date = new Date(`${parts[2]}-${month}-${day}T00:00:00+09:00`);
+                return `${parts[2]}-${month}-${day}`;
             }
+            
             // DD/MM/YYYY 형식인 경우
-            else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDate)) {
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDate)) {
                 const parts = cleanDate.split('/');
                 const day = parts[0].padStart(2, '0');
                 const month = parts[1].padStart(2, '0');
-                date = new Date(`${parts[2]}-${month}-${day}T00:00:00+09:00`);
-            }
-            else {
-                // 기본적으로 현재 날짜 사용
-                return new Date().toISOString().split('T')[0];
+                return `${parts[2]}-${month}-${day}`;
             }
             
-            // 날짜가 유효한지 확인
-            if (isNaN(date.getTime())) {
-                return new Date().toISOString().split('T')[0];
+            // ISO 형식인 경우 (시간 정보 포함)
+            if (cleanDate.includes('T')) {
+                const date = new Date(cleanDate);
+                if (!isNaN(date.getTime())) {
+                    // 로컬 시간 기준으로 날짜만 추출
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
             }
             
-            // 한국 시간을 미국 중부 시간으로 변환 (UTC-6)
-            const centralTime = new Date(date.getTime() - (15 * 60 * 60 * 1000)); // 15시간 차이
-            return centralTime.toISOString().split('T')[0];
+            // 기본적으로 현재 날짜 사용
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         } catch (error) {
             console.error('날짜 변환 오류:', error);
-            return new Date().toISOString().split('T')[0];
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
     }
 
@@ -93,6 +109,16 @@ class InboundStatus {
             
             // ISO 형식인 경우 날짜 부분만 추출
             if (typeof centralDate === 'string' && centralDate.includes('T')) {
+                // 타임존 정보가 있으면 로컬 시간으로 변환
+                const date = new Date(centralDate);
+                if (!isNaN(date.getTime())) {
+                    // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+                // 타임존 정보가 없으면 그냥 날짜 부분만 추출
                 return centralDate.split('T')[0];
             }
             
@@ -103,7 +129,11 @@ class InboundStatus {
                 return '-';
             }
             
-            return date.toISOString().split('T')[0];
+            // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         } catch (error) {
             console.error('날짜 변환 오류:', error, '입력값:', centralDate);
             return '-';
@@ -122,6 +152,16 @@ class InboundStatus {
             
             // ISO 형식인 경우 날짜 부분만 추출
             if (typeof dateValue === 'string' && dateValue.includes('T')) {
+                // 타임존 정보가 있으면 로컬 시간으로 변환
+                const date = new Date(dateValue);
+                if (!isNaN(date.getTime())) {
+                    // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+                // 타임존 정보가 없으면 그냥 날짜 부분만 추출
                 return dateValue.split('T')[0];
             }
             
@@ -132,7 +172,11 @@ class InboundStatus {
                 return '-';
             }
             
-            return date.toISOString().split('T')[0];
+            // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         } catch (error) {
             console.error('날짜 포맷 오류:', error, '입력값:', dateValue);
             return '-';
@@ -416,12 +460,12 @@ class InboundStatus {
 
     async loadMasterParts() {
         try {
-        const { data, error } = await this.supabase
-            .from('parts')
+            const { data, error } = await this.supabase
+                .from('parts')
                 .select('*')
-            .order('part_number');
+                .order('part_number');
         
-        if (error) {
+            if (error) {
                 console.error('마스터 파트 로드 오류:', error);
                 this.masterParts = [];
                 return;
@@ -440,7 +484,8 @@ class InboundStatus {
         const select = document.getElementById('partNumberSelect');
         if (!select) return;
         
-        select.innerHTML = `<option value="">${i18n.t('select_part_option')}</option>`;
+        const selectPartText = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('select_part_option') : '파트를 선택하세요';
+        select.innerHTML = `<option value="">${selectPartText}</option>`;
         this.masterParts.forEach(part => {
             const option = document.createElement('option');
             option.value = part.part_number;
@@ -1454,11 +1499,13 @@ class InboundStatus {
     }
 
     showError(message) {
-        alert(i18n.t('error_prefix') + message);
+        const prefix = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('error_prefix') : '오류: ';
+        alert(prefix + message);
     }
 
     showSuccess(message) {
-        alert(i18n.t('success_prefix') + message);
+        const prefix = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('success_prefix') : '성공: ';
+        alert(prefix + message);
     }
 }
 

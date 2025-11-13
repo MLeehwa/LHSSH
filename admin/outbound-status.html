@@ -164,15 +164,9 @@
                     </a>
 
                     <!-- Physical Inventory -->
-                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
-                        <i class="fas fa-clipboard-check w-5 h-5 mr-3"></i>
+                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 bg-orange-50 border-l-4 border-orange-500 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition-all duration-200 font-semibold">
+                        <i class="fas fa-clipboard-check w-5 h-5 mr-3 text-orange-600"></i>
                         <span>실사 관리</span>
-                    </a>
-
-                    <!-- Daily Inventory -->
-                    <a href="daily-inventory-enhanced.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
-                        <i class="fas fa-calendar-day w-5 h-5 mr-3"></i>
-                        <span>일일 재고</span>
                     </a>
 
                     <!-- Initial Inventory Setup -->
@@ -278,12 +272,6 @@
                                 </button>
                             </div>
                             <div class="flex items-center space-x-4">
-                                <button id="validateSyncBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200">
-                                    <i class="fas fa-sync-alt mr-2"></i>재고 동기화 확인
-                                </button>
-                                <button id="fixSyncBtn" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors duration-200">
-                                    <i class="fas fa-tools mr-2"></i>동기화 수정
-                                </button>
                                 <button id="confirmOutboundBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                                     <i class="fas fa-check mr-2"></i>출고 확정
                                 </button>
@@ -482,7 +470,13 @@
                     <!-- 파트 입력 테이블 (Handsontable) -->
                     <div class="border border-gray-300 rounded-lg p-4">
                         <div class="flex items-center justify-between mb-4">
-                            <h4 class="text-md font-medium text-gray-800">출고 파트 목록</h4>
+                            <div class="flex items-center space-x-4">
+                                <h4 class="text-md font-medium text-gray-800">출고 파트 목록</h4>
+                                <label class="flex items-center space-x-2 cursor-pointer">
+                                    <input type="checkbox" id="includeASCheckbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="text-sm text-gray-700">AS 제품 포함</span>
+                                </label>
+                            </div>
                             <div class="flex space-x-2">
                                 <button id="addRowBtn" class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
                                     <i class="fas fa-plus mr-1"></i>행 추가
@@ -595,6 +589,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../js/supabase-client.js"></script>
+    <script src="../js/i18n.js"></script>
     <!-- Handsontable JS -->
     <script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
     <script src="../js/outbound-status.js"></script>

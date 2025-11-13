@@ -174,6 +174,8 @@ class PhysicalInventoryAdmin {
             const { data, error } = await this.supabase
                 .from('parts')
                 .select('part_number, category')
+                .eq('status', 'ACTIVE')
+                .eq('product_type', 'PRODUCTION')  // 양산 제품만
                 .order('part_number');
 
             if (error) throw error;
@@ -282,12 +284,20 @@ class PhysicalInventoryAdmin {
             
             const statusClass = this.getStatusClass(session.status);
 
+            const isCompleted = session.status === 'COMPLETED';
+            const deleteButton = isCompleted 
+                ? '<span class="text-gray-400 text-sm">삭제 불가</span>'
+                : `<button onclick="event.stopPropagation(); window.physicalInventoryAdmin.deleteSession(${session.id}, '${(session.notes || '세션명 없음').replace(/'/g, "\\'")}')" 
+                            class="delete-session-btn bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-all duration-200 text-sm">
+                        <i class="fas fa-trash mr-1"></i>삭제
+                    </button>`;
+
             row.innerHTML = `
                 <td>${session.notes || '세션명 없음'}</td>
                 <td>${new Date(session.session_date).toLocaleDateString()}</td>
                 <td><span class="status-badge ${statusClass}">${this.getStatusText(session.status)}</span></td>
                 <td>${new Date(session.created_at).toLocaleString()}</td>
-                <td>${session.created_by || '-'}</td>
+                <td>${deleteButton}</td>
             `;
             
             tbody.appendChild(row);
@@ -340,7 +350,7 @@ class PhysicalInventoryAdmin {
         tbody.innerHTML = '';
         
         if (!this.inventoryItems || this.inventoryItems.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-white/60">${i18n.t('no_inventory_items')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-white/60">${i18n.t('no_inventory_items')}</td></tr>`;
             return;
         }
         
@@ -424,6 +434,15 @@ class PhysicalInventoryAdmin {
                                placeholder="비고 입력"
                                ${isConfirmed ? 'disabled' : ''}>
                     </div>
+                </td>
+                <td>
+                    ${isConfirmed 
+                        ? '<span class="text-gray-400 text-sm">삭제 불가</span>'
+                        : `<button onclick="event.stopPropagation(); window.physicalInventoryAdmin.deleteInventoryItem(${item.id}, '${item.part_number.replace(/'/g, "\\'")}')" 
+                            class="delete-item-btn bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-all duration-200 text-sm">
+                            <i class="fas fa-trash mr-1"></i>삭제
+                        </button>`
+                    }
                 </td>
             `;
             
@@ -713,7 +732,94 @@ class PhysicalInventoryAdmin {
         console.log('비고 pending edit 업데이트 완료:', newValue, 'pendingEdits:', this.pendingEdits);
     }
 
-    // 삭제 함수 제거됨 (세션 완료 버튼만 사용)
+    // 세션 삭제
+    async deleteSession(sessionId, sessionName) {
+        // 완료된 세션은 삭제 불가
+        const session = this.sessions.find(s => s.id === sessionId);
+        if (session && session.status === 'COMPLETED') {
+            this.showAlert('완료된 세션은 삭제할 수 없습니다.', 'warning');
+            return;
+        }
+
+        if (!confirm(`세션 "${sessionName}"을(를) 삭제하시겠습니까?\n\n주의: 세션과 관련된 모든 실사 항목도 함께 삭제됩니다.`)) {
+            return;
+        }
+
+        try {
+            if (!this.supabase) {
+                throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.');
+            }
+
+            // 세션 삭제 (CASCADE로 인해 관련 항목도 자동 삭제됨)
+            const { error } = await this.supabase
+                .from('physical_inventory_sessions')
+                .delete()
+                .eq('id', sessionId);
+
+            if (error) throw error;
+
+            // 현재 세션이 삭제된 세션이면 초기화
+            if (this.currentSession && this.currentSession.id === sessionId) {
+                this.currentSession = null;
+                this.inventoryItems = [];
+                this.pendingEdits = {};
+                document.getElementById('sessionDetailsSection').style.display = 'none';
+                document.getElementById('sessionsSection').style.display = 'block';
+            }
+
+            // 세션 목록 새로고침
+            await this.loadSessions();
+            this.renderSessions();
+
+            this.showAlert(`세션 "${sessionName}"이(가) 성공적으로 삭제되었습니다.`, 'success');
+        } catch (error) {
+            console.error('세션 삭제 오류:', error);
+            this.showAlert('세션 삭제 중 오류가 발생했습니다: ' + error.message, 'danger');
+        }
+    }
+
+    // 실사 항목 삭제
+    async deleteInventoryItem(itemId, partNumber) {
+        // 완료된 항목은 삭제 불가
+        const item = this.inventoryItems.find(i => i.id === itemId);
+        if (item && item.status === 'COMPLETED') {
+            this.showAlert('완료된 실사 항목은 삭제할 수 없습니다.', 'warning');
+            return;
+        }
+
+        if (!confirm(`파트 "${partNumber}"의 실사 항목을 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            if (!this.supabase) {
+                throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.');
+            }
+
+            // 실사 항목 삭제
+            const { error } = await this.supabase
+                .from('physical_inventory_items')
+                .delete()
+                .eq('id', itemId);
+
+            if (error) throw error;
+
+            // pendingEdits에서도 제거
+            if (this.pendingEdits[itemId]) {
+                delete this.pendingEdits[itemId];
+            }
+
+            // 현재 세션의 항목 목록 새로고침
+            if (this.currentSession) {
+                await this.loadSessionDetails(this.currentSession.id);
+            }
+
+            this.showAlert(`파트 "${partNumber}"의 실사 항목이 성공적으로 삭제되었습니다.`, 'success');
+        } catch (error) {
+            console.error('실사 항목 삭제 오류:', error);
+            this.showAlert('실사 항목 삭제 중 오류가 발생했습니다: ' + error.message, 'danger');
+        }
+    }
 
     // 확정 함수 제거됨 (세션 완료 버튼만 사용)
 

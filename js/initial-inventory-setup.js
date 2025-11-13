@@ -13,6 +13,9 @@ class InitialInventorySetup {
         this.updateCurrentTime();
         this.setDefaultDate();
         
+        // 초기 테이블 렌더링 (빈 상태 표시)
+        this.renderInitialStockTable();
+        
         // Supabase가 초기화된 후 파트 로드
         if (this.supabase) {
             await this.loadParts();
@@ -64,7 +67,9 @@ class InitialInventorySetup {
 
     updatePartSelect() {
         const partSelect = document.getElementById('partSelect');
-        partSelect.innerHTML = `<option value="">${i18n.t('select_part_manual')}</option>`;
+        // i18n이 없을 경우 기본값 사용
+        const selectText = (window.i18n && window.i18n.t) ? window.i18n.t('select_part_manual') : '파트를 선택하세요';
+        partSelect.innerHTML = `<option value="">${selectText}</option>`;
         
         this.parts.forEach(part => {
             const option = document.createElement('option');
@@ -246,25 +251,35 @@ class InitialInventorySetup {
     }
 
     downloadTemplate() {
+        // 파트 목록이 로드되지 않았으면 경고
+        if (!this.parts || this.parts.length === 0) {
+            this.showError('파트 목록이 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+
         const headers = ['part_number', 'initial_stock'];
-        const sampleData = [
-            ['INNER-001', '100'],
-            ['REAR-001', '50'],
-            ['INNER-002', '75']
-        ];
+        
+        // 현재 등록되어 있는 모든 파트를 CSV 데이터로 변환
+        const csvData = this.parts.map(part => [
+            part.part_number,
+            '0' // 초기 재고는 0으로 설정 (사용자가 입력)
+        ]);
 
         let csvContent = headers.join(',') + '\n';
-        csvContent += sampleData.map(row => row.join(',')).join('\n');
+        csvContent += csvData.map(row => row.join(',')).join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', 'initial_inventory_template.csv');
+        const fileName = `initial_inventory_template_${new Date().toISOString().split('T')[0]}.csv`;
+        link.setAttribute('download', fileName);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        this.showSuccess(`${this.parts.length}개의 파트가 포함된 템플릿이 다운로드되었습니다.`);
     }
 
     addInitialStock() {
@@ -320,6 +335,12 @@ class InitialInventorySetup {
         const tbody = document.getElementById('initialStockTableBody');
         const emptyState = document.getElementById('emptyState');
 
+        // 요소가 없으면 조기 반환
+        if (!tbody || !emptyState) {
+            console.warn('테이블 요소를 찾을 수 없습니다.');
+            return;
+        }
+
         if (this.initialStockData.length === 0) {
             tbody.innerHTML = '';
             emptyState.style.display = 'block';
@@ -335,17 +356,17 @@ class InitialInventorySetup {
             
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${item.part_number}
+                    ${item.part_number || ''}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         item.category === 'INNER' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
                     }">
-                        ${item.category}
+                        ${item.category || 'N/A'}
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${item.initial_stock.toLocaleString()}
+                    ${(item.initial_stock || 0).toLocaleString()}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button onclick="initialInventorySetup.removeStock(${index})" 
@@ -371,7 +392,8 @@ class InitialInventorySetup {
             return;
         }
 
-        if (confirm(i18n.t('confirm_delete_all'))) {
+        const confirmDeleteText = (window.i18n && window.i18n.t) ? window.i18n.t('confirm_delete_all') : '모든 초기 재고 데이터를 삭제하시겠습니까?';
+        if (confirm(confirmDeleteText)) {
             this.initialStockData = [];
             this.renderInitialStockTable();
             this.showSuccess('모든 초기 재고 데이터가 삭제되었습니다.');
@@ -386,6 +408,31 @@ class InitialInventorySetup {
 
         if (!this.referenceDate) {
             this.showError('기준 날짜를 선택해주세요.');
+            return;
+        }
+
+        // 최종 확인 (매우 중요한 작업이므로 이중 확인)
+        const confirmMessage = `⚠️ 경고: 이 작업은 다음을 수행합니다:\n\n` +
+            `1. inventory 테이블의 모든 기존 데이터 삭제\n` +
+            `2. inventory_transactions 테이블의 모든 거래 내역 삭제\n` +
+            `3. physical_inventory_items 테이블의 모든 실사 항목 삭제\n` +
+            `4. physical_inventory_sessions 테이블의 모든 실사 세션 삭제\n` +
+            `5. arn_parts 테이블의 모든 입고 파트 데이터 삭제\n` +
+            `6. arn_containers 테이블의 모든 입고 컨테이너 데이터 삭제\n` +
+            `7. daily_inventory_summary 테이블의 모든 일별 재고 요약 삭제\n` +
+            `8. 입력한 ${this.initialStockData.length}개 파트만 새로 생성\n\n` +
+            `이 작업은 되돌릴 수 없습니다.\n\n` +
+            `정말로 진행하시겠습니까?`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // 이중 확인
+        const doubleConfirmMessage = `마지막 확인: 모든 기존 재고 데이터, 거래 내역, 실사 데이터, 입고 데이터가 삭제됩니다.\n\n` +
+            `정말로 계속하시겠습니까?`;
+        
+        if (!confirm(doubleConfirmMessage)) {
             return;
         }
 
@@ -408,7 +455,76 @@ class InitialInventorySetup {
 
             console.log('조회된 daily_inventory_summary:', dailySummary);
 
-            // 2. 기존 inventory 데이터 삭제
+            // 2. 기존 데이터 삭제 (순서 중요: 외래 키 제약 조건 고려)
+            // 2-1. physical_inventory_items 삭제 (먼저 삭제해야 함 - session_id 외래 키)
+            console.log('physical_inventory_items 삭제 중...');
+            const { error: itemsDeleteError } = await this.supabase
+                .from('physical_inventory_items')
+                .delete()
+                .neq('id', 0); // 모든 데이터 삭제
+
+            if (itemsDeleteError) {
+                console.warn('physical_inventory_items 삭제 오류 (무시 가능):', itemsDeleteError);
+            }
+
+            // 2-2. physical_inventory_sessions 삭제
+            console.log('physical_inventory_sessions 삭제 중...');
+            const { error: sessionsDeleteError } = await this.supabase
+                .from('physical_inventory_sessions')
+                .delete()
+                .neq('id', 0); // 모든 데이터 삭제
+
+            if (sessionsDeleteError) {
+                console.warn('physical_inventory_sessions 삭제 오류 (무시 가능):', sessionsDeleteError);
+            }
+
+            // 2-3. arn_parts 삭제 (arn_number, part_number 외래 키 - 먼저 삭제)
+            console.log('arn_parts 삭제 중...');
+            const { error: arnPartsDeleteError } = await this.supabase
+                .from('arn_parts')
+                .delete()
+                .neq('id', 0); // 모든 데이터 삭제
+
+            if (arnPartsDeleteError) {
+                console.warn('arn_parts 삭제 오류 (무시 가능):', arnPartsDeleteError);
+            }
+
+            // 2-4. arn_containers 삭제
+            console.log('arn_containers 삭제 중...');
+            const { error: arnContainersDeleteError } = await this.supabase
+                .from('arn_containers')
+                .delete()
+                .neq('id', 0); // 모든 데이터 삭제
+
+            if (arnContainersDeleteError) {
+                console.warn('arn_containers 삭제 오류 (무시 가능):', arnContainersDeleteError);
+            }
+
+            // 2-5. inventory_transactions 삭제
+            console.log('inventory_transactions 삭제 중...');
+            const { error: transactionError } = await this.supabase
+                .from('inventory_transactions')
+                .delete()
+                .neq('id', 0); // 모든 데이터 삭제
+
+            if (transactionError) {
+                console.warn('inventory_transactions 삭제 오류:', transactionError);
+                throw transactionError;
+            }
+
+            // 2-6. daily_inventory_summary 삭제
+            console.log('daily_inventory_summary 삭제 중...');
+            const { error: dailySummaryDeleteError } = await this.supabase
+                .from('daily_inventory_summary')
+                .delete()
+                .neq('part_number', ''); // 모든 데이터 삭제
+
+            if (dailySummaryDeleteError) {
+                console.warn('daily_inventory_summary 삭제 오류 (무시 가능):', dailySummaryDeleteError);
+            }
+
+            // 2-7. inventory 데이터 삭제 (마지막)
+            console.log('inventory 삭제 중...');
             const { error: deleteError } = await this.supabase
                 .from('inventory')
                 .delete()
@@ -439,15 +555,7 @@ class InitialInventorySetup {
 
             if (insertError) throw insertError;
 
-            // 5. 거래 내역 초기화
-            const { error: transactionError } = await this.supabase
-                .from('inventory_transactions')
-                .delete()
-                .neq('part_number', '');
-
-            if (transactionError) throw transactionError;
-
-            // 6. 선택한 날짜의 daily_inventory_summary 생성 (초기 재고 상태 반영)
+            // 5. 선택한 날짜의 daily_inventory_summary 생성 (초기 재고 상태 반영)
             console.log('선택한 날짜의 daily_inventory_summary 생성 중...');
             console.log('기준 날짜:', this.referenceDate);
             
@@ -519,7 +627,8 @@ class InitialInventorySetup {
     }
 
     logout() {
-        if (confirm(i18n.t('confirm_logout'))) {
+        const confirmLogoutText = (window.i18n && window.i18n.t) ? window.i18n.t('confirm_logout') : '로그아웃하시겠습니까?';
+        if (confirm(confirmLogoutText)) {
             window.location.href = '../login.html';
         }
     }

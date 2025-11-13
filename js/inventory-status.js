@@ -15,6 +15,22 @@ class InventoryStatus {
         this.isLoading = false;
         this.domCache = new Map();
         
+        // 정렬 관련
+        this.sortColumn = null;
+        this.sortDirection = 'asc'; // 'asc' or 'desc'
+        
+        // 날짜별 재고 계산 관련
+        this.dateStockData = [];
+        this.dateStockSortColumn = null;
+        this.dateStockSortDirection = 'asc';
+        
+        // 일자별 입출고 현황 관련
+        this.dailyInOutData = [];
+        this.dailyInOutDateList = []; // 엑셀 다운로드용 날짜 목록
+        
+        // AS 필터 상태 추적
+        this.lastIncludeAS = false; // 기본값: AS 제품 제외 (양산 제품만)
+        
         // Supabase 클라이언트 초기화
         this.initializeSupabase();
         
@@ -72,18 +88,24 @@ class InventoryStatus {
             }
         });
 
-        container.addEventListener('change', (e) => {
+        container.addEventListener('change', async (e) => {
             if (e.target.matches('#dateFilter, #stockFilter')) {
-                this.applyFilters();
+                await this.applyFilters();
+            } else if (e.target.matches('#includeASCheckbox')) {
+                await this.handleASCheckboxChange();
+            } else if (e.target.matches('#includeASCheckboxDateStock')) {
+                // 날짜별 재고 계산은 계산 버튼을 눌러야 하므로 여기서는 처리하지 않음
+            } else if (e.target.matches('#includeASCheckboxDailyInOut')) {
+                // 일자별 입출고 현황은 조회 버튼을 눌러야 하므로 여기서는 처리하지 않음
             }
         });
 
-        container.addEventListener('click', (e) => {
+        container.addEventListener('click', async (e) => {
             // Filter buttons
             if (e.target.matches('#applyFilter')) {
-                this.applyFilters();
+                await this.applyFilters();
             } else if (e.target.matches('#resetFilter')) {
-                this.resetFilters();
+                await this.resetFilters();
             } else if (e.target.matches('#refreshDataBtn')) {
                 this.refreshData();
             } else if (e.target.matches('#csvUploadBtn')) {
@@ -163,7 +185,17 @@ class InventoryStatus {
         if (this.isLoading) return;
         
         const now = Date.now();
-        if (now - this.lastDataUpdate < this.dataUpdateInterval) {
+        
+        // AS 체크박스 상태 확인 (캐시 체크 전에 확인)
+        const includeASCheckbox = document.getElementById('includeASCheckbox');
+        const includeAS = includeASCheckbox?.checked || false;
+        
+        // AS 상태가 변경되었거나 캐시가 만료되었을 때만 로드
+        const cacheKey = includeAS ? 'data_with_as' : 'data_production';
+        const lastCacheKey = this.lastIncludeAS ? 'data_with_as' : 'data_production';
+        const asStateChanged = cacheKey !== lastCacheKey;
+        
+        if (!asStateChanged && now - this.lastDataUpdate < this.dataUpdateInterval) {
             console.log('Using cached data');
             return;
         }
@@ -171,7 +203,7 @@ class InventoryStatus {
         this.isLoading = true;
         
         try {
-            console.log('데이터 로딩 시작...');
+            console.log('데이터 로딩 시작... (AS 포함:', includeAS, ')');
             
             if (!this.supabase) {
                 console.warn('Supabase 클라이언트가 초기화되지 않았습니다. 모의 데이터를 사용합니다.');
@@ -179,10 +211,15 @@ class InventoryStatus {
                 return;
             }
             
+            // AS 상태가 변경되었으면 캐시 클리어
+            if (asStateChanged) {
+                this.cache.clear();
+            }
+            
             // Performance: Load data in parallel
             const [inventoryResult, transactionResult] = await Promise.all([
-                this.loadInventoryData(),
-                this.loadTransactionData()
+                this.loadInventoryData(includeAS),
+                this.loadTransactionData(includeAS)
             ]);
             
             this.inventory = inventoryResult;
@@ -192,9 +229,9 @@ class InventoryStatus {
             this.filteredTransactions = [...this.transactions];
             
             this.lastDataUpdate = now;
-            this.cache.clear(); // Clear old cache
+            this.lastIncludeAS = includeAS; // 마지막 AS 상태 저장
             
-            console.log('데이터 로드 완료. 총 재고:', this.inventory.length, '총 거래:', this.transactions.length);
+            console.log('데이터 로드 완료. 총 재고:', this.inventory.length, '총 거래:', this.transactions.length, '(AS 포함:', includeAS, ')');
             
             this.renderInventory();
             this.renderTransactions();
@@ -207,12 +244,73 @@ class InventoryStatus {
         }
     }
 
-    async loadInventoryData() {
-        const cacheKey = 'inventory_data';
+    async loadInventoryData(includeAS = false) {
+        // AS 포함 여부에 따라 캐시 키 변경
+        const cacheKey = includeAS ? 'inventory_data_with_as' : 'inventory_data_production';
         if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
+            const cached = this.cache.get(cacheKey);
+            console.log('재고 데이터 캐시 사용 (AS 포함:', includeAS, ', 개수:', cached.length, ')');
+            return cached;
         }
 
+        console.log('재고 데이터 로드 시작 (AS 포함:', includeAS, ')');
+        
+        // 1. 먼저 parts 테이블에서 필터링된 파트 목록 가져오기
+        let partsQuery = this.supabase
+            .from('parts')
+            .select('part_number, product_type')
+            .eq('status', 'ACTIVE');
+        
+        if (!includeAS) {
+            // AS를 포함하지 않으면 PRODUCTION만, NULL이나 빈 값은 제외
+            partsQuery = partsQuery.eq('product_type', 'PRODUCTION');
+        } else {
+            // AS를 포함할 때도 NULL이나 빈 값은 제외 (명시적으로 PRODUCTION 또는 AS만)
+            partsQuery = partsQuery.in('product_type', ['PRODUCTION', 'AS']);
+        }
+        
+        const { data: partsData, error: partsError } = await partsQuery;
+        
+        if (partsError) {
+            console.error('파트 목록 로드 오류:', partsError);
+            return this.getMockInventory();
+        }
+        
+        if (!partsData || partsData.length === 0) {
+            console.warn('필터링된 파트가 없습니다. (AS 포함:', includeAS, ')');
+            return [];
+        }
+        
+        // 추가 필터링: product_type이 NULL이거나 빈 값인 경우 제외
+        const filteredParts = partsData.filter(p => {
+            const productType = p.product_type;
+            if (!includeAS) {
+                // AS 포함 안 할 때: PRODUCTION만 허용
+                return productType === 'PRODUCTION';
+            } else {
+                // AS 포함 할 때: PRODUCTION 또는 AS만 허용
+                return productType === 'PRODUCTION' || productType === 'AS';
+            }
+        });
+        
+        // product_type이 잘못된 파트 확인
+        const invalidParts = partsData.filter(p => {
+            const productType = p.product_type;
+            return !productType || (productType !== 'PRODUCTION' && productType !== 'AS');
+        });
+        
+        if (invalidParts.length > 0) {
+            console.warn('잘못된 product_type을 가진 파트:', invalidParts.map(p => ({
+                part: p.part_number,
+                product_type: p.product_type
+            })));
+        }
+        
+        console.log('필터링된 파트 개수:', filteredParts.length, '(AS 포함:', includeAS, ', 전체:', partsData.length, ')');
+        
+        const allowedPartNumbers = new Set(filteredParts.map(p => p.part_number));
+        
+        // 2. inventory 테이블에서 데이터 가져오기
         const { data: inventoryData, error: inventoryError } = await this.supabase
             .from('inventory')
             .select('*')
@@ -223,21 +321,86 @@ class InventoryStatus {
             return this.getMockInventory();
         }
         
-        const result = inventoryData || [];
+        // 3. 필터링된 파트만 포함
+        const result = (inventoryData || []).filter(item => 
+            allowedPartNumbers.has(item.part_number)
+        );
+        
+        console.log('필터링된 재고 데이터 개수:', result.length, '(전체:', inventoryData?.length || 0, ', AS 포함:', includeAS, ')');
+        
         this.cache.set(cacheKey, result);
         return result;
     }
 
-    async loadTransactionData() {
-        const cacheKey = 'transaction_data';
+    async loadTransactionData(includeAS = false) {
+        // AS 포함 여부에 따라 캐시 키 변경
+        const cacheKey = includeAS ? 'transaction_data_with_as' : 'transaction_data_production';
         if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
+            const cached = this.cache.get(cacheKey);
+            console.log('거래 내역 데이터 캐시 사용 (AS 포함:', includeAS, ', 개수:', cached.length, ')');
+            return cached;
         }
 
+        console.log('거래 내역 데이터 로드 시작 (AS 포함:', includeAS, ')');
+        
+        // 1. 먼저 parts 테이블에서 필터링된 파트 목록 가져오기
+        let partsQuery = this.supabase
+            .from('parts')
+            .select('part_number, product_type')
+            .eq('status', 'ACTIVE');
+        
+        if (!includeAS) {
+            // AS를 포함하지 않으면 PRODUCTION만, NULL이나 빈 값은 제외
+            partsQuery = partsQuery.eq('product_type', 'PRODUCTION');
+        } else {
+            // AS를 포함할 때도 NULL이나 빈 값은 제외 (명시적으로 PRODUCTION 또는 AS만)
+            partsQuery = partsQuery.in('product_type', ['PRODUCTION', 'AS']);
+        }
+        
+        const { data: partsData, error: partsError } = await partsQuery;
+        
+        if (partsError) {
+            console.error('파트 목록 로드 오류:', partsError);
+            return this.getMockTransactions();
+        }
+        
+        if (!partsData || partsData.length === 0) {
+            console.warn('필터링된 파트가 없습니다. (AS 포함:', includeAS, ')');
+            return [];
+        }
+        
+        // 추가 필터링: product_type이 NULL이거나 빈 값인 경우 제외
+        const filteredParts = partsData.filter(p => {
+            const productType = p.product_type;
+            if (!includeAS) {
+                // AS 포함 안 할 때: PRODUCTION만 허용
+                return productType === 'PRODUCTION';
+            } else {
+                // AS 포함 할 때: PRODUCTION 또는 AS만 허용
+                return productType === 'PRODUCTION' || productType === 'AS';
+            }
+        });
+        
+        // product_type이 잘못된 파트 확인
+        const invalidParts = partsData.filter(p => {
+            const productType = p.product_type;
+            return !productType || (productType !== 'PRODUCTION' && productType !== 'AS');
+        });
+        
+        if (invalidParts.length > 0) {
+            console.warn('잘못된 product_type을 가진 파트:', invalidParts.map(p => ({
+                part: p.part_number,
+                product_type: p.product_type
+            })));
+        }
+        
+        const allowedPartNumbers = new Set(filteredParts.map(p => p.part_number));
+        
+        // 2. inventory_transactions 테이블에서 데이터 가져오기
         const { data: transactionData, error: transactionError } = await this.supabase
             .from('inventory_transactions')
             .select('*')
-            .order('date', { ascending: false })
+            .order('transaction_date', { ascending: false })
             .limit(100);
         
         if (transactionError) {
@@ -245,7 +408,13 @@ class InventoryStatus {
             return this.getMockTransactions();
         }
         
-        const result = transactionData || [];
+        // 3. 필터링된 파트만 포함
+        const result = (transactionData || []).filter(item => 
+            allowedPartNumbers.has(item.part_number)
+        );
+        
+        console.log('필터링된 거래 내역 개수:', result.length, '(전체:', transactionData?.length || 0, ', AS 포함:', includeAS, ')');
+        
         this.cache.set(cacheKey, result);
         return result;
     }
@@ -536,15 +705,24 @@ class InventoryStatus {
             clearTimeout(this.filterTimeout);
         }
         
-        this.filterTimeout = setTimeout(() => {
-            this.applyFilters();
+        this.filterTimeout = setTimeout(async () => {
+            await this.applyFilters();
         }, 150); // Reduced from 300ms to 150ms for better responsiveness
     }
 
-    applyFilters() {
-        const partNumberFilter = document.getElementById('partNumberFilter').value.toLowerCase();
-        const dateFilter = document.getElementById('dateFilter').value;
-        const stockFilter = document.getElementById('stockFilter').value;
+    async applyFilters() {
+        const partNumberFilter = document.getElementById('partNumberFilter')?.value?.toLowerCase() || '';
+        const dateFilter = document.getElementById('dateFilter')?.value || '';
+        const stockFilter = document.getElementById('stockFilter')?.value || '';
+        const includeASCheckbox = document.getElementById('includeASCheckbox');
+        const includeAS = includeASCheckbox?.checked || false;
+
+        // AS 체크박스가 변경되었으면 데이터 재로드
+        if (this.lastIncludeAS !== includeAS) {
+            this.lastIncludeAS = includeAS;
+            await this.loadData();
+            return; // loadData에서 renderInventory와 renderTransactions를 호출하므로 여기서는 리턴
+        }
 
         // Performance: Use more efficient filtering
         this.filteredInventory = this.inventory.filter(item => {
@@ -556,7 +734,7 @@ class InventoryStatus {
 
         this.filteredTransactions = this.transactions.filter(transaction => {
             const partNumber = (transaction.part_number || transaction.partNumber || '').toLowerCase();
-            const transactionDate = transaction.date || transaction.created_at || '';
+            const transactionDate = transaction.transaction_date || transaction.date || transaction.created_at || '';
             const matchesPartNumber = !partNumberFilter || partNumber.includes(partNumberFilter);
             const matchesDate = !dateFilter || transactionDate === dateFilter;
             return matchesPartNumber && matchesDate;
@@ -570,16 +748,33 @@ class InventoryStatus {
         });
     }
 
-    resetFilters() {
+    async handleASCheckboxChange() {
+        // AS 체크박스 변경 시 데이터 재로드
+        await this.applyFilters();
+    }
+
+    async resetFilters() {
         document.getElementById('partNumberFilter').value = '';
         document.getElementById('dateFilter').value = '';
         document.getElementById('stockFilter').value = '';
+        // AS 체크박스도 초기화
+        const includeASCheckbox = document.getElementById('includeASCheckbox');
+        const wasChecked = includeASCheckbox?.checked || false;
+        if (includeASCheckbox) {
+            includeASCheckbox.checked = false;
+        }
 
-        this.filteredInventory = [...this.inventory];
-        this.filteredTransactions = [...this.transactions];
-        this.renderInventory();
-        this.renderTransactions();
-        this.updateStats();
+        // AS 체크박스가 변경되었으면 데이터 재로드
+        if (wasChecked) {
+            this.lastIncludeAS = false;
+            await this.loadData();
+        } else {
+            this.filteredInventory = [...this.inventory];
+            this.filteredTransactions = [...this.transactions];
+            this.renderInventory();
+            this.renderTransactions();
+            this.updateStats();
+        }
         this.showNotification('필터가 초기화되었습니다.', 'info');
     }
 
@@ -619,6 +814,20 @@ class InventoryStatus {
                 const partNumber = item.part_number || 'N/A';
                 const currentStock = item.current_stock !== undefined ? item.current_stock : 0;
                 const lastUpdated = item.last_updated || 'N/A';
+                
+                // 날짜만 표시 (YYYY-MM-DD 형식)
+                let formattedDate = 'N/A';
+                if (lastUpdated !== 'N/A' && lastUpdated) {
+                    try {
+                        const date = new Date(lastUpdated);
+                        if (!isNaN(date.getTime())) {
+                            formattedDate = date.toISOString().split('T')[0];
+                        }
+                    } catch (e) {
+                        // 날짜 파싱 실패 시 원본 표시
+                        formattedDate = lastUpdated;
+                    }
+                }
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">${partNumber}</td>
@@ -628,7 +837,7 @@ class InventoryStatus {
                             ${statusText}
                         </span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${lastUpdated}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formattedDate}</td>
                 `;
                 fragment.appendChild(row);
             });
@@ -661,24 +870,25 @@ class InventoryStatus {
                 const row = document.createElement('tr');
                 
                 // Cache type styling
+                const transactionType = transaction.transaction_type || transaction.type;
                 let typeColor, typeText, quantityPrefix;
-                if (typeCache.has(transaction.type)) {
-                    const cached = typeCache.get(transaction.type);
+                if (typeCache.has(transactionType)) {
+                    const cached = typeCache.get(transactionType);
                     typeColor = cached.color;
                     typeText = cached.text;
                     quantityPrefix = cached.prefix;
                 } else {
-                    typeColor = transaction.type === 'INBOUND' ? 'text-green-600' : 'text-red-600';
-                    typeText = transaction.type === 'INBOUND' ? '입고' : '출고';
-                    quantityPrefix = transaction.type === 'INBOUND' ? '+' : '-';
-                    typeCache.set(transaction.type, { color: typeColor, text: typeText, prefix: quantityPrefix });
+                    typeColor = transactionType === 'INBOUND' ? 'text-green-600' : 'text-red-600';
+                    typeText = transactionType === 'INBOUND' ? '입고' : '출고';
+                    quantityPrefix = transactionType === 'INBOUND' ? '+' : '-';
+                    typeCache.set(transactionType, { color: typeColor, text: typeText, prefix: quantityPrefix });
                 }
 
-                const date = transaction.date || 'N/A';
+                const date = transaction.transaction_date || transaction.date || 'N/A';
                 const partNumber = transaction.part_number || 'N/A';
                 const quantity = transaction.quantity !== undefined ? transaction.quantity : 0;
                 const balanceAfter = transaction.balance_after !== undefined ? transaction.balance_after : 0;
-                const referenceNumber = transaction.reference_number || 'N/A';
+                const referenceNumber = transaction.reference_id || transaction.reference_number || 'N/A';
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
@@ -804,12 +1014,12 @@ class InventoryStatus {
 
             // 일간 내역 데이터
             const transactionData = this.filteredTransactions.map(transaction => ({
-                '날짜': transaction.date,
-                '파트 번호': transaction.partNumber,
-                '유형': transaction.type === 'INBOUND' ? '입고' : '출고',
+                '날짜': transaction.transaction_date || transaction.date,
+                '파트 번호': transaction.part_number || transaction.partNumber,
+                '유형': transaction.transaction_type === 'INBOUND' || transaction.type === 'INBOUND' ? '입고' : '출고',
                 '수량': transaction.quantity,
-                '마감 재고': transaction.balanceAfter,
-                '참조 번호': transaction.referenceNumber
+                '마감 재고': transaction.balance_after || transaction.balanceAfter,
+                '참조 번호': transaction.reference_id || transaction.reference_number || transaction.referenceNumber
             }));
 
             // 워크시트 생성
@@ -1019,7 +1229,9 @@ class InventoryStatus {
         
         // 주말 데이터 수집
         this.transactions.forEach(transaction => {
-            const dateObj = new Date(transaction.date);
+            const transactionDate = transaction.transaction_date || transaction.date;
+            if (!transactionDate) return;
+            const dateObj = new Date(transactionDate);
             const dayOfWeek = dateObj.getDay();
             
             // 주말인 경우 (토요일: 6, 일요일: 0)
@@ -1029,13 +1241,14 @@ class InventoryStatus {
                     day: '2-digit'
                 });
                 
+                const transactionType = transaction.transaction_type || transaction.type;
                 weekendData.push([
                     dateStr,
-                    transaction.partNumber,
-                    transaction.type === 'INBOUND' ? '입고' : '출고',
+                    transaction.part_number || transaction.partNumber,
+                    transactionType === 'INBOUND' ? '입고' : '출고',
                     transaction.quantity,
-                    transaction.balanceAfter,
-                    transaction.referenceNumber
+                    transaction.balance_after || transaction.balanceAfter,
+                    transaction.reference_id || transaction.reference_number || transaction.referenceNumber
                 ]);
             }
         });
@@ -1443,12 +1656,11 @@ class InventoryStatus {
             await this.supabase
                 .from('inventory_transactions')
                 .insert({
-                    date: date,
+                    transaction_date: date,
                     part_number: partNumber,
-                    type: 'INBOUND',
+                    transaction_type: 'INBOUND',
                     quantity: quantity,
-                    balance_after: newStock,
-                    reference_number: `CSV_${Date.now()}`
+                    reference_id: `CSV_${Date.now()}`
                 });
 
         } catch (error) {
@@ -1473,7 +1685,8 @@ class InventoryStatus {
                     .insert({
                         part_number: partNumber,
                         category: category,
-                        status: 'ACTIVE'
+                        status: 'ACTIVE',
+                        product_type: 'PRODUCTION'  // 기본값: 양산 제품
                     });
             }
         } catch (error) {
@@ -1555,13 +1768,19 @@ class InventoryStatus {
         });
     }
 
-    async loadMasterParts() {
+    async loadMasterParts(includeAS = false) {
         try {
-            const { data, error } = await this.supabase
+            let query = this.supabase
                 .from('parts')
                 .select('part_number')
-                .eq('status', 'ACTIVE')
-                .order('part_number');
+                .eq('status', 'ACTIVE');
+            
+            // AS를 포함하지 않으면 양산 제품만
+            if (!includeAS) {
+                query = query.eq('product_type', 'PRODUCTION');
+            }
+            
+            const { data, error } = await query.order('part_number');
 
             if (error) throw error;
             
@@ -1629,6 +1848,1736 @@ class InventoryStatus {
             loading.classList.remove('hidden');
         } else {
             loading.classList.add('hidden');
+        }
+    }
+
+    // 테이블 정렬 기능
+    sortTable(column) {
+        // 같은 컬럼을 클릭하면 정렬 방향 토글
+        if (this.sortColumn === column) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+
+        // 정렬 아이콘 업데이트
+        this.updateSortIcons();
+
+        // 데이터 정렬
+        this.filteredInventory.sort((a, b) => {
+            let aValue = a[column];
+            let bValue = b[column];
+
+            // null/undefined 처리
+            if (aValue === null || aValue === undefined) aValue = '';
+            if (bValue === null || bValue === undefined) bValue = '';
+
+            // 날짜 컬럼 처리
+            if (column === 'last_updated') {
+                const aDate = aValue ? new Date(aValue).getTime() : 0;
+                const bDate = bValue ? new Date(bValue).getTime() : 0;
+                return this.sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+            }
+
+            // 숫자 컬럼 처리
+            if (column === 'current_stock') {
+                const aNum = Number(aValue) || 0;
+                const bNum = Number(bValue) || 0;
+                return this.sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+            }
+
+            // 문자열 컬럼 처리
+            aValue = String(aValue).toLowerCase();
+            bValue = String(bValue).toLowerCase();
+
+            if (this.sortDirection === 'asc') {
+                return aValue.localeCompare(bValue);
+            } else {
+                return bValue.localeCompare(aValue);
+            }
+        });
+
+        // 테이블 다시 렌더링
+        this.renderInventory();
+    }
+
+    updateSortIcons() {
+        // 모든 정렬 아이콘 초기화
+        const columns = ['part_number', 'current_stock', 'status', 'last_updated'];
+        columns.forEach(col => {
+            const icon = document.getElementById(`sortIcon_${col}`);
+            if (icon) {
+                icon.className = 'fas fa-sort ml-1 text-gray-400';
+            }
+        });
+
+        // 현재 정렬된 컬럼의 아이콘 업데이트
+        if (this.sortColumn) {
+            const icon = document.getElementById(`sortIcon_${this.sortColumn}`);
+            if (icon) {
+                if (this.sortDirection === 'asc') {
+                    icon.className = 'fas fa-sort-up ml-1 text-blue-600';
+                } else {
+                    icon.className = 'fas fa-sort-down ml-1 text-blue-600';
+                }
+            }
+        }
+    }
+
+    // 날짜별 재고 계산
+    async calculateDateStock() {
+        const calculationDate = document.getElementById('stockCalculationDate').value;
+        
+        if (!calculationDate) {
+            this.showNotification('기준일을 선택해주세요.', 'error');
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            // AS 체크박스 상태 확인
+            const includeAS = document.getElementById('includeASCheckboxDateStock')?.checked || false;
+            
+            // 1. 모든 파트 목록 가져오기
+            let query = this.supabase
+                .from('parts')
+                .select('part_number')
+                .eq('status', 'ACTIVE');
+            
+            // AS를 포함하지 않으면 양산 제품만
+            if (!includeAS) {
+                query = query.eq('product_type', 'PRODUCTION');
+            }
+            
+            const { data: allParts, error: partsError } = await query.order('part_number');
+
+            if (partsError) throw partsError;
+
+            // 2. 해당일(기준일)의 거래 내역만 가져오기
+            const { data: dailyTransactions, error: dailyTransError } = await this.supabase
+                .from('inventory_transactions')
+                .select('part_number, transaction_type, quantity, transaction_date')
+                .eq('transaction_date', calculationDate);
+
+            if (dailyTransError) throw dailyTransError;
+
+            // 2-1. 해당일의 실사 재고 정보 가져오기 (JOIN을 사용하여 최적화)
+            // 캐시 키 생성
+            const cacheKey = `physical_inventory_${calculationDate}`;
+            const cachedData = this.cache.get(cacheKey);
+            
+            let physicalInventoryItems = [];
+            
+            if (cachedData && (Date.now() - cachedData.timestamp) < this.dataUpdateInterval) {
+                // 캐시된 데이터 사용
+                physicalInventoryItems = cachedData.items;
+                console.log(`캐시에서 실사 재고 데이터 로드: ${calculationDate}`);
+            } else {
+                // 데이터베이스에서 조회 (최적화된 쿼리)
+                // 먼저 세션 ID를 조회한 후 items 조회 (Supabase JOIN 제한 고려)
+                const { data: sessions, error: sessionsError } = await this.supabase
+                    .from('physical_inventory_sessions')
+                    .select('id')
+                    .eq('session_date', calculationDate)
+                    .in('status', ['PENDING', 'COMPLETED']);
+                
+                if (sessionsError) {
+                    console.warn('실사 세션 조회 오류:', sessionsError);
+                }
+                
+                let items = [];
+                let itemsError = null;
+                
+                if (!sessionsError && sessions && sessions.length > 0) {
+                    const sessionIds = sessions.map(s => s.id);
+                    const { data: itemsData, error: itemsErr } = await this.supabase
+                        .from('physical_inventory_items')
+                        .select('part_number, physical_stock, system_stock, created_at')
+                        .in('session_id', sessionIds)
+                        .order('created_at', { ascending: false }); // 최신 항목 우선
+                    
+                    itemsError = itemsErr;
+                    if (!itemsError && itemsData) {
+                        items = itemsData;
+                    } else if (itemsError) {
+                        console.warn('실사 항목 조회 오류:', itemsError);
+                    }
+                }
+                
+                if (!itemsError && items) {
+                    physicalInventoryItems = items;
+                    
+                    // 캐시에 저장
+                    this.cache.set(cacheKey, {
+                        items: physicalInventoryItems,
+                        timestamp: Date.now()
+                    });
+                } else if (itemsError) {
+                    console.warn('실사 재고 조회 오류:', itemsError);
+                    // 오류가 있어도 계속 진행 (실사 재고가 없는 경우일 수 있음)
+                }
+            }
+
+            // 3. 현재 재고 정보 가져오기
+            const { data: currentInventory, error: invError } = await this.supabase
+                .from('inventory')
+                .select('part_number, current_stock');
+
+            if (invError) throw invError;
+
+            // 4. 파트별로 집계
+            const stockMap = new Map();
+            
+            // 모든 파트 초기화
+            allParts.forEach(part => {
+                stockMap.set(part.part_number, {
+                    part_number: part.part_number,
+                    previous_stock: 0,  // 전날 재고
+                    daily_inbound: 0,   // 해당일 입고 합계
+                    daily_outbound: 0,  // 해당일 출고 합계
+                    daily_adjustment: 0,  // 해당일 실사 조정 합계
+                    calculated_stock: 0  // 금일 재고
+                });
+            });
+
+            // 기준일 이후의 거래 내역 가져오기 (전날 재고 역산용)
+            const { data: futureTransactions, error: futureError } = await this.supabase
+                .from('inventory_transactions')
+                .select('part_number, transaction_type, quantity, transaction_date')
+                .gt('transaction_date', calculationDate);
+
+            if (futureError) throw futureError;
+
+            // 전날 재고 계산: 현재 재고에서 기준일 이후 거래를 역산
+            // 전날 재고 = 현재 재고 - (기준일 이후 입고) + (기준일 이후 출고) - (기준일 입고) + (기준일 출고)
+            // 먼저 현재 재고 정보로 초기화
+            currentInventory.forEach(inv => {
+                if (stockMap.has(inv.part_number)) {
+                    stockMap.get(inv.part_number).previous_stock = inv.current_stock || 0;
+                }
+            });
+            
+            // 재고 정보가 없는 파트는 0으로 초기화
+            stockMap.forEach((stock, partNumber) => {
+                if (stock.previous_stock === undefined) {
+                    stock.previous_stock = 0;
+                }
+            });
+
+            // 기준일 이후 거래를 역산하여 전날 재고 계산
+            if (futureTransactions) {
+                futureTransactions.forEach(trans => {
+                    const partNumber = trans.part_number;
+                    if (stockMap.has(partNumber)) {
+                        const stock = stockMap.get(partNumber);
+                        if (trans.transaction_type === 'INBOUND') {
+                            stock.previous_stock -= trans.quantity || 0;
+                        } else if (trans.transaction_type === 'OUTBOUND') {
+                            stock.previous_stock += trans.quantity || 0;
+                        } else if (trans.transaction_type === 'ADJUSTMENT') {
+                            // ADJUSTMENT는 조정이므로 역산 시 반대로 계산
+                            stock.previous_stock -= trans.quantity || 0;
+                        }
+                    }
+                });
+            }
+
+            // 기준일 거래도 역산하여 전날 재고 계산
+            dailyTransactions.forEach(trans => {
+                const partNumber = trans.part_number;
+                if (stockMap.has(partNumber)) {
+                    const stock = stockMap.get(partNumber);
+                    if (trans.transaction_type === 'INBOUND') {
+                        stock.previous_stock -= trans.quantity || 0;
+                    } else if (trans.transaction_type === 'OUTBOUND') {
+                        stock.previous_stock += trans.quantity || 0;
+                    } else if (trans.transaction_type === 'ADJUSTMENT') {
+                        // ADJUSTMENT는 조정이므로 역산 시 반대로 계산
+                        stock.previous_stock -= trans.quantity || 0;
+                    }
+                }
+            });
+
+            // 해당일의 거래 내역 집계 (ADJUSTMENT 제외, 실사 재고는 별도 처리)
+            dailyTransactions.forEach(trans => {
+                const partNumber = trans.part_number;
+                if (!stockMap.has(partNumber)) {
+                    stockMap.set(partNumber, {
+                        part_number: partNumber,
+                        previous_stock: 0,
+                        daily_inbound: 0,
+                        daily_outbound: 0,
+                        daily_adjustment: 0,  // 실사 조정 추가
+                        calculated_stock: 0
+                    });
+                }
+
+                const stock = stockMap.get(partNumber);
+                
+                if (trans.transaction_type === 'INBOUND') {
+                    stock.daily_inbound += trans.quantity || 0;
+                } else if (trans.transaction_type === 'OUTBOUND') {
+                    stock.daily_outbound += trans.quantity || 0;
+                }
+                // ADJUSTMENT는 physical_inventory_items에서 직접 가져오므로 여기서는 처리하지 않음
+            });
+
+            // 해당일의 실사 재고 정보 집계 (physical_inventory_items에서 직접 가져옴)
+            // 같은 파트에 여러 실사 항목이 있을 경우 가장 최근 것 사용 (created_at 기준)
+            // Map을 사용하여 O(1) 조회 성능 확보
+            const physicalStockMap = new Map();
+            
+            // 이미 created_at 기준으로 정렬되어 있으므로, 첫 번째 항목만 사용
+            for (const item of physicalInventoryItems) {
+                const partNumber = item.part_number;
+                if (!physicalStockMap.has(partNumber)) {
+                    const difference = item.physical_stock - item.system_stock;
+                    physicalStockMap.set(partNumber, {
+                        physical_stock: item.physical_stock,
+                        system_stock: item.system_stock,
+                        difference: difference
+                    });
+                }
+            }
+
+            // 실사 재고 정보를 stockMap에 반영
+            physicalStockMap.forEach((physicalData, partNumber) => {
+                if (!stockMap.has(partNumber)) {
+                    stockMap.set(partNumber, {
+                        part_number: partNumber,
+                        previous_stock: 0,
+                        daily_inbound: 0,
+                        daily_outbound: 0,
+                        daily_adjustment: 0,
+                        calculated_stock: 0
+                    });
+                }
+                const stock = stockMap.get(partNumber);
+                // 실사 조정 값 = physical_stock - system_stock
+                stock.daily_adjustment = physicalData.difference;
+            });
+
+            // 금일 재고 계산 = 전날 재고 + 해당일 입고 - 해당일 출고 + 해당일 실사 조정
+            stockMap.forEach((stock, partNumber) => {
+                stock.calculated_stock = stock.previous_stock + stock.daily_inbound - stock.daily_outbound + (stock.daily_adjustment || 0);
+            });
+
+            // 배열로 변환
+            this.dateStockData = Array.from(stockMap.values());
+            
+            // 테이블 렌더링
+            this.renderDateStockTable();
+            
+            this.showNotification(`${calculationDate} 기준 재고 계산이 완료되었습니다.`, 'success');
+        } catch (error) {
+            console.error('날짜별 재고 계산 오류:', error);
+            this.showNotification('재고 계산 중 오류가 발생했습니다.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    // 일자별 입출고 현황 데이터 로드
+    async loadDailyInOutData() {
+        const startDate = document.getElementById('dailyInOutStartDate').value;
+        const endDate = document.getElementById('dailyInOutEndDate').value;
+        
+        if (!startDate || !endDate) {
+            this.showNotification('시작일과 종료일을 모두 선택해주세요.', 'error');
+            return;
+        }
+        
+        if (new Date(startDate) > new Date(endDate)) {
+            this.showNotification('시작일이 종료일보다 늦을 수 없습니다.', 'error');
+            return;
+        }
+        
+        // 날짜 범위가 너무 크면 경고
+        const daysDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 31) {
+            if (!confirm(`선택한 날짜 범위가 ${daysDiff}일입니다. 많은 데이터를 조회하므로 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) {
+                return;
+            }
+        }
+        
+        this.showLoading(true);
+        
+        try {
+            // 날짜 목록 생성
+            const dateList = [];
+            const currentDate = new Date(startDate);
+            const endDateObj = new Date(endDate);
+            
+            while (currentDate <= endDateObj) {
+                dateList.push(new Date(currentDate).toISOString().split('T')[0]);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            console.log(`일자별 입출고 현황 조회: ${startDate} ~ ${endDate} (${dateList.length}일)`);
+            
+            // AS 체크박스 상태 확인
+            const includeAS = document.getElementById('includeASCheckboxDailyInOut')?.checked || false;
+            
+            // 1. 모든 파트 목록 가져오기
+            let query = this.supabase
+                .from('parts')
+                .select('part_number')
+                .eq('status', 'ACTIVE');
+            
+            // AS를 포함하지 않으면 양산 제품만
+            if (!includeAS) {
+                query = query.eq('product_type', 'PRODUCTION');
+            }
+            
+            const { data: allParts, error: partsError } = await query.order('part_number');
+            
+            if (partsError) throw partsError;
+            
+            // 2. 날짜 범위의 모든 거래 내역 가져오기
+            // 먼저 모든 거래 내역을 가져와서 날짜 필터링을 클라이언트에서 수행
+            // (Supabase의 날짜 필터링이 정확하지 않을 수 있음)
+            const { data: allTransactions, error: transError } = await this.supabase
+                .from('inventory_transactions')
+                .select('part_number, transaction_type, quantity, transaction_date')
+                .order('transaction_date', { ascending: true });
+            
+            if (transError) {
+                console.error('거래 내역 조회 오류:', transError);
+                throw transError;
+            }
+            
+            // 클라이언트에서 날짜 범위 필터링
+            const transactions = (allTransactions || []).filter(t => {
+                if (!t.transaction_date) return false;
+                
+                // 날짜 형식 정규화
+                let transDate;
+                if (typeof t.transaction_date === 'string') {
+                    transDate = t.transaction_date.split('T')[0];
+                } else if (t.transaction_date instanceof Date) {
+                    transDate = t.transaction_date.toISOString().split('T')[0];
+                } else {
+                    transDate = new Date(t.transaction_date).toISOString().split('T')[0];
+                }
+                
+                return transDate >= startDate && transDate <= endDate;
+            });
+            
+            console.log(`원본 거래 내역: ${allTransactions?.length || 0}건, 필터링 후: ${transactions.length}건`);
+            
+            // 디버깅: 거래 내역 확인
+            console.log(`=== 거래 내역 조회 결과 ===`);
+            console.log(`총 거래 내역: ${transactions?.length || 0}건`);
+            console.log(`조회 기간: ${startDate} ~ ${endDate}`);
+            
+            // 원본 데이터에서 모든 transaction_type 확인
+            if (allTransactions && allTransactions.length > 0) {
+                const allTypes = {};
+                allTransactions.forEach(t => {
+                    const type = (t.transaction_type || 'NULL').toUpperCase();
+                    allTypes[type] = (allTypes[type] || 0) + 1;
+                });
+                console.log('원본 데이터의 모든 transaction_type:', allTypes);
+            }
+            
+            if (transactions && transactions.length > 0) {
+                console.log('거래 내역 샘플 (최대 10건):', transactions.slice(0, 10).map(t => ({
+                    part: t.part_number,
+                    type: t.transaction_type,
+                    typeUpper: (t.transaction_type || '').toUpperCase(),
+                    qty: t.quantity,
+                    date: t.transaction_date,
+                    dateType: typeof t.transaction_date,
+                    dateNormalized: typeof t.transaction_date === 'string' 
+                        ? t.transaction_date.split('T')[0] 
+                        : new Date(t.transaction_date).toISOString().split('T')[0]
+                })));
+                
+                const inboundCount = transactions.filter(t => {
+                    const type = (t.transaction_type || '').toUpperCase();
+                    return type === 'INBOUND';
+                }).length;
+                const outboundCount = transactions.filter(t => {
+                    const type = (t.transaction_type || '').toUpperCase();
+                    return type === 'OUTBOUND';
+                }).length;
+                
+                console.log(`입고(INBOUND) 건수: ${inboundCount}건`);
+                console.log(`출고(OUTBOUND) 건수: ${outboundCount}건`);
+                console.log(`기타 타입: ${transactions.length - inboundCount - outboundCount}건`);
+                
+                // OUTBOUND가 없는 경우 원본 데이터에서 확인
+                if (outboundCount === 0 && allTransactions) {
+                    const allOutbound = allTransactions.filter(t => {
+                        const type = (t.transaction_type || '').toUpperCase();
+                        return type === 'OUTBOUND';
+                    });
+                    console.warn(`⚠️ 필터링된 데이터에 OUTBOUND가 없지만, 원본 데이터에는 ${allOutbound.length}건의 OUTBOUND가 있습니다!`);
+                    if (allOutbound.length > 0) {
+                        console.log('원본 OUTBOUND 샘플 (최대 5건):', allOutbound.slice(0, 5).map(t => ({
+                            part: t.part_number,
+                            type: t.transaction_type,
+                            qty: t.quantity,
+                            date: t.transaction_date,
+                            dateNormalized: typeof t.transaction_date === 'string' 
+                                ? t.transaction_date.split('T')[0] 
+                                : new Date(t.transaction_date).toISOString().split('T')[0],
+                            inRange: (() => {
+                                const date = typeof t.transaction_date === 'string' 
+                                    ? t.transaction_date.split('T')[0] 
+                                    : new Date(t.transaction_date).toISOString().split('T')[0];
+                                return date >= startDate && date <= endDate;
+                            })()
+                        })));
+                    }
+                }
+                
+                // 날짜별 분포 확인
+                const dateDistribution = {};
+                transactions.forEach(t => {
+                    if (!t.transaction_date) return;
+                    const date = typeof t.transaction_date === 'string'
+                        ? t.transaction_date.split('T')[0]
+                        : new Date(t.transaction_date).toISOString().split('T')[0];
+                    dateDistribution[date] = (dateDistribution[date] || 0) + 1;
+                });
+                console.log('날짜별 거래 내역 분포:', dateDistribution);
+            } else {
+                console.warn('⚠️ 거래 내역이 없습니다!');
+                if (allTransactions && allTransactions.length > 0) {
+                    console.log(`원본 데이터에는 ${allTransactions.length}건이 있지만, 날짜 필터링 후 0건입니다.`);
+                    console.log('원본 데이터 날짜 범위 확인 필요');
+                } else {
+                    console.log('데이터베이스에서 직접 확인이 필요합니다.');
+                }
+            }
+            
+            // 3. 날짜 범위의 실사 재고 정보 가져오기
+            const { data: sessions, error: sessionsError } = await this.supabase
+                .from('physical_inventory_sessions')
+                .select('id, session_date')
+                .gte('session_date', startDate)
+                .lte('session_date', endDate)
+                .in('status', ['PENDING', 'COMPLETED']);
+            
+            let physicalInventoryItems = [];
+            if (!sessionsError && sessions && sessions.length > 0) {
+                const sessionIds = sessions.map(s => s.id);
+                const { data: items, error: itemsError } = await this.supabase
+                    .from('physical_inventory_items')
+                    .select('part_number, physical_stock, system_stock, created_at, session_id')
+                    .in('session_id', sessionIds);
+                
+                if (!itemsError && items) {
+                    // 세션 날짜 정보 추가
+                    const sessionMap = new Map(sessions.map(s => [s.id, s.session_date]));
+                    physicalInventoryItems = items.map(item => ({
+                        ...item,
+                        session_date: sessionMap.get(item.session_id)
+                    }));
+                }
+            }
+            
+            // 4. 각 날짜별로 입고/출고/재고 계산
+            const partDataMap = new Map();
+            
+            // 모든 파트 초기화
+            allParts.forEach(part => {
+                partDataMap.set(part.part_number, {
+                    part_number: part.part_number,
+                    dates: {}
+                });
+            });
+            
+            // 각 날짜별로 데이터 계산
+            dateList.forEach((date, dateIndex) => {
+                // 해당 날짜의 거래 내역 필터링 (날짜 형식 정규화)
+                const dateTransactions = transactions.filter(t => {
+                    if (!t.transaction_date) return false;
+                    // transaction_date가 날짜만 있는지, 시간이 포함되어 있는지 확인
+                    const transDate = typeof t.transaction_date === 'string' 
+                        ? t.transaction_date.split('T')[0] 
+                        : new Date(t.transaction_date).toISOString().split('T')[0];
+                    return transDate === date;
+                });
+                
+                // 디버깅: 첫 번째 날짜와 마지막 날짜만 상세 로그
+                if (dateIndex === 0 || dateIndex === dateList.length - 1) {
+                    console.log(`날짜 ${date} 필터링 결과:`, {
+                        totalTransactions: transactions.length,
+                        filteredCount: dateTransactions.length,
+                        sample: dateTransactions.slice(0, 3).map(t => ({
+                            part: t.part_number,
+                            type: t.transaction_type,
+                            qty: t.quantity,
+                            date: t.transaction_date
+                        }))
+                    });
+                }
+                
+                // 해당 날짜의 실사 재고 필터링 (날짜 형식 정규화)
+                const datePhysicalItems = physicalInventoryItems.filter(item => {
+                    if (!item.session_date) return false;
+                    const sessionDate = typeof item.session_date === 'string'
+                        ? item.session_date.split('T')[0]
+                        : new Date(item.session_date).toISOString().split('T')[0];
+                    return sessionDate === date;
+                });
+                
+                // 파트별로 입고/출고 집계
+                const dateInbound = {};
+                const dateOutbound = {};
+                const dateAdjustment = {};
+                
+                dateTransactions.forEach(trans => {
+                    if (!trans.part_number) {
+                        console.warn('part_number가 없는 거래 내역:', trans);
+                        return; // part_number가 없으면 스킵
+                    }
+                    
+                    if (!partDataMap.has(trans.part_number)) {
+                        partDataMap.set(trans.part_number, {
+                            part_number: trans.part_number,
+                            dates: {}
+                        });
+                    }
+                    
+                    const quantity = Number(trans.quantity) || 0;
+                    
+                    // transaction_type 대소문자 무시하고 비교
+                    const transType = (trans.transaction_type || '').toUpperCase();
+                    
+                    // 디버깅: OUTBOUND 데이터 확인
+                    if (dateIndex === 0 && transType === 'OUTBOUND') {
+                        console.log('OUTBOUND 거래 내역 발견:', {
+                            part: trans.part_number,
+                            type: trans.transaction_type,
+                            originalQty: trans.quantity,
+                            parsedQty: quantity,
+                            absQty: Math.abs(quantity)
+                        });
+                    }
+                    
+                    if (transType === 'INBOUND') {
+                        dateInbound[trans.part_number] = (dateInbound[trans.part_number] || 0) + quantity;
+                    } else if (transType === 'OUTBOUND') {
+                        // OUTBOUND는 양수로 저장되어 있지만, 혹시 음수일 수도 있으므로 절댓값 사용
+                        const outboundQty = quantity < 0 ? Math.abs(quantity) : quantity;
+                        dateOutbound[trans.part_number] = (dateOutbound[trans.part_number] || 0) + outboundQty;
+                        
+                        // 디버깅: 첫 번째 날짜의 OUTBOUND 집계 확인
+                        if (dateIndex === 0) {
+                            console.log(`OUTBOUND 집계: 파트 ${trans.part_number}, 수량 ${outboundQty}, 누적: ${dateOutbound[trans.part_number]}`);
+                        }
+                    } else if (transType === 'ADJUSTMENT') {
+                        dateAdjustment[trans.part_number] = (dateAdjustment[trans.part_number] || 0) + quantity;
+                    } else {
+                        // 알 수 없는 타입 로그
+                        if (dateIndex === 0) {
+                            console.warn(`알 수 없는 transaction_type: ${trans.transaction_type}`, trans);
+                        }
+                    }
+                });
+                
+                // 디버깅: 첫 번째 날짜의 집계 결과 확인
+                if (dateIndex === 0) {
+                    const inboundTotal = Object.values(dateInbound).reduce((a, b) => a + b, 0);
+                    const outboundTotal = Object.values(dateOutbound).reduce((a, b) => a + b, 0);
+                    
+                    console.log(`=== 날짜 ${date} 집계 결과 ===`);
+                    console.log(`입고 파트 수: ${Object.keys(dateInbound).length}개`);
+                    console.log(`출고 파트 수: ${Object.keys(dateOutbound).length}개`);
+                    console.log(`입고 총합: ${inboundTotal}`);
+                    console.log(`출고 총합: ${outboundTotal}`);
+                    console.log('입고 샘플:', Object.entries(dateInbound).slice(0, 5));
+                    console.log('출고 샘플:', Object.entries(dateOutbound).slice(0, 5));
+                    
+                    // OUTBOUND가 0인 경우 상세 디버깅
+                    if (outboundTotal === 0 && dateTransactions.some(t => {
+                        const type = (t.transaction_type || '').toUpperCase();
+                        return type === 'OUTBOUND';
+                    })) {
+                        console.warn('⚠️ OUTBOUND 거래 내역이 있지만 집계가 0입니다!');
+                        const outboundTrans = dateTransactions.filter(t => {
+                            const type = (t.transaction_type || '').toUpperCase();
+                            return type === 'OUTBOUND';
+                        });
+                        console.log('OUTBOUND 거래 내역 상세:', outboundTrans.map(t => ({
+                            part: t.part_number,
+                            type: t.transaction_type,
+                            qty: t.quantity,
+                            qtyType: typeof t.quantity
+                        })));
+                    }
+                }
+                
+                // 실사 재고 조정
+                datePhysicalItems.forEach(item => {
+                    if (!item.part_number) return; // part_number가 없으면 스킵
+                    
+                    const physicalStock = Number(item.physical_stock) || 0;
+                    const systemStock = Number(item.system_stock) || 0;
+                    const difference = physicalStock - systemStock;
+                    dateAdjustment[item.part_number] = (dateAdjustment[item.part_number] || 0) + difference;
+                });
+                
+                // 각 파트별로 날짜별 데이터 저장
+                partDataMap.forEach((partData, partNumber) => {
+                    partData.dates[date] = {
+                        inbound: dateInbound[partNumber] || 0,
+                        outbound: dateOutbound[partNumber] || 0,
+                        adjustment: dateAdjustment[partNumber] || 0
+                    };
+                });
+            });
+            
+            // 5. 각 날짜별 재고 계산 (전날 재고 + 입고 - 출고 + 조정)
+            // 먼저 시작일 전날의 재고를 가져와야 함
+            const dayBeforeStart = new Date(startDate);
+            dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+            const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
+            
+            // 전날 재고 계산
+            const previousStockMap = new Map();
+            try {
+                const { data: prevTransactions } = await this.supabase
+                    .from('inventory_transactions')
+                    .select('part_number, transaction_type, quantity')
+                    .lte('transaction_date', dayBeforeStartStr);
+                
+                if (prevTransactions) {
+                    allParts.forEach(part => {
+                        let stock = 0;
+                        prevTransactions
+                            .filter(t => t.part_number === part.part_number)
+                            .forEach(trans => {
+                                if (trans.transaction_type === 'INBOUND') {
+                                    stock += trans.quantity;
+                                } else if (trans.transaction_type === 'OUTBOUND') {
+                                    stock -= Math.abs(trans.quantity);
+                                } else if (trans.transaction_type === 'ADJUSTMENT') {
+                                    stock += trans.quantity;
+                                }
+                            });
+                        previousStockMap.set(part.part_number, stock);
+                    });
+                }
+            } catch (error) {
+                console.warn('전날 재고 계산 오류:', error);
+            }
+            
+            // 각 날짜별로 재고 계산
+            dateList.forEach((date, index) => {
+                partDataMap.forEach((partData, partNumber) => {
+                    // dateData가 없으면 기본값으로 초기화
+                    if (!partData.dates[date]) {
+                        partData.dates[date] = {
+                            inbound: 0,
+                            outbound: 0,
+                            adjustment: 0
+                        };
+                    }
+                    
+                    const dateData = partData.dates[date];
+                    let currentStock;
+                    
+                    if (index === 0) {
+                        // 첫 날: 전날 재고 + 입고 - 출고 + 조정
+                        currentStock = (previousStockMap.get(partNumber) || 0) + (dateData.inbound || 0) - (dateData.outbound || 0) + (dateData.adjustment || 0);
+                    } else {
+                        // 이후 날: 전날 재고 + 입고 - 출고 + 조정
+                        const prevDate = dateList[index - 1];
+                        const prevDateData = partData.dates[prevDate];
+                        if (!prevDateData) {
+                            console.warn(`이전 날짜(${prevDate}) 데이터가 없습니다. 파트: ${partNumber}`);
+                            // 이전 날짜 데이터가 없으면 기본값 사용
+                            partData.dates[prevDate] = {
+                                inbound: 0,
+                                outbound: 0,
+                                adjustment: 0,
+                                stock: previousStockMap.get(partNumber) || 0
+                            };
+                        }
+                        const prevStock = (prevDateData?.stock || previousStockMap.get(partNumber) || 0);
+                        currentStock = prevStock + (dateData.inbound || 0) - (dateData.outbound || 0) + (dateData.adjustment || 0);
+                    }
+                    
+                    dateData.stock = currentStock;
+                });
+            });
+            
+            // 6. 데이터 저장 및 렌더링
+            this.dailyInOutData = Array.from(partDataMap.values());
+            this.dailyInOutDateList = dateList; // 엑셀 다운로드용 날짜 목록 저장
+            
+            // 디버깅: 데이터 확인
+            console.log('일자별 입출고 데이터:', {
+                totalParts: this.dailyInOutData.length,
+                dateRange: `${startDate} ~ ${endDate}`,
+                sampleData: this.dailyInOutData.slice(0, 3).map(p => ({
+                    part: p.part_number,
+                    firstDate: Object.keys(p.dates)[0],
+                    firstDateData: p.dates[Object.keys(p.dates)[0]]
+                }))
+            });
+            
+            this.renderDailyStockTable(dateList); // 재고 현황만 표시하는 표 (상단)
+            this.renderDailyInOutTable(dateList); // 입출고 상세 표 (하단)
+            
+            // 엑셀 다운로드 버튼 표시
+            const exportBtn = document.getElementById('exportDailyInOutExcelBtn');
+            if (exportBtn) {
+                exportBtn.style.display = 'inline-block';
+            }
+            
+            this.showNotification(`${startDate} ~ ${endDate} 일자별 입출고 현황을 조회했습니다.`, 'success');
+            
+        } catch (error) {
+            console.error('일자별 입출고 현황 조회 오류:', error);
+            this.showNotification('일자별 입출고 현황 조회 중 오류가 발생했습니다.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    // 일자별 재고 현황 테이블 렌더링 (재고만 표시)
+    renderDailyStockTable(dateList) {
+        const container = document.getElementById('dailyStockTableContainer');
+        if (!container) return;
+        
+        if (this.dailyInOutData.length === 0) {
+            container.innerHTML = '<div class="px-6 py-4 text-center text-gray-500">데이터가 없습니다.</div>';
+            return;
+        }
+        
+        // 테이블 생성
+        const table = document.createElement('table');
+        table.className = 'min-w-full divide-y divide-white/20';
+        
+        // 헤더 생성
+        const thead = document.createElement('thead');
+        thead.className = 'bg-white/10';
+        const headerRow = document.createElement('tr');
+        
+        // 파트 번호 헤더
+        const partHeader = document.createElement('th');
+        partHeader.className = 'px-4 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider sticky left-0 bg-white/10 z-10';
+        partHeader.textContent = '파트 번호';
+        headerRow.appendChild(partHeader);
+        
+        // 각 날짜별 헤더 (재고만)
+        dateList.forEach(date => {
+            const dateHeader = document.createElement('th');
+            dateHeader.className = 'px-3 py-3 text-center text-xs font-medium text-gray-800/80 uppercase tracking-wider';
+            dateHeader.innerHTML = `
+                <div>${new Date(date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
+                <div class="text-xs text-gray-600 mt-1 text-blue-600">재고</div>
+            `;
+            headerRow.appendChild(dateHeader);
+        });
+        
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        
+        // 바디 생성
+        const tbody = document.createElement('tbody');
+        tbody.className = 'bg-white/5 divide-y divide-white/20';
+        
+        this.dailyInOutData.forEach(partData => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-white/10';
+            
+            // 파트 번호
+            const partCell = document.createElement('td');
+            partCell.className = 'px-4 py-3 text-sm font-medium text-gray-800 sticky left-0 bg-white/5 z-10';
+            partCell.textContent = partData.part_number;
+            row.appendChild(partCell);
+            
+            // 각 날짜별 재고만 표시
+            dateList.forEach(date => {
+                const dateData = partData.dates[date] || { stock: 0 };
+                
+                const stockCell = document.createElement('td');
+                stockCell.className = 'px-3 py-3 text-sm text-center text-blue-600 font-semibold';
+                stockCell.textContent = dateData.stock || 0;
+                row.appendChild(stockCell);
+            });
+            
+            tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        
+        // 컨테이너에 테이블 추가
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+    
+    // 일자별 입출고 테이블 렌더링
+    renderDailyInOutTable(dateList) {
+        const container = document.getElementById('dailyInOutTableContainer');
+        if (!container) return;
+        
+        if (this.dailyInOutData.length === 0) {
+            container.innerHTML = '<div class="px-6 py-4 text-center text-gray-500">데이터가 없습니다.</div>';
+            return;
+        }
+        
+        // 테이블 생성
+        const table = document.createElement('table');
+        table.className = 'min-w-full divide-y divide-white/20';
+        
+        // 헤더 생성
+        const thead = document.createElement('thead');
+        thead.className = 'bg-white/10';
+        const headerRow = document.createElement('tr');
+        
+        // 파트 번호 헤더
+        const partHeader = document.createElement('th');
+        partHeader.className = 'px-4 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider sticky left-0 bg-white/10 z-10';
+        partHeader.textContent = '파트 번호';
+        headerRow.appendChild(partHeader);
+        
+        // 각 날짜별 헤더 (입고, 출고, 재고)
+        dateList.forEach(date => {
+            const dateHeader = document.createElement('th');
+            dateHeader.className = 'px-2 py-3 text-center text-xs font-medium text-gray-800/80 uppercase tracking-wider';
+            dateHeader.colSpan = 3;
+            dateHeader.innerHTML = `
+                <div>${new Date(date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
+                <div class="text-xs text-gray-600 mt-1">
+                    <span class="text-green-600">입고</span> | 
+                    <span class="text-red-600">출고</span> | 
+                    <span class="text-blue-600">재고</span>
+                </div>
+            `;
+            headerRow.appendChild(dateHeader);
+        });
+        
+        thead.appendChild(headerRow);
+        
+        // 서브 헤더 (입고, 출고, 재고)
+        const subHeaderRow = document.createElement('tr');
+        subHeaderRow.className = 'bg-white/5';
+        
+        // 파트 번호 열 (빈 칸)
+        const emptySubHeader = document.createElement('th');
+        emptySubHeader.className = 'px-4 py-2 sticky left-0 bg-white/5 z-10';
+        subHeaderRow.appendChild(emptySubHeader);
+        
+        // 각 날짜별 서브 헤더
+        dateList.forEach(() => {
+            ['입고', '출고', '재고'].forEach((label, idx) => {
+                const subHeader = document.createElement('th');
+                subHeader.className = 'px-2 py-2 text-center text-xs font-medium text-gray-700';
+                if (idx === 0) subHeader.classList.add('text-green-600');
+                else if (idx === 1) subHeader.classList.add('text-red-600');
+                else subHeader.classList.add('text-blue-600');
+                subHeader.textContent = label;
+                subHeaderRow.appendChild(subHeader);
+            });
+        });
+        
+        thead.appendChild(subHeaderRow);
+        table.appendChild(thead);
+        
+        // 바디 생성
+        const tbody = document.createElement('tbody');
+        tbody.className = 'bg-white/5 divide-y divide-white/20';
+        
+        this.dailyInOutData.forEach(partData => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-white/10';
+            
+            // 파트 번호
+            const partCell = document.createElement('td');
+            partCell.className = 'px-4 py-3 text-sm font-medium text-gray-800 sticky left-0 bg-white/5 z-10';
+            partCell.textContent = partData.part_number;
+            row.appendChild(partCell);
+            
+            // 각 날짜별 데이터
+            dateList.forEach(date => {
+                const dateData = partData.dates[date] || { inbound: 0, outbound: 0, stock: 0, adjustment: 0 };
+                
+                // 입고
+                const inboundCell = document.createElement('td');
+                inboundCell.className = 'px-2 py-3 text-sm text-center text-green-600';
+                inboundCell.textContent = dateData.inbound || 0;
+                row.appendChild(inboundCell);
+                
+                // 출고
+                const outboundCell = document.createElement('td');
+                outboundCell.className = 'px-2 py-3 text-sm text-center text-red-600';
+                outboundCell.textContent = dateData.outbound || 0;
+                row.appendChild(outboundCell);
+                
+                // 재고
+                const stockCell = document.createElement('td');
+                stockCell.className = 'px-2 py-3 text-sm text-center text-blue-600 font-semibold';
+                stockCell.textContent = dateData.stock || 0;
+                row.appendChild(stockCell);
+            });
+            
+            tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        
+        // 컨테이너에 테이블 추가
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+    
+    // 일자별 입출고 현황 엑셀 다운로드 (ExcelJS 사용)
+    async exportDailyInOutExcel() {
+        if (!this.dailyInOutData || this.dailyInOutData.length === 0) {
+            this.showNotification('다운로드할 데이터가 없습니다. 먼저 조회해주세요.', 'error');
+            return;
+        }
+        
+        if (!this.dailyInOutDateList || this.dailyInOutDateList.length === 0) {
+            this.showNotification('날짜 정보가 없습니다. 먼저 조회해주세요.', 'error');
+            return;
+        }
+        
+        try {
+            this.showLoading(true);
+            
+            // ExcelJS 라이브러리 확인
+            if (typeof ExcelJS === 'undefined') {
+                throw new Error('ExcelJS 라이브러리가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
+            }
+            
+            // 워크북 생성
+            const workbook = new ExcelJS.Workbook();
+            
+            // 날짜 형식 변환 함수 (mm/dd)
+            const formatDate = (dateStr) => {
+                const date = new Date(dateStr);
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${month}/${day}`;
+            };
+            
+            // 시트 1: 일자별 재고 현황
+            const worksheetStock = workbook.addWorksheet('일자별 재고 현황');
+            
+            // 헤더 행 생성
+            const stockHeader = ['파트 번호'];
+            this.dailyInOutDateList.forEach(date => {
+                stockHeader.push(formatDate(date));
+            });
+            worksheetStock.addRow(stockHeader);
+            
+            // 헤더 스타일링
+            const headerRow = worksheetStock.getRow(1);
+            headerRow.eachCell((cell, colNumber) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF4472C4' }
+                };
+                cell.font = {
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true,
+                    size: 11
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle'
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            
+            // 데이터 행 추가 및 스타일링
+            this.dailyInOutData.forEach((partData, rowIndex) => {
+                const row = [partData.part_number];
+                this.dailyInOutDateList.forEach(date => {
+                    const dateData = partData.dates[date] || { stock: 0 };
+                    row.push(dateData.stock || 0);
+                });
+                const dataRow = worksheetStock.addRow(row);
+                
+                dataRow.eachCell((cell, colNumber) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: rowIndex % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' }
+                    };
+                    cell.font = {
+                        size: 10,
+                        color: colNumber === 1 ? { argb: 'FF000000' } : { argb: 'FF0066CC' },
+                        bold: colNumber > 1
+                    };
+                    cell.alignment = {
+                        horizontal: colNumber === 1 ? 'left' : 'center',
+                        vertical: 'middle'
+                    };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+            });
+            
+            // 컬럼 너비 설정
+            worksheetStock.getColumn(1).width = 15;
+            for (let i = 2; i <= this.dailyInOutDateList.length + 1; i++) {
+                worksheetStock.getColumn(i).width = 10;
+            }
+            
+            // 시트 2: 일자별 입출고 상세
+            const worksheetInOut = workbook.addWorksheet('일자별 입출고 상세');
+            let currentRow = 1;
+            
+            // 입고 구역
+            const inboundTitleRow = worksheetInOut.addRow(['입고 현황', ...Array(this.dailyInOutDateList.length).fill('')]);
+            inboundTitleRow.getCell(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFC6E0B4' }
+            };
+            inboundTitleRow.getCell(1).font = {
+                bold: true,
+                size: 12
+            };
+            inboundTitleRow.getCell(1).border = {
+                top: { style: 'medium' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            currentRow++;
+            
+            // 입고 헤더
+            const inboundHeader = ['파트 번호'];
+            this.dailyInOutDateList.forEach(date => {
+                inboundHeader.push(formatDate(date));
+            });
+            const inboundHeaderRow = worksheetInOut.addRow(inboundHeader);
+            inboundHeaderRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF70AD47' }
+                };
+                cell.font = {
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true,
+                    size: 11
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle'
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            currentRow++;
+            
+            // 입고 데이터
+            this.dailyInOutData.forEach((partData, rowIndex) => {
+                const row = [partData.part_number];
+                this.dailyInOutDateList.forEach(date => {
+                    const dateData = partData.dates[date] || { inbound: 0 };
+                    row.push(dateData.inbound || 0);
+                });
+                const dataRow = worksheetInOut.addRow(row);
+                dataRow.eachCell((cell, colNumber) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: rowIndex % 2 === 0 ? 'FFE2EFDA' : 'FFFFFFFF' }
+                    };
+                    cell.font = {
+                        color: { argb: 'FF006100' },
+                        size: 10
+                    };
+                    cell.alignment = {
+                        horizontal: colNumber === 1 ? 'left' : 'center',
+                        vertical: 'middle'
+                    };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+                currentRow++;
+            });
+            
+            // 빈 행 2개
+            worksheetInOut.addRow([]);
+            worksheetInOut.addRow([]);
+            currentRow += 2;
+            
+            // 출고 구역
+            const outboundTitleRow = worksheetInOut.addRow(['출고 현황', ...Array(this.dailyInOutDateList.length).fill('')]);
+            outboundTitleRow.getCell(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF4B084' }
+            };
+            outboundTitleRow.getCell(1).font = {
+                bold: true,
+                size: 12
+            };
+            outboundTitleRow.getCell(1).border = {
+                top: { style: 'medium' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            currentRow++;
+            
+            // 출고 헤더
+            const outboundHeader = ['파트 번호'];
+            this.dailyInOutDateList.forEach(date => {
+                outboundHeader.push(formatDate(date));
+            });
+            const outboundHeaderRow = worksheetInOut.addRow(outboundHeader);
+            outboundHeaderRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFC00000' }
+                };
+                cell.font = {
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true,
+                    size: 11
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle'
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            currentRow++;
+            
+            // 출고 데이터
+            this.dailyInOutData.forEach((partData, rowIndex) => {
+                const row = [partData.part_number];
+                this.dailyInOutDateList.forEach(date => {
+                    const dateData = partData.dates[date] || { outbound: 0 };
+                    row.push(dateData.outbound || 0);
+                });
+                const dataRow = worksheetInOut.addRow(row);
+                dataRow.eachCell((cell, colNumber) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: rowIndex % 2 === 0 ? 'FFFFE699' : 'FFFFFFFF' }
+                    };
+                    cell.font = {
+                        color: { argb: 'FFC00000' },
+                        size: 10
+                    };
+                    cell.alignment = {
+                        horizontal: colNumber === 1 ? 'left' : 'center',
+                        vertical: 'middle'
+                    };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+                currentRow++;
+            });
+            
+            // 빈 행 2개
+            worksheetInOut.addRow([]);
+            worksheetInOut.addRow([]);
+            currentRow += 2;
+            
+            // 재고 구역
+            const stockTitleRow = worksheetInOut.addRow(['재고 현황', ...Array(this.dailyInOutDateList.length).fill('')]);
+            stockTitleRow.getCell(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFBDD7EE' }
+            };
+            stockTitleRow.getCell(1).font = {
+                bold: true,
+                size: 12
+            };
+            stockTitleRow.getCell(1).border = {
+                top: { style: 'medium' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            currentRow++;
+            
+            // 재고 헤더
+            const stockHeader2 = ['파트 번호'];
+            this.dailyInOutDateList.forEach(date => {
+                stockHeader2.push(formatDate(date));
+            });
+            const stockHeaderRow2 = worksheetInOut.addRow(stockHeader2);
+            stockHeaderRow2.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF4472C4' }
+                };
+                cell.font = {
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true,
+                    size: 11
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle'
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            currentRow++;
+            
+            // 재고 데이터
+            this.dailyInOutData.forEach((partData, rowIndex) => {
+                const row = [partData.part_number];
+                this.dailyInOutDateList.forEach(date => {
+                    const dateData = partData.dates[date] || { stock: 0 };
+                    row.push(dateData.stock || 0);
+                });
+                const dataRow = worksheetInOut.addRow(row);
+                dataRow.eachCell((cell, colNumber) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: rowIndex % 2 === 0 ? 'FFD9E1F2' : 'FFFFFFFF' }
+                    };
+                    cell.font = {
+                        color: { argb: 'FF0066CC' },
+                        bold: true,
+                        size: 10
+                    };
+                    cell.alignment = {
+                        horizontal: colNumber === 1 ? 'left' : 'center',
+                        vertical: 'middle'
+                    };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+                currentRow++;
+            });
+            
+            // 컬럼 너비 설정
+            worksheetInOut.getColumn(1).width = 15;
+            for (let i = 2; i <= this.dailyInOutDateList.length + 1; i++) {
+                worksheetInOut.getColumn(i).width = 10;
+            }
+            
+            // 파일명 생성
+            const startDate = document.getElementById('dailyInOutStartDate').value;
+            const endDate = document.getElementById('dailyInOutEndDate').value;
+            const fileName = `일자별입출고현황_${startDate}_${endDate}.xlsx`;
+            
+            // 파일 다운로드
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            window.URL.revokeObjectURL(url);
+            
+            this.showNotification('엑셀 파일이 다운로드되었습니다.', 'success');
+            
+        } catch (error) {
+            console.error('엑셀 다운로드 오류:', error);
+            this.showNotification(`엑셀 다운로드 중 오류가 발생했습니다: ${error.message}`, 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    // 일자별 재고 현황 엑셀 스타일링
+    applyDailyExcelStyling(ws, totalRows, totalCols) {
+        // 모든 셀에 테두리 및 스타일 적용
+        for (let row = 0; row < totalRows; row++) {
+            for (let col = 0; col < totalCols; col++) {
+                const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+                if (!ws[cellRef]) continue;
+                
+                if (row === 0) {
+                    // 헤더 행
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: "4472C4" } },
+                        font: { color: { rgb: "FFFFFF" }, bold: true, sz: 11 },
+                        alignment: { horizontal: "center", vertical: "center" },
+                        border: {
+                            top: { style: "thin", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                } else {
+                    // 데이터 행
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: row % 2 === 0 ? "FFFFFF" : "F2F2F2" } },
+                        font: { sz: 10 },
+                        alignment: { 
+                            horizontal: col === 0 ? "left" : "center", 
+                            vertical: "center" 
+                        },
+                        border: {
+                            top: { style: "thin", color: { rgb: "CCCCCC" } },
+                            bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                            left: { style: "thin", color: { rgb: "CCCCCC" } },
+                            right: { style: "thin", color: { rgb: "CCCCCC" } }
+                        }
+                    };
+                    
+                    // 재고 열은 파란색, 굵게
+                    if (col > 0) {
+                        ws[cellRef].s.font.color = { rgb: "0066CC" };
+                        ws[cellRef].s.font.bold = true;
+                    }
+                }
+            }
+        }
+    }
+    
+    // 일자별 입출고 상세 엑셀 스타일링
+    applyDailyInOutExcelStyling(ws, data, partCount) {
+        const totalRows = data.length;
+        const totalCols = data[0] ? data[0].length : 0;
+        
+        let currentRow = 0;
+        
+        // 입고 구역
+        currentRow++; // 빈 행
+        // 제목 행
+        for (let col = 0; col < totalCols; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+            if (ws[cellRef]) {
+                if (col === 0) {
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: "C6E0B4" } },
+                        font: { color: { rgb: "000000" }, bold: true, sz: 12 },
+                        alignment: { horizontal: "left", vertical: "center" },
+                        border: {
+                            top: { style: "medium", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                }
+            }
+        }
+        currentRow++;
+        
+        // 입고 헤더
+        for (let col = 0; col < totalCols; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+            if (ws[cellRef]) {
+                ws[cellRef].s = {
+                    fill: { fgColor: { rgb: "70AD47" } },
+                    font: { color: { rgb: "FFFFFF" }, bold: true, sz: 11 },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+        }
+        currentRow++;
+        
+        // 입고 데이터
+        for (let i = 0; i < partCount; i++) {
+            for (let col = 0; col < totalCols; col++) {
+                const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+                if (ws[cellRef]) {
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: i % 2 === 0 ? "E2EFDA" : "FFFFFF" } },
+                        font: { color: { rgb: "006100" }, sz: 10 },
+                        alignment: { 
+                            horizontal: col === 0 ? "left" : "center", 
+                            vertical: "center" 
+                        },
+                        border: {
+                            top: { style: "thin", color: { rgb: "CCCCCC" } },
+                            bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                            left: { style: "thin", color: { rgb: "CCCCCC" } },
+                            right: { style: "thin", color: { rgb: "CCCCCC" } }
+                        }
+                    };
+                }
+            }
+            currentRow++;
+        }
+        
+        // 빈 행 2개
+        currentRow += 2;
+        
+        // 출고 구역
+        // 제목 행
+        for (let col = 0; col < totalCols; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+            if (ws[cellRef]) {
+                if (col === 0) {
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: "F4B084" } },
+                        font: { color: { rgb: "000000" }, bold: true, sz: 12 },
+                        alignment: { horizontal: "left", vertical: "center" },
+                        border: {
+                            top: { style: "medium", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                }
+            }
+        }
+        currentRow++;
+        
+        // 출고 헤더
+        for (let col = 0; col < totalCols; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+            if (ws[cellRef]) {
+                ws[cellRef].s = {
+                    fill: { fgColor: { rgb: "C00000" } },
+                    font: { color: { rgb: "FFFFFF" }, bold: true, sz: 11 },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+        }
+        currentRow++;
+        
+        // 출고 데이터
+        for (let i = 0; i < partCount; i++) {
+            for (let col = 0; col < totalCols; col++) {
+                const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+                if (ws[cellRef]) {
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: i % 2 === 0 ? "FFE699" : "FFFFFF" } },
+                        font: { color: { rgb: "C00000" }, sz: 10 },
+                        alignment: { 
+                            horizontal: col === 0 ? "left" : "center", 
+                            vertical: "center" 
+                        },
+                        border: {
+                            top: { style: "thin", color: { rgb: "CCCCCC" } },
+                            bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                            left: { style: "thin", color: { rgb: "CCCCCC" } },
+                            right: { style: "thin", color: { rgb: "CCCCCC" } }
+                        }
+                    };
+                }
+            }
+            currentRow++;
+        }
+        
+        // 빈 행 2개
+        currentRow += 2;
+        
+        // 재고 구역
+        // 제목 행
+        for (let col = 0; col < totalCols; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+            if (ws[cellRef]) {
+                if (col === 0) {
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: "BDD7EE" } },
+                        font: { color: { rgb: "000000" }, bold: true, sz: 12 },
+                        alignment: { horizontal: "left", vertical: "center" },
+                        border: {
+                            top: { style: "medium", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                }
+            }
+        }
+        currentRow++;
+        
+        // 재고 헤더
+        for (let col = 0; col < totalCols; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+            if (ws[cellRef]) {
+                ws[cellRef].s = {
+                    fill: { fgColor: { rgb: "4472C4" } },
+                    font: { color: { rgb: "FFFFFF" }, bold: true, sz: 11 },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+        }
+        currentRow++;
+        
+        // 재고 데이터
+        for (let i = 0; i < partCount; i++) {
+            for (let col = 0; col < totalCols; col++) {
+                const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+                if (ws[cellRef]) {
+                    ws[cellRef].s = {
+                        fill: { fgColor: { rgb: i % 2 === 0 ? "D9E1F2" : "FFFFFF" } },
+                        font: { color: { rgb: "0066CC" }, bold: true, sz: 10 },
+                        alignment: { 
+                            horizontal: col === 0 ? "left" : "center", 
+                            vertical: "center" 
+                        },
+                        border: {
+                            top: { style: "thin", color: { rgb: "CCCCCC" } },
+                            bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                            left: { style: "thin", color: { rgb: "CCCCCC" } },
+                            right: { style: "thin", color: { rgb: "CCCCCC" } }
+                        }
+                    };
+                }
+            }
+            currentRow++;
+        }
+    }
+
+    renderDateStockTable() {
+        const tbody = document.getElementById('dateStockTableBody');
+        const fragment = document.createDocumentFragment();
+
+        if (this.dateStockData.length === 0) {
+            const noDataRow = document.createElement('tr');
+            noDataRow.innerHTML = `
+                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                    계산된 데이터가 없습니다.
+                </td>
+            `;
+            fragment.appendChild(noDataRow);
+        } else {
+            this.dateStockData.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // 입고/출고/조정이 0이면 "-"로 표시
+                const inboundDisplay = item.daily_inbound > 0 ? `+${item.daily_inbound}` : '-';
+                const outboundDisplay = item.daily_outbound > 0 ? `-${item.daily_outbound}` : '-';
+                const adjustmentDisplay = item.daily_adjustment !== 0 
+                    ? (item.daily_adjustment > 0 ? `+${item.daily_adjustment}` : `${item.daily_adjustment}`)
+                    : '-';
+                
+                // 전날 재고와 금일 재고가 다른지 확인
+                const isChanged = item.previous_stock !== item.calculated_stock;
+                const stockClass = isChanged ? 'text-blue-600 font-bold' : 'text-gray-900';
+                const stockBg = isChanged ? 'bg-blue-50' : '';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">${item.part_number}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.previous_stock}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${item.daily_inbound > 0 ? 'text-green-600' : 'text-gray-400'}">${inboundDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${item.daily_outbound > 0 ? 'text-red-600' : 'text-gray-400'}">${outboundDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${item.daily_adjustment !== 0 ? (item.daily_adjustment > 0 ? 'text-purple-600' : 'text-orange-600') : 'text-gray-400'}">${adjustmentDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${stockClass} ${stockBg}">${item.calculated_stock}</td>
+                `;
+                fragment.appendChild(row);
+            });
+        }
+
+        tbody.innerHTML = '';
+        tbody.appendChild(fragment);
+    }
+
+    sortDateStockTable(column) {
+        if (this.dateStockSortColumn === column) {
+            this.dateStockSortDirection = this.dateStockSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.dateStockSortColumn = column;
+            this.dateStockSortDirection = 'asc';
+        }
+
+        this.updateDateStockSortIcons();
+
+        this.dateStockData.sort((a, b) => {
+            let aValue = a[column];
+            let bValue = b[column];
+
+            if (aValue === null || aValue === undefined) aValue = 0;
+            if (bValue === null || bValue === undefined) bValue = 0;
+
+            if (typeof aValue === 'number') {
+                return this.dateStockSortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+            }
+
+            aValue = String(aValue).toLowerCase();
+            bValue = String(bValue).toLowerCase();
+
+            if (this.dateStockSortDirection === 'asc') {
+                return aValue.localeCompare(bValue);
+            } else {
+                return bValue.localeCompare(aValue);
+            }
+        });
+
+        this.renderDateStockTable();
+    }
+
+    updateDateStockSortIcons() {
+        const columns = ['part_number', 'previous_stock', 'daily_inbound', 'daily_outbound', 'daily_adjustment', 'calculated_stock'];
+        columns.forEach(col => {
+            const icon = document.getElementById(`dateSortIcon_${col}`);
+            if (icon) {
+                icon.className = 'fas fa-sort ml-1 text-gray-400';
+            }
+        });
+
+        if (this.dateStockSortColumn) {
+            const icon = document.getElementById(`dateSortIcon_${this.dateStockSortColumn}`);
+            if (icon) {
+                if (this.dateStockSortDirection === 'asc') {
+                    icon.className = 'fas fa-sort-up ml-1 text-blue-600';
+                } else {
+                    icon.className = 'fas fa-sort-down ml-1 text-blue-600';
+                }
+            }
         }
     }
 }
