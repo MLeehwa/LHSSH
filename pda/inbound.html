@@ -58,63 +58,26 @@
             });
         }
         
-        // 입력 필드 포커스 방지 함수
+        // 입력 필드 포커스 방지 함수 (입고 작업 시에는 사용하지 않음 - 키보드 활성화)
         function preventInputFocus() {
-            // 바코드 입력 필드는 완전히 제외
-            const allowedIds = ['barcodeInput'];
-            
-            // 모든 입력 요소를 찾아서 허용된 ID가 아닌 것만 제어
-            const allInputs = document.querySelectorAll('input, textarea, select');
-            allInputs.forEach(input => {
-                // 허용된 ID는 완전히 제외
-                if (allowedIds.includes(input.id)) {
-                    return;
-                }
-                
-                // input[type="text"], input[type="number"], textarea만 포커스 방지
-                if (input.tagName === 'INPUT' && 
-                    (input.type === 'text' || input.type === 'number') ||
-                    input.tagName === 'TEXTAREA') {
-                    
-                    // 포커스 이벤트 방지
-                    input.addEventListener('focus', function(e) {
-                        e.preventDefault();
-                        e.target.blur();
-                        hideKeyboard();
-                    });
-                    
-                    // 클릭 이벤트 방지
-                    input.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.target.blur();
-                        hideKeyboard();
-                    });
-                    
-                    // 터치 이벤트 방지
-                    input.addEventListener('touchstart', function(e) {
-                        e.preventDefault();
-                        e.target.blur();
-                        hideKeyboard();
-                    });
-                }
-            });
+            // 입고 작업 시에는 키보드를 활성화하므로 이 함수는 사용하지 않음
+            // 바코드 입력 필드는 항상 활성화
+            return;
         }
         
-        // 바코드 입력 필드 특별 처리
+        // 바코드 입력 필드 특별 처리 (입고 작업 시 키보드 활성화)
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
-                // 바코드 입력 시 키보드 숨김 (입력 완료 후)
-                barcodeInput.addEventListener('input', function() {
-                    // 입력이 완료된 후 키보드 숨김
-                    setTimeout(hideKeyboard, 500);
-                });
+                // 입고 작업 시에는 키보드를 활성화하므로 키보드 숨김 기능 제거
+                // 바코드 스캐너를 사용하지만, 수동 입력도 가능하도록 키보드 활성화
+                barcodeInput.setAttribute('inputmode', 'text');
+                barcodeInput.removeAttribute('readonly');
                 
-                // 바코드 입력 완료 시 키보드 숨김
-                barcodeInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        setTimeout(hideKeyboard, 200);
-                    }
+                // 포커스 시 키보드 표시
+                barcodeInput.addEventListener('focus', function() {
+                    // 키보드 활성화를 위해 readonly 제거
+                    this.removeAttribute('readonly');
                 });
                 
                 // 바코드 입력 필드 포커스는 자유롭게 허용
@@ -743,6 +706,8 @@
                     }
                     
                     // 2. DB에서 중복 체크 (같은 컨테이너에서 이미 스캔된 경우 확인)
+                    // 주의: 메모리 Set에 없으면 첫 스캔이므로, DB 체크는 선택적으로만 수행
+                    // 메모리 Set이 최우선이고, DB는 보조 확인용
                     try {
                         const { data: existingCode, error: checkError } = await supabase
                             .from('scanned_unique_codes')
@@ -750,9 +715,15 @@
                             .eq('unique_code', parsedData.uniqueNumber)
                             .single();
                         
-                        if (checkError && checkError.code !== 'PGRST116') { // PGRST116은 "not found" 오류
+                        // PGRST116은 "not found" 오류 - 정상적인 경우 (첫 스캔)
+                        if (checkError && checkError.code === 'PGRST116') {
+                            // 첫 스캔이므로 DB에 없음 - 정상, 계속 진행
+                            console.log('첫 스캔 (DB에 없음):', parsedData.uniqueNumber);
+                        } else if (checkError) {
+                            // 다른 오류인 경우만 경고
                             console.warn('고유코드 중복 체크 오류 (무시하고 진행):', checkError);
                         } else if (existingCode) {
+                            // DB에 존재하는 경우만 중복 체크
                             console.log('고유코드 중복 감지 (DB):', parsedData.uniqueNumber, existingCode);
                             
                             // 상태가 COMPLETED인 경우 - 다른 ARN으로 이미 입고 완료된 경우 절대 재입고 불가
@@ -1070,6 +1041,7 @@
                 }
                 
                 // 2. DB에서 중복 체크 (scanned_unique_codes 테이블에서 확인)
+                // 주의: 메모리 Set에 없으면 첫 스캔이므로, DB 체크는 선택적으로만 수행
                 try {
                     const { data: existingCode, error: checkError } = await supabase
                         .from('scanned_unique_codes')
@@ -1077,9 +1049,15 @@
                         .eq('unique_code', barcode)
                         .single();
                     
-                    if (checkError && checkError.code !== 'PGRST116') { // PGRST116은 "not found" 오류
+                    // PGRST116은 "not found" 오류 - 정상적인 경우 (첫 스캔)
+                    if (checkError && checkError.code === 'PGRST116') {
+                        // 첫 스캔이므로 DB에 없음 - 정상, 계속 진행
+                        console.log('첫 스캔 (DB에 없음):', barcode);
+                    } else if (checkError) {
+                        // 다른 오류인 경우만 경고
                         console.warn('바코드 중복 체크 오류 (무시하고 진행):', checkError);
                     } else if (existingCode) {
+                        // DB에 존재하는 경우만 중복 체크
                         console.log('바코드 중복 감지 (DB):', barcode, existingCode);
                         
                         // 상태가 COMPLETED인 경우 - 다른 ARN으로 이미 입고 완료된 경우 절대 재입고 불가
@@ -1534,7 +1512,14 @@
             
             renderPartsList();
             updateProgress();
-            document.getElementById('barcodeInput').value = '';
+            const barcodeInput = document.getElementById('barcodeInput');
+            if (barcodeInput) {
+                barcodeInput.value = '';
+                setTimeout(() => {
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                }, 100);
+            }
             showNotification('스캔이 초기화되었습니다.', 'info');
         }
 
@@ -1813,20 +1798,55 @@
             loadPendingContainers();
         }
 
-        // 알림 표시
+        // 알림 표시 (Toast 스타일 - 비차단형)
         function showNotification(message, type = 'info') {
-            // 간단한 알림 구현
-            alert(message);
+            // 기존 알림이 있으면 제거
+            const existingNotification = document.getElementById('toastNotification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
             
-            // 알림 닫은 후 바코드 입력창으로 포커스 이동
+            // Toast 알림 요소 생성
+            const notification = document.createElement('div');
+            notification.id = 'toastNotification';
+            
+            // 타입에 따른 색상 설정
+            let bgColor = 'bg-blue-500';
+            let textColor = 'text-white';
+            if (type === 'error' || type === 'danger') {
+                bgColor = 'bg-red-500';
+            } else if (type === 'success') {
+                bgColor = 'bg-green-500';
+            } else if (type === 'warning') {
+                bgColor = 'bg-yellow-500';
+            }
+            
+            notification.className = `fixed top-4 left-1/2 transform -translate-x-1/2 z-50 ${bgColor} ${textColor} px-6 py-4 rounded-lg shadow-lg max-w-md text-center font-semibold text-sm whitespace-pre-line`;
+            notification.style.transition = 'opacity 0.3s ease-in-out';
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // 3초 후 자동으로 사라지기
             setTimeout(() => {
-                const barcodeInput = document.getElementById('barcodeInput');
-                const scanSection = document.getElementById('scanSection');
-                if (barcodeInput && scanSection && !scanSection.classList.contains('hidden')) {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }, 3000);
+            
+            // 바코드 입력창 포커스 유지 (alert가 아니므로 포커스가 풀리지 않음)
+            const barcodeInput = document.getElementById('barcodeInput');
+            const scanSection = document.getElementById('scanSection');
+            if (barcodeInput && scanSection && !scanSection.classList.contains('hidden')) {
+                // 약간의 지연 후 포커스 유지
+                setTimeout(() => {
                     barcodeInput.focus();
                     barcodeInput.select();
-                }
-            }, 100);
+                }, 50);
+            }
         }
 
         // 현재 시간 업데이트
