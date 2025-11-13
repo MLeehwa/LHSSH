@@ -32,3 +32,18 @@ COMMENT ON COLUMN scanned_unique_codes.scanned_at IS '바코드 스캔 시점';
 COMMENT ON COLUMN scanned_unique_codes.status IS '상태: PENDING(대기), COMPLETED(완료)';
 COMMENT ON COLUMN scanned_unique_codes.inbound_date IS '입고 확정 날짜';
 
+-- 권한 부여 (anon 사용자에게 INSERT, SELECT, UPDATE, DELETE 권한 부여)
+GRANT ALL ON TABLE scanned_unique_codes TO anon;
+GRANT ALL ON TABLE scanned_unique_codes TO authenticated;
+GRANT USAGE, SELECT ON SEQUENCE scanned_unique_codes_id_seq TO anon;
+GRANT USAGE, SELECT ON SEQUENCE scanned_unique_codes_id_seq TO authenticated;
+
+-- RLS (Row Level Security) 정책 설정 (필요한 경우)
+ALTER TABLE scanned_unique_codes ENABLE ROW LEVEL SECURITY;
+
+-- 모든 사용자가 모든 행에 접근할 수 있도록 정책 생성 (필요에 따라 수정)
+CREATE POLICY "Allow all operations on scanned_unique_codes" ON scanned_unique_codes
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+

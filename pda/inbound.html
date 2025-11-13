@@ -978,14 +978,17 @@
                                     console.warn('고유번호 저장 오류:', insertError);
                                     // 저장 실패 시 메모리에서도 제거
                                     scannedUniqueCodes.delete(parsedData.uniqueNumber);
-                                    showNotification(`고유번호 저장 오류: ${insertError.message}`, 'error');
+                                    
+                                    // 권한 오류인 경우 더 명확한 메시지 표시
+                                    let errorMessage = `고유번호 저장 오류: ${insertError.message}`;
+                                    if (insertError.message && insertError.message.includes('permission denied')) {
+                                        errorMessage = `❌ 권한 오류: scanned_unique_codes 테이블에 대한 권한이 없습니다.\n데이터베이스 관리자에게 권한 설정을 요청하세요.\n\n오류 상세: ${insertError.message}`;
+                                    }
+                                    
+                                    showNotification(errorMessage, 'error');
                                     
                                     const barcodeInput = document.getElementById('barcodeInput');
                                     barcodeInput.value = '';
-                                    setTimeout(() => {
-                                        barcodeInput.focus();
-                                        barcodeInput.select();
-                                    }, 100);
                                     
                                     return false;
                                 }
@@ -1008,14 +1011,19 @@
                             console.error('고유번호 저장 중 오류:', saveError);
                             // 저장 실패 시 메모리에서도 제거
                             scannedUniqueCodes.delete(parsedData.uniqueNumber);
-                            showNotification(`고유번호 저장 중 오류가 발생했습니다.`, 'error');
+                            
+                            // 권한 오류인 경우 더 명확한 메시지 표시
+                            let errorMessage = `고유번호 저장 중 오류가 발생했습니다.`;
+                            if (saveError.message && saveError.message.includes('permission denied')) {
+                                errorMessage = `❌ 권한 오류: scanned_unique_codes 테이블에 대한 권한이 없습니다.\n데이터베이스 관리자에게 권한 설정을 요청하세요.\n\n오류 상세: ${saveError.message}`;
+                            } else if (saveError.message) {
+                                errorMessage = `고유번호 저장 중 오류: ${saveError.message}`;
+                            }
+                            
+                            showNotification(errorMessage, 'error');
                             
                             const barcodeInput = document.getElementById('barcodeInput');
                             barcodeInput.value = '';
-                            setTimeout(() => {
-                                barcodeInput.focus();
-                                barcodeInput.select();
-                            }, 100);
                             
                             return false;
                         }
@@ -1235,14 +1243,17 @@
                                 console.warn('바코드 저장 오류:', insertError);
                                 // 저장 실패 시 메모리에서도 제거
                                 scannedUniqueCodes.delete(barcode);
-                                showNotification(`바코드 저장 오류: ${insertError.message}`, 'error');
+                                
+                                // 권한 오류인 경우 더 명확한 메시지 표시
+                                let errorMessage = `바코드 저장 오류: ${insertError.message}`;
+                                if (insertError.message && insertError.message.includes('permission denied')) {
+                                    errorMessage = `❌ 권한 오류: scanned_unique_codes 테이블에 대한 권한이 없습니다.\n데이터베이스 관리자에게 권한 설정을 요청하세요.\n\n오류 상세: ${insertError.message}`;
+                                }
+                                
+                                showNotification(errorMessage, 'error');
                                 
                                 const barcodeInput = document.getElementById('barcodeInput');
                                 barcodeInput.value = '';
-                                setTimeout(() => {
-                                    barcodeInput.focus();
-                                    barcodeInput.select();
-                                }, 100);
                                 
                                 return false;
                             }
@@ -1265,14 +1276,19 @@
                         console.error('바코드 저장 중 오류:', saveError);
                         // 저장 실패 시 메모리에서도 제거
                         scannedUniqueCodes.delete(barcode);
-                        showNotification(`바코드 저장 중 오류가 발생했습니다.`, 'error');
+                        
+                        // 권한 오류인 경우 더 명확한 메시지 표시
+                        let errorMessage = `바코드 저장 중 오류가 발생했습니다.`;
+                        if (saveError.message && saveError.message.includes('permission denied')) {
+                            errorMessage = `❌ 권한 오류: scanned_unique_codes 테이블에 대한 권한이 없습니다.\n데이터베이스 관리자에게 권한 설정을 요청하세요.\n\n오류 상세: ${saveError.message}`;
+                        } else if (saveError.message) {
+                            errorMessage = `바코드 저장 중 오류: ${saveError.message}`;
+                        }
+                        
+                        showNotification(errorMessage, 'error');
                         
                         const barcodeInput = document.getElementById('barcodeInput');
                         barcodeInput.value = '';
-                        setTimeout(() => {
-                            barcodeInput.focus();
-                            barcodeInput.select();
-                        }, 100);
                         
                         return false;
                     }
@@ -1801,6 +1817,16 @@
         function showNotification(message, type = 'info') {
             // 간단한 알림 구현
             alert(message);
+            
+            // 알림 닫은 후 바코드 입력창으로 포커스 이동
+            setTimeout(() => {
+                const barcodeInput = document.getElementById('barcodeInput');
+                const scanSection = document.getElementById('scanSection');
+                if (barcodeInput && scanSection && !scanSection.classList.contains('hidden')) {
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                }
+            }, 100);
         }
 
         // 현재 시간 업데이트
