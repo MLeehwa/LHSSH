@@ -140,6 +140,15 @@ class OutboundStatus {
             this.updateStats();
             this.updateCurrentTime();
             
+            // 날짜 필터를 오늘 날짜로 초기화
+            const dateFilter = document.getElementById('dateFilter');
+            if (dateFilter) {
+                const today = new Date().toISOString().split('T')[0];
+                dateFilter.value = today;
+                // 필터 적용
+                this.applyFilters();
+            }
+            
             // Performance: Use requestAnimationFrame for time updates
             this.scheduleTimeUpdate();
             
@@ -652,10 +661,12 @@ handleSequenceChange(e) {
             return `
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${part.part_number}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${part.scanned_qty || 0}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-2xl font-bold text-blue-600">${part.scanned_qty || 0}</span>
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <input type="number" 
-                               class="actual-qty-input w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                               class="actual-qty-input w-24 px-3 py-2 text-xl font-bold text-green-600 border-2 border-green-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500" 
                                value="${part.actual_qty || 0}" 
                                min="0" 
                                max="9999"
