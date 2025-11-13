@@ -3089,8 +3089,8 @@
                     const productType = inventoryData && typeof inventoryData === 'object' ? inventoryData.product_type : null;
                     return productType === productTypeFilter;
                 });
-            }
-            
+                }
+                
             // 차이 필터 적용
             const filterValue = document.getElementById('filterSelect') ? document.getElementById('filterSelect').value : 'all';
             if (filterValue === 'difference') {

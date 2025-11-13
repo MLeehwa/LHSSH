@@ -727,10 +727,10 @@
                 
                 // 고유코드가 있는 경우 중복 검사 (메모리 + DB)
                 if (parsedData.uniqueNumber) {
-                    // 1. 메모리상의 중복 체크
+                    // 1. 메모리상의 중복 체크 (가장 빠른 체크)
                     if (scannedUniqueCodes.has(parsedData.uniqueNumber)) {
                         console.log('고유코드 중복 감지 (메모리):', parsedData.uniqueNumber);
-                        showNotification(`이미 스캔된 고유코드입니다: ${parsedData.uniqueNumber}`, 'error');
+                        showNotification(`❌ 중복 스캔: 이미 스캔된 고유코드입니다.\n고유코드: ${parsedData.uniqueNumber}`, 'error');
                         
                         const barcodeInput = document.getElementById('barcodeInput');
                         barcodeInput.value = '';
@@ -742,7 +742,7 @@
                         return false;
                     }
                     
-                    // 2. DB에서 중복 체크 (scanned_unique_codes 테이블에서 확인)
+                    // 2. DB에서 중복 체크 (같은 컨테이너에서 이미 스캔된 경우 확인)
                     try {
                         const { data: existingCode, error: checkError } = await supabase
                             .from('scanned_unique_codes')
@@ -776,12 +776,12 @@
                                 
                                 return false;
                             } else {
-                                // PENDING 상태인 경우 - 중복 스캔 차단
+                                // PENDING 상태인 경우 - 같은 컨테이너에서 이미 스캔된 경우 중복 스캔 차단
                                 const currentArn = selectedContainer?.arn_number || '미선택';
                                 const existingArn = existingCode.arn_number || '알 수 없음';
                                 
                                 if (selectedContainer && existingCode.arn_number === selectedContainer.arn_number) {
-                                    // 같은 컨테이너에서 이미 스캔된 경우 - 중복 스캔 차단
+                                    // 같은 컨테이너에서 이미 스캔된 경우 - 중복 스캔 차단 (수량 증가 방지)
                                     console.log('같은 컨테이너의 PENDING 항목 - 중복 스캔 차단');
                                     showNotification(`❌ 중복 스캔: 이 고유코드는 이미 스캔되었습니다.\n고유코드: ${parsedData.uniqueNumber}\n컨테이너: ${currentArn}`, 'error');
                                     
@@ -922,24 +922,29 @@
                     console.log('파트 매칭 성공:', part);
                     console.log('선택한 컨테이너:', selectedContainer?.arn_number, '파트 번호:', part.part_number);
                     
-                    // 고유코드가 있으면 스캔된 목록에 추가 및 즉시 DB에 저장
+                    // 고유코드가 있으면 먼저 DB에 저장 시도 (중복 방지)
                     if (parsedData.uniqueNumber) {
-                        scannedUniqueCodes.add(parsedData.uniqueNumber);
-                        console.log('고유코드 등록됨:', parsedData.uniqueNumber);
-                        console.log('현재 스캔된 고유코드 목록:', Array.from(scannedUniqueCodes));
+                        // 먼저 메모리 Set에 추가 (race condition 방지)
+                        if (scannedUniqueCodes.has(parsedData.uniqueNumber)) {
+                            console.log('고유코드 중복 감지 (메모리 - 파트 매칭 후):', parsedData.uniqueNumber);
+                            showNotification(`이미 스캔된 고유코드입니다: ${parsedData.uniqueNumber}`, 'error');
+                            
+                            const barcodeInput = document.getElementById('barcodeInput');
+                            barcodeInput.value = '';
+                            setTimeout(() => {
+                                barcodeInput.focus();
+                                barcodeInput.select();
+                            }, 100);
+                            
+                            return false;
+                        }
                         
-                        // 파트 객체에 고유번호 배열로 저장 (나중에 입고 확정 시 참조용)
-                        if (!part.scannedUniqueCodes) {
-                            part.scannedUniqueCodes = [];
-                        }
-                        // 중복 방지
-                        if (!part.scannedUniqueCodes.includes(parsedData.uniqueNumber)) {
-                            part.scannedUniqueCodes.push(parsedData.uniqueNumber);
-                        }
+                        // 메모리 Set에 먼저 추가 (동시 스캔 방지)
+                        scannedUniqueCodes.add(parsedData.uniqueNumber);
+                        console.log('고유코드 메모리 등록됨:', parsedData.uniqueNumber);
                         
                         // 스캔 시점에 바로 DB에 저장 (PENDING 상태)
-                        // 선택한 컨테이너의 arn_number와 파트 번호를 함께 저장
-                        // 이렇게 하면 관리자 화면에서 등록한 입고 정보(arn_parts)와 PDA 스캔 정보(scanned_unique_codes)가 연결됩니다.
+                        // UNIQUE 제약조건으로 중복 방지
                         try {
                             const { error: insertError } = await supabase
                                 .from('scanned_unique_codes')
@@ -953,25 +958,72 @@
                                 });
                             
                             if (insertError) {
-                                // UNIQUE 제약조건 위반은 이미 저장된 것이므로 무시
+                                // UNIQUE 제약조건 위반은 이미 저장된 것이므로 중복 스캔으로 처리
                                 if (insertError.code === '23505') {
-                                    console.log('고유번호가 이미 DB에 저장되어 있음:', parsedData.uniqueNumber);
+                                    console.log('고유번호가 이미 DB에 저장되어 있음 (중복 스캔):', parsedData.uniqueNumber);
+                                    // 메모리에서도 제거
+                                    scannedUniqueCodes.delete(parsedData.uniqueNumber);
+                                    
+                                    showNotification(`❌ 중복 스캔: 이 고유코드는 이미 스캔되었습니다.\n고유코드: ${parsedData.uniqueNumber}`, 'error');
+                                    
+                                    const barcodeInput = document.getElementById('barcodeInput');
+                                    barcodeInput.value = '';
+                                    setTimeout(() => {
+                                        barcodeInput.focus();
+                                        barcodeInput.select();
+                                    }, 100);
+                                    
+                                    return false;
                                 } else {
-                                    console.warn('고유번호 저장 오류 (무시하고 진행):', insertError);
+                                    console.warn('고유번호 저장 오류:', insertError);
+                                    // 저장 실패 시 메모리에서도 제거
+                                    scannedUniqueCodes.delete(parsedData.uniqueNumber);
+                                    showNotification(`고유번호 저장 오류: ${insertError.message}`, 'error');
+                                    
+                                    const barcodeInput = document.getElementById('barcodeInput');
+                                    barcodeInput.value = '';
+                                    setTimeout(() => {
+                                        barcodeInput.focus();
+                                        barcodeInput.select();
+                                    }, 100);
+                                    
+                                    return false;
                                 }
                             } else {
                                 console.log('고유번호 DB 저장 완료:', parsedData.uniqueNumber, '컨테이너:', selectedContainer?.arn_number, '파트:', part.part_number);
+                                
+                                // DB 저장 성공 후 파트 객체에 고유번호 배열로 저장 (나중에 입고 확정 시 참조용)
+                                if (!part.scannedUniqueCodes) {
+                                    part.scannedUniqueCodes = [];
+                                }
+                                // 중복 방지
+                                if (!part.scannedUniqueCodes.includes(parsedData.uniqueNumber)) {
+                                    part.scannedUniqueCodes.push(parsedData.uniqueNumber);
+                                }
+                                
+                                // DB 저장 성공 시에만 수량 추가 (중복 스캔 방지)
+                                part.scannedQuantity += parsedData.quantity;
                             }
                         } catch (saveError) {
                             console.error('고유번호 저장 중 오류:', saveError);
-                            // 저장 실패해도 스캔은 계속 진행
+                            // 저장 실패 시 메모리에서도 제거
+                            scannedUniqueCodes.delete(parsedData.uniqueNumber);
+                            showNotification(`고유번호 저장 중 오류가 발생했습니다.`, 'error');
+                            
+                            const barcodeInput = document.getElementById('barcodeInput');
+                            barcodeInput.value = '';
+                            setTimeout(() => {
+                                barcodeInput.focus();
+                                barcodeInput.select();
+                            }, 100);
+                            
+                            return false;
                         }
                     } else {
                         console.log('고유코드 없음 (중복 검사 건너뜀)');
+                        // 고유코드가 없는 경우에만 수량 추가
+                        part.scannedQuantity += parsedData.quantity;
                     }
-                    
-                    // 스캔된 수량을 해당 파트에 추가
-                    part.scannedQuantity += parsedData.quantity;
                     
                     renderPartsList();
                     updateProgress();
@@ -1129,20 +1181,27 @@
                 if (part) {
                     console.log('직접 파트 번호 매칭 성공:', part);
                     
-                    // 전체 바코드를 고유코드로 등록 (중복 방지)
-                    scannedUniqueCodes.add(barcode);
-                    console.log('직접 입력 바코드를 고유코드로 등록:', barcode);
+                    // 먼저 메모리 Set에 추가 (race condition 방지)
+                    if (scannedUniqueCodes.has(barcode)) {
+                        console.log('직접 입력 바코드 중복 감지 (메모리 - 파트 매칭 후):', barcode);
+                        showNotification(`이미 스캔된 바코드입니다: ${barcode}`, 'error');
+                        
+                        const barcodeInput = document.getElementById('barcodeInput');
+                        barcodeInput.value = '';
+                        setTimeout(() => {
+                            barcodeInput.focus();
+                            barcodeInput.select();
+                        }, 100);
+                        
+                        return false;
+                    }
                     
-                    // 파트 객체에 고유번호 배열로 저장 (나중에 입고 확정 시 참조용)
-                    if (!part.scannedUniqueCodes) {
-                        part.scannedUniqueCodes = [];
-                    }
-                    // 중복 방지
-                    if (!part.scannedUniqueCodes.includes(barcode)) {
-                        part.scannedUniqueCodes.push(barcode);
-                    }
+                    // 메모리 Set에 먼저 추가 (동시 스캔 방지)
+                    scannedUniqueCodes.add(barcode);
+                    console.log('직접 입력 바코드 메모리 등록됨:', barcode);
                     
                     // 스캔 시점에 바로 DB에 저장 (PENDING 상태)
+                    // UNIQUE 제약조건으로 중복 방지
                     try {
                         const { error: insertError } = await supabase
                             .from('scanned_unique_codes')
@@ -1156,22 +1215,67 @@
                             });
                         
                         if (insertError) {
-                            // UNIQUE 제약조건 위반은 이미 저장된 것이므로 무시
+                            // UNIQUE 제약조건 위반은 이미 저장된 것이므로 중복 스캔으로 처리
                             if (insertError.code === '23505') {
-                                console.log('바코드가 이미 DB에 저장되어 있음:', barcode);
+                                console.log('바코드가 이미 DB에 저장되어 있음 (중복 스캔):', barcode);
+                                // 메모리에서도 제거
+                                scannedUniqueCodes.delete(barcode);
+                                
+                                showNotification(`❌ 중복 스캔: 이 바코드는 이미 스캔되었습니다.\n바코드: ${barcode}`, 'error');
+                                
+                                const barcodeInput = document.getElementById('barcodeInput');
+                                barcodeInput.value = '';
+                                setTimeout(() => {
+                                    barcodeInput.focus();
+                                    barcodeInput.select();
+                                }, 100);
+                                
+                                return false;
                             } else {
-                                console.warn('바코드 저장 오류 (무시하고 진행):', insertError);
+                                console.warn('바코드 저장 오류:', insertError);
+                                // 저장 실패 시 메모리에서도 제거
+                                scannedUniqueCodes.delete(barcode);
+                                showNotification(`바코드 저장 오류: ${insertError.message}`, 'error');
+                                
+                                const barcodeInput = document.getElementById('barcodeInput');
+                                barcodeInput.value = '';
+                                setTimeout(() => {
+                                    barcodeInput.focus();
+                                    barcodeInput.select();
+                                }, 100);
+                                
+                                return false;
                             }
                         } else {
-                            console.log('바코드 DB 저장 완료:', barcode);
+                            console.log('바코드 DB 저장 완료:', barcode, '컨테이너:', selectedContainer?.arn_number, '파트:', part.part_number);
+                            
+                            // DB 저장 성공 후 파트 객체에 고유번호 배열로 저장 (나중에 입고 확정 시 참조용)
+                            if (!part.scannedUniqueCodes) {
+                                part.scannedUniqueCodes = [];
+                            }
+                            // 중복 방지
+                            if (!part.scannedUniqueCodes.includes(barcode)) {
+                                part.scannedUniqueCodes.push(barcode);
+                            }
+                            
+                            // DB 저장 성공 시에만 수량 추가 (중복 스캔 방지)
+                            part.scannedQuantity += 1;
                         }
                     } catch (saveError) {
                         console.error('바코드 저장 중 오류:', saveError);
-                        // 저장 실패해도 스캔은 계속 진행
+                        // 저장 실패 시 메모리에서도 제거
+                        scannedUniqueCodes.delete(barcode);
+                        showNotification(`바코드 저장 중 오류가 발생했습니다.`, 'error');
+                        
+                        const barcodeInput = document.getElementById('barcodeInput');
+                        barcodeInput.value = '';
+                        setTimeout(() => {
+                            barcodeInput.focus();
+                            barcodeInput.select();
+                        }, 100);
+                        
+                        return false;
                     }
-                    
-                    // 스캔된 수량을 해당 파트에 추가 (수량 1)
-                    part.scannedQuantity += 1;
                     
                     renderPartsList();
                     updateProgress();
@@ -1857,22 +1961,28 @@
         // 이벤트 리스너 설정
         function setupEventListeners() {
             // 컨테이너 선택 이벤트
-            document.getElementById('containerSelect').addEventListener('change', function(e) {
+            document.getElementById('containerSelect').addEventListener('change', async function(e) {
                 const arnNumber = e.target.value;
                 if (arnNumber) {
-                    // 컨테이너 선택 후 강한 포커스 제어 적용
-                    setTimeout(preventInputFocus, 100);
-                    
                     // 컨테이너 정보 로드 (selectedContainer 설정)
-                    loadSelectedContainerInfo(arnNumber);
+                    await loadSelectedContainerInfo(arnNumber);
                     
                     // 컨테이너 파트 로드
-                    loadContainerParts(arnNumber);
+                    await loadContainerParts(arnNumber);
                     
                     // UI 섹션 표시
                     document.getElementById('scanSection').classList.remove('hidden');
                     document.getElementById('partsSection').classList.remove('hidden');
                     document.getElementById('actionButtonsSection').classList.remove('hidden');
+                    
+                    // 바코드 입력창에 포커스 (약간의 지연 후)
+                    setTimeout(() => {
+                        const barcodeInput = document.getElementById('barcodeInput');
+                        if (barcodeInput) {
+                            barcodeInput.focus();
+                            barcodeInput.select();
+                        }
+                    }, 300);
                 } else {
                     // UI 섹션 숨기기
                     document.getElementById('scanSection').classList.add('hidden');
