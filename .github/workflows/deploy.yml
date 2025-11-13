@@ -28,17 +28,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
-          exclude-paths: |
-            node_modules
-            .git
-            .github
-            *.md
-            .netlify
-            .vscode
-            .idea
           
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          enablement: true
