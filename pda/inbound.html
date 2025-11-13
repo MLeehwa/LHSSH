@@ -65,55 +65,48 @@
             return;
         }
         
-        // 바코드 입력 필드 특별 처리 (입고 작업 시 키보드 활성화)
+        // 바코드 입력 필드 특별 처리 (입고 작업 시 키보드 비활성화)
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
-                // 입고 작업 시에는 키보드를 활성화하므로 키보드 숨김 기능 제거
-                // 바코드 스캐너를 사용하지만, 수동 입력도 가능하도록 키보드 활성화
-                barcodeInput.setAttribute('inputmode', 'text');
-                barcodeInput.removeAttribute('readonly');
+                // 입고 작업 시에는 바코드 스캐너를 사용하므로 키보드 비활성화
+                // 포커스는 허용하되 키보드는 나타나지 않도록 설정
+                barcodeInput.setAttribute('readonly', 'readonly');
+                barcodeInput.setAttribute('inputmode', 'none');
                 
-                // 포커스 시 키보드 표시
+                // 포커스 시에도 키보드가 나타나지 않도록 처리
                 barcodeInput.addEventListener('focus', function() {
-                    // 키보드 활성화를 위해 readonly 제거
-                    this.removeAttribute('readonly');
+                    // readonly 유지하여 키보드 비활성화
+                    this.setAttribute('readonly', 'readonly');
+                    this.setAttribute('inputmode', 'none');
                 });
                 
-                // 바코드 입력 필드 포커스는 자유롭게 허용
-                // (스캔을 위해 포커스 제어하지 않음)
+                // 클릭/터치 시에도 키보드가 나타나지 않도록
+                barcodeInput.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    this.focus();
+                    this.select();
+                });
+                
+                barcodeInput.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    this.focus();
+                    this.select();
+                });
+                
+                // 바코드 입력 필드 포커스는 허용하되 키보드는 비활성화
+                // (스캔을 위해 포커스 제어하지 않음, 하지만 키보드는 나타나지 않음)
             }
         }
         
-        // 페이지 로드 시 키보드 숨김
+        // 페이지 로드 시 바코드 입력 필드 설정 (입고 작업 시 키보드 활성화)
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(hideKeyboard, 100);
-            setTimeout(hideKeyboard, 500);
-            setTimeout(hideKeyboard, 1000);
-            setTimeout(preventInputFocus, 200);
+            // 입고 작업 시에는 키보드를 활성화하므로 hideKeyboard 호출 제거
             setTimeout(setupBarcodeInput, 300);
         });
         
-        // 화면 터치 시 키보드 숨김
-        document.addEventListener('touchstart', function(e) {
-            if (!e.target.matches('input, textarea, select, button')) {
-                hideKeyboard();
-            }
-        });
-        
-        // 포커스 이벤트 시 키보드 숨김
-        document.addEventListener('focusin', function(e) {
-            if (!e.target.matches('input, textarea, select')) {
-                hideKeyboard();
-            }
-        });
-        
-        // 키보드 이벤트 시 키보드 숨김
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                hideKeyboard();
-            }
-        });
+        // 입고 작업 시에는 키보드를 활성화하므로 화면 터치 시 키보드 숨김 기능 제거
+        // (바코드 입력 필드에 포커스가 있을 때는 키보드 유지)
     </script>
     
     <script>
