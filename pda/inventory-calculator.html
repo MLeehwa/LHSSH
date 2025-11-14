@@ -735,7 +735,9 @@
             const sessionNameInput = document.getElementById('sessionName');
             
             if (sessionDate && sessionNameInput) {
-                const dateObj = new Date(sessionDate);
+                // 로컬 시간으로 날짜 파싱 (시간대 문제 방지)
+                const [year, month, day] = sessionDate.split('-').map(Number);
+                const dateObj = new Date(year, month - 1, day);
                 const sessionName = `계산기 실사 ${dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}`;
                 sessionNameInput.value = sessionName;
             }
@@ -1763,7 +1765,9 @@
             
             // 세션명이 없으면 자동 생성
             if (!sessionName) {
-                const dateObj = new Date(sessionDate);
+                // 로컬 시간으로 날짜 파싱 (시간대 문제 방지)
+                const [year, month, day] = sessionDate.split('-').map(Number);
+                const dateObj = new Date(year, month - 1, day);
                 sessionName = `계산기 실사 ${dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}`;
             }
             
