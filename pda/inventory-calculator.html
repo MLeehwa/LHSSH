@@ -28,7 +28,28 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding-bottom: 120px;
+            padding-bottom: 100px;
+        }
+        
+        /* 타블렛 세로 모드 최적화 */
+        @media (max-width: 1024px) and (orientation: portrait) {
+            body {
+                padding-bottom: 90px;
+            }
+            
+            .glass-card {
+                padding: 0.75rem !important;
+                margin-bottom: 0.75rem !important;
+            }
+            
+            header {
+                padding: 0.75rem !important;
+                margin-bottom: 0.75rem !important;
+            }
+            
+            main {
+                padding: 0.75rem !important;
+            }
         }
         
         .glass-card {
@@ -295,8 +316,12 @@
             justify-content: center;
         }
         
-        /* 반응형 스타일 */
+        /* 반응형 스타일 - 타블렛 세로 모드 최적화 */
         @media (max-width: 1200px) {
+            #calculationTable {
+                min-width: 900px !important;
+            }
+            
             .table-input {
                 font-size: 16px !important;
                 padding: 10px 6px !important;
@@ -311,11 +336,6 @@
             
             .quantity-control .table-input {
                 min-width: 28px !important;
-            }
-            
-            .quantity-btn {
-                min-width: 24px !important;
-                min-height: 40px !important;
             }
             
             .subtotal-cell {
@@ -337,7 +357,61 @@
             }
         }
         
+        /* 타블렛 세로 모드 (768px ~ 1024px) */
+        @media (max-width: 1024px) and (orientation: portrait) {
+            #calculationTable {
+                min-width: 800px !important;
+            }
+            
+            .table-input {
+                font-size: 14px !important;
+                padding: 8px 4px !important;
+                min-height: 44px;
+            }
+            
+            .quantity-btn {
+                min-width: 32px !important;
+                min-height: 44px !important;
+                font-size: 16px;
+            }
+            
+            .quantity-control .table-input {
+                min-width: 24px !important;
+            }
+            
+            .subtotal-cell {
+                font-size: 11px !important;
+                padding: 5px 2px !important;
+                min-height: 44px;
+            }
+            
+            .total-cell {
+                font-size: 15px !important;
+            }
+            
+            table {
+                font-size: 11px;
+            }
+            
+            th, td {
+                padding: 3px 1px !important;
+            }
+            
+            th {
+                font-size: 10px !important;
+            }
+            
+            /* 헤더 텍스트 줄바꿈 최적화 */
+            th br {
+                display: block;
+            }
+        }
+        
         @media (max-width: 768px) {
+            #calculationTable {
+                min-width: 700px !important;
+            }
+            
             .table-input {
                 font-size: 14px !important;
                 padding: 8px 4px !important;
@@ -434,8 +508,8 @@
     <!-- Main Content -->
     <main class="p-4">
         <!-- 세션 정보 -->
-        <div class="glass-card p-4 mb-4">
-            <h2 class="text-lg font-bold text-gray-800 mb-3" data-i18n="session_info">세션 정보</h2>
+        <div class="glass-card p-3 mb-3">
+            <h2 class="text-base font-bold text-gray-800 mb-2" data-i18n="session_info">세션 정보</h2>
             <div class="input-group">
                 <label class="input-label" data-i18n="date">날짜</label>
                 <input type="date" id="sessionDate" class="input-field" value="" onchange="loadSessionsForDate()">
@@ -453,27 +527,27 @@
         </div>
 
         <!-- 입력 테이블 -->
-        <div class="glass-card p-4 mb-4">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-bold text-gray-800" data-i18n="inventory_calculation_table">재고 계산 테이블</h2>
+        <div class="glass-card p-3 mb-3">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-base font-bold text-gray-800" data-i18n="inventory_calculation_table">재고 계산 테이블</h2>
                 <div class="flex gap-2">
-                    <span class="text-sm text-gray-600" id="partsStatus">파트 로딩 중...</span>
+                    <span class="text-xs text-gray-600" id="partsStatus">파트 로딩 중...</span>
                 </div>
             </div>
             <div class="overflow-x-auto w-full">
-                <table class="w-full border-collapse table-auto" style="min-width: 1160px; width: 100%;">
+                <table class="w-full border-collapse table-auto" id="calculationTable" style="min-width: 1160px; width: 100%;">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center" style="width: 40px; min-width: 40px;" data-i18n="no">번호</th>
-                            <th class="border-2 border-gray-400 px-2 py-2 text-sm font-semibold text-gray-800 text-center" style="width: 130px; min-width: 130px;" data-i18n="part_number">파트</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="5" style="min-width: 200px;">박스</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 50px; min-width: 50px;" data-i18n="box1_subtotal">박스<br>소계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="3" style="min-width: 120px;">렉</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 50px; min-width: 50px;" data-i18n="rack_subtotal">렉<br>소계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 50px; min-width: 50px;" data-i18n="remaining_quantity">잔량</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-sm font-bold text-gray-800 text-center bg-red-50" style="width: 80px; min-width: 80px; border-left: 3px solid #ef4444;" data-i18n="total">총합계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-sm font-bold text-blue-800 text-center bg-blue-50" style="width: 80px; min-width: 80px;" data-i18n="system_stock">시스템 재고</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-sm font-bold text-gray-800 text-center bg-gray-50" style="width: 80px; min-width: 80px;">차이</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center" style="width: 35px; min-width: 35px;" data-i18n="no">번호</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center" style="width: 100px; min-width: 100px;" data-i18n="part_number">파트</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="5" style="min-width: 180px;">박스</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 45px; min-width: 45px;" data-i18n="box1_subtotal">박스<br>소계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="3" style="min-width: 110px;">렉</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 45px; min-width: 45px;" data-i18n="rack_subtotal">렉<br>소계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 45px; min-width: 45px;" data-i18n="remaining_quantity">잔량</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-red-50" style="width: 70px; min-width: 70px; border-left: 3px solid #ef4444;" data-i18n="total">총합계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-blue-800 text-center bg-blue-50" style="width: 70px; min-width: 70px;" data-i18n="system_stock">시스템<br>재고</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-gray-50" style="width: 60px; min-width: 60px;">차이</th>
                         </tr>
                         <tr class="bg-gray-50">
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center"></th>

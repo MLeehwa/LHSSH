@@ -710,12 +710,46 @@
             }
         }
 
+        // 파트 번호 정렬 함수 (이미지 순서 기준)
+        function sortPartNumbers(partNumbers) {
+            // 정렬 순서 정의 (이미지 기준)
+            const sortOrder = [
+                '49560-DO000',
+                '49560-L1250',
+                '49560-P2600',
+                '49560-R5210',
+                '49560-S9420',
+                '49560-S9480',
+                '49600-R5000',
+                '49601-R5000',
+                '49600-S9000',
+                '49601-S9000'
+            ];
+            
+            return partNumbers.sort((a, b) => {
+                const indexA = sortOrder.indexOf(a);
+                const indexB = sortOrder.indexOf(b);
+                
+                // 정의된 순서에 있으면 그 순서대로
+                if (indexA !== -1 && indexB !== -1) {
+                    return indexA - indexB;
+                }
+                // 둘 다 정의된 순서에 없으면 사전식 정렬
+                if (indexA === -1 && indexB === -1) {
+                    return a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' });
+                }
+                // 정의된 순서에 있는 것이 먼저
+                return indexA !== -1 ? -1 : 1;
+            });
+        }
+
         // 파트 목록 렌더링
         function renderPartsList() {
             const partsList = document.getElementById('partsList');
             partsList.innerHTML = '';
 
-            Object.keys(scannedParts).forEach(partNumber => {
+            // 파트 번호 순서로 정렬하여 표시 (이미지 순서 기준)
+            sortPartNumbers(Object.keys(scannedParts)).forEach(partNumber => {
                 const part = scannedParts[partNumber];
                 const partItem = document.createElement('tr');
                 partItem.className = 'hover:bg-gray-50 transition-colors duration-200';

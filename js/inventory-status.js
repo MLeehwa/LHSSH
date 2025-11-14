@@ -2277,13 +2277,17 @@ class InventoryStatus {
         this.showLoading(true);
         
         try {
-            // 날짜 목록 생성
+            // 날짜 목록 생성 (로컬 시간 기준, 오늘 날짜 포함)
             const dateList = [];
-            const currentDate = new Date(startDate);
-            const endDateObj = new Date(endDate);
+            const currentDate = new Date(startDate + 'T00:00:00'); // 로컬 시간으로 명시적 설정
+            const endDateObj = new Date(endDate + 'T23:59:59'); // 종료일 포함을 위해 시간 추가
             
             while (currentDate <= endDateObj) {
-                dateList.push(new Date(currentDate).toISOString().split('T')[0]);
+                // 로컬 시간 기준으로 날짜 추출 (YYYY-MM-DD)
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDate.getDate()).padStart(2, '0');
+                dateList.push(`${year}-${month}-${day}`);
                 currentDate.setDate(currentDate.getDate() + 1);
             }
             
@@ -2606,35 +2610,75 @@ class InventoryStatus {
             });
             
             // 5. 각 날짜별 재고 계산 (전날 재고 + 입고 - 출고 + 조정)
-            // 먼저 시작일 전날의 재고를 가져와야 함
-            const dayBeforeStart = new Date(startDate);
+            // 현재 재고를 기준으로 역산하여 시작일 전날 재고 계산
+            const dayBeforeStart = new Date(startDate + 'T00:00:00');
             dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
-            const dayBeforeStartStr = dayBeforeStart.toISOString().split('T')[0];
+            const dayBeforeStartStr = `${dayBeforeStart.getFullYear()}-${String(dayBeforeStart.getMonth() + 1).padStart(2, '0')}-${String(dayBeforeStart.getDate()).padStart(2, '0')}`;
             
-            // 전날 재고 계산
+            // 전날 재고 계산: 현재 재고에서 시작일 이후 거래 내역을 역산
             const previousStockMap = new Map();
             try {
-                const { data: prevTransactions } = await this.supabase
-                    .from('inventory_transactions')
-                    .select('part_number, transaction_type, quantity')
-                    .lte('transaction_date', dayBeforeStartStr);
+                // 1. 현재 재고 가져오기
+                const { data: currentInventory, error: invError } = await this.supabase
+                    .from('inventory')
+                    .select('part_number, current_stock');
                 
-                if (prevTransactions) {
+                if (!invError && currentInventory) {
+                    const inventoryMap = new Map(currentInventory.map(inv => [inv.part_number, inv.current_stock || 0]));
+                    
+                    // 2. 시작일 이후의 모든 거래 내역 가져오기 (역산용)
+                    const { data: futureTransactions } = await this.supabase
+                        .from('inventory_transactions')
+                        .select('part_number, transaction_type, quantity')
+                        .gte('transaction_date', startDate);
+                    
+                    // 3. 각 파트별로 현재 재고에서 역산하여 시작일 전날 재고 계산
                     allParts.forEach(part => {
-                        let stock = 0;
-                        prevTransactions
-                            .filter(t => t.part_number === part.part_number)
-                            .forEach(trans => {
-                                if (trans.transaction_type === 'INBOUND') {
-                                    stock += trans.quantity;
-                                } else if (trans.transaction_type === 'OUTBOUND') {
-                                    stock -= Math.abs(trans.quantity);
-                                } else if (trans.transaction_type === 'ADJUSTMENT') {
-                                    stock += trans.quantity;
-                                }
-                            });
-                        previousStockMap.set(part.part_number, stock);
+                        const currentStock = inventoryMap.get(part.part_number) || 0;
+                        let previousStock = currentStock;
+                        
+                        // 시작일 이후 거래 내역을 역산
+                        if (futureTransactions) {
+                            futureTransactions
+                                .filter(t => t.part_number === part.part_number)
+                                .forEach(trans => {
+                                    if (trans.transaction_type === 'INBOUND') {
+                                        previousStock -= trans.quantity; // 입고를 빼서 역산
+                                    } else if (trans.transaction_type === 'OUTBOUND') {
+                                        previousStock += Math.abs(trans.quantity); // 출고를 더해서 역산
+                                    } else if (trans.transaction_type === 'ADJUSTMENT') {
+                                        previousStock -= trans.quantity; // 조정을 빼서 역산
+                                    }
+                                });
+                        }
+                        
+                        previousStockMap.set(part.part_number, previousStock);
                     });
+                } else {
+                    // inventory 테이블이 없거나 오류가 있으면 기존 방식 사용
+                    console.warn('inventory 테이블 조회 실패, 기존 방식으로 전날 재고 계산');
+                    const { data: prevTransactions } = await this.supabase
+                        .from('inventory_transactions')
+                        .select('part_number, transaction_type, quantity')
+                        .lte('transaction_date', dayBeforeStartStr);
+                    
+                    if (prevTransactions) {
+                        allParts.forEach(part => {
+                            let stock = 0;
+                            prevTransactions
+                                .filter(t => t.part_number === part.part_number)
+                                .forEach(trans => {
+                                    if (trans.transaction_type === 'INBOUND') {
+                                        stock += trans.quantity;
+                                    } else if (trans.transaction_type === 'OUTBOUND') {
+                                        stock -= Math.abs(trans.quantity);
+                                    } else if (trans.transaction_type === 'ADJUSTMENT') {
+                                        stock += trans.quantity;
+                                    }
+                                });
+                            previousStockMap.set(part.part_number, stock);
+                        });
+                    }
                 }
             } catch (error) {
                 console.warn('전날 재고 계산 오류:', error);
@@ -2743,8 +2787,11 @@ class InventoryStatus {
         dateList.forEach(date => {
             const dateHeader = document.createElement('th');
             dateHeader.className = 'px-3 py-3 text-center text-xs font-medium text-gray-800/80 uppercase tracking-wider';
+            // 날짜에 +1일 추가 (시간대 차이 보정)
+            const dateObj = new Date(date);
+            dateObj.setDate(dateObj.getDate() + 1);
             dateHeader.innerHTML = `
-                <div>${new Date(date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
+                <div>${dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
                 <div class="text-xs text-gray-600 mt-1 text-blue-600">재고</div>
             `;
             headerRow.appendChild(dateHeader);
@@ -2817,8 +2864,11 @@ class InventoryStatus {
             const dateHeader = document.createElement('th');
             dateHeader.className = 'px-2 py-3 text-center text-xs font-medium text-gray-800/80 uppercase tracking-wider';
             dateHeader.colSpan = 3;
+            // 날짜에 +1일 추가 (시간대 차이 보정)
+            const dateObj = new Date(date);
+            dateObj.setDate(dateObj.getDate() + 1);
             dateHeader.innerHTML = `
-                <div>${new Date(date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
+                <div>${dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
                 <div class="text-xs text-gray-600 mt-1">
                     <span class="text-green-600">입고</span> | 
                     <span class="text-red-600">출고</span> | 
@@ -2925,9 +2975,10 @@ class InventoryStatus {
             // 워크북 생성
             const workbook = new ExcelJS.Workbook();
             
-            // 날짜 형식 변환 함수 (mm/dd)
+            // 날짜 형식 변환 함수 (mm/dd) - +1일 추가 (시간대 차이 보정)
             const formatDate = (dateStr) => {
                 const date = new Date(dateStr);
+                date.setDate(date.getDate() + 1); // +1일 추가
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
                 return `${month}/${day}`;

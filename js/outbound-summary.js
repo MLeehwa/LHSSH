@@ -530,7 +530,7 @@ class OutboundSummary {
                 console.log(`파트 처리 중: ${part.part_number}, 수량: ${part.actual_qty}, 시퀀스 상태: ${sequence.status}`);
                 
                 combinedData.push({
-                    date: sequence.outbound_date || new Date().toISOString().split('T')[0],
+                    date: this.formatDateOnly(sequence.outbound_date) || new Date().toISOString().split('T')[0],
                     sequence: sequenceNumber,
                     partNumber: part.part_number,
                     scannedQty: part.scanned_qty || 0,
@@ -605,7 +605,11 @@ class OutboundSummary {
                 console.log('필터링 전 데이터:', filteredData.length, '개');
                 
                 filteredData = filteredData.filter(item => {
-                    const itemDate = new Date(item.date);
+                    // 날짜를 YYYY-MM-DD 형식으로 변환하여 시간대 차이 방지
+                    const itemDateStr = this.formatDateOnly(item.date);
+                    if (itemDateStr === '-') return false;
+                    
+                    const itemDate = new Date(itemDateStr + 'T00:00:00'); // 로컬 시간으로 명시적 설정
                     const itemYear = itemDate.getFullYear();
                     const itemMonth = itemDate.getMonth() + 1;
                     
@@ -625,7 +629,11 @@ class OutboundSummary {
                 
                 if (selectedWeek) {
                     filteredData = filteredData.filter(item => {
-                        const itemDate = new Date(item.date);
+                        // 날짜를 YYYY-MM-DD 형식으로 변환하여 시간대 차이 방지
+                        const itemDateStr = this.formatDateOnly(item.date);
+                        if (itemDateStr === '-') return false;
+                        
+                        const itemDate = new Date(itemDateStr + 'T00:00:00'); // 로컬 시간으로 명시적 설정
                         const itemWeek = this.getWeekNumber(itemDate);
                         const itemYear = itemDate.getFullYear();
                         return `${itemYear}-W${itemWeek.toString().padStart(2, '0')}` === selectedWeek;
@@ -691,6 +699,52 @@ class OutboundSummary {
         const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
         const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
         return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+    }
+
+    // 날짜를 YYYY-MM-DD 형식으로 변환 (시간대 차이 방지 - 로컬 시간 기준)
+    formatDateOnly(dateValue) {
+        try {
+            if (!dateValue) return '-';
+            
+            // 이미 YYYY-MM-DD 형식인 경우
+            if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+                return dateValue;
+            }
+            
+            // ISO 형식인 경우 날짜 부분만 추출 (시간대 무시)
+            if (typeof dateValue === 'string' && dateValue.includes('T')) {
+                // 타임스탬프가 있으면 날짜 부분만 추출 (T 이전 부분)
+                const datePart = dateValue.split('T')[0];
+                // YYYY-MM-DD 형식인지 확인
+                if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                    return datePart;
+                }
+            }
+            
+            // 날짜만 있는 문자열 형식 (예: "2024-11-03")
+            if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+                const datePart = dateValue.substring(0, 10);
+                if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                    return datePart;
+                }
+            }
+            
+            // Date 객체로 변환 시도
+            const date = new Date(dateValue);
+            if (isNaN(date.getTime())) {
+                console.warn('유효하지 않은 날짜:', dateValue);
+                return '-';
+            }
+            
+            // 로컬 시간 기준으로 날짜 추출 (UTC가 아닌 로컬 시간대 사용)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        } catch (error) {
+            console.error('날짜 포맷 오류:', error, '입력값:', dateValue);
+            return '-';
+        }
     }
 
 
@@ -799,13 +853,15 @@ class OutboundSummary {
             
             html += `
                 <tr class="bg-gradient-to-r from-blue-600 to-blue-700 border-b-2 border-blue-800">
-                    <td class="sticky left-0 z-20 bg-gradient-to-r from-blue-600 to-blue-700 ${compactClass} font-bold text-white border-r border-blue-800" style="min-width: 120px; max-width: 150px;">
+                    <td class="sticky left-0 z-20 bg-gradient-to-r from-blue-600 to-blue-700 ${compactClass} font-bold text-white border-r border-blue-800" style="min-width: 180px; max-width: 200px;">
                         파트 번호
                     </td>
             `;
             
             summaryStructure.dates.forEach(date => {
                 const dateObj = new Date(date);
+                // 날짜에 +1일 추가 (시간대 차이 보정)
+                dateObj.setDate(dateObj.getDate() + 1);
                 const formattedDate = this.isCompactMode 
                     ? dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
                     : dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', weekday: 'short' });
@@ -827,7 +883,7 @@ class OutboundSummary {
             
             html += `
                 <tr class="bg-blue-100 border-b border-blue-300">
-                    <td class="sticky left-0 z-20 bg-blue-100 ${compactHeaderClass} font-medium text-blue-900 border-r border-blue-300">
+                    <td class="sticky left-0 z-20 bg-blue-100 ${compactHeaderClass} font-medium text-blue-900 border-r border-blue-300" style="min-width: 180px; max-width: 200px;">
                         차수
                     </td>
             `;
@@ -912,7 +968,7 @@ class OutboundSummary {
                 
                 html += `
                     <tr class="hover:bg-blue-50 transition-colors duration-150 border-b border-gray-200 ${rowBgClass}">
-                        <td class="sticky left-0 z-20 ${stickyBgClass} ${compactDataClass} font-medium text-gray-900 border-r border-gray-300">
+                        <td class="sticky left-0 z-20 ${stickyBgClass} ${compactDataClass} font-medium text-gray-900 border-r border-gray-300" style="min-width: 180px; max-width: 200px;">
                             ${partNumber}
                         </td>
                 `;
@@ -956,7 +1012,7 @@ class OutboundSummary {
             
             html += `
                 <tr class="bg-gradient-to-r from-green-600 to-green-700 border-t-2 border-green-800">
-                    <td class="sticky left-0 z-20 bg-gradient-to-r from-green-600 to-green-700 ${compactTotalClass} font-bold text-white border-r border-green-800">
+                    <td class="sticky left-0 z-20 bg-gradient-to-r from-green-600 to-green-700 ${compactTotalClass} font-bold text-white border-r border-green-800" style="min-width: 180px; max-width: 200px;">
                         합계
                     </td>
             `;
@@ -1021,6 +1077,39 @@ class OutboundSummary {
         }
     }
 
+    // 파트 번호 정렬 함수 (이미지 순서 기준)
+    sortPartNumbers(partNumbers) {
+        // 정렬 순서 정의 (이미지 기준)
+        const sortOrder = [
+            '49560-DO000',
+            '49560-L1250',
+            '49560-P2600',
+            '49560-R5210',
+            '49560-S9420',
+            '49560-S9480',
+            '49600-R5000',
+            '49601-R5000',
+            '49600-S9000',
+            '49601-S9000'
+        ];
+        
+        return partNumbers.sort((a, b) => {
+            const indexA = sortOrder.indexOf(a);
+            const indexB = sortOrder.indexOf(b);
+            
+            // 정의된 순서에 있으면 그 순서대로
+            if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
+            }
+            // 둘 다 정의된 순서에 없으면 사전식 정렬
+            if (indexA === -1 && indexB === -1) {
+                return a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' });
+            }
+            // 정의된 순서에 있는 것이 먼저
+            return indexA !== -1 ? -1 : 1;
+        });
+    }
+
     // 가로 요약 테이블 구조 생성
     createHorizontalSummaryStructure(data) {
         const structure = {
@@ -1079,8 +1168,8 @@ class OutboundSummary {
             });
         });
         
-        // 파트 번호 정렬
-        structure.parts.sort();
+        // 파트 번호 정렬 (이미지 순서 기준)
+        this.sortPartNumbers(structure.parts);
         
         console.log('가로 요약 구조 생성:', structure);
         return structure;
@@ -1124,8 +1213,11 @@ class OutboundSummary {
             // 이번 주 출고 (최근 7일, 완료된 데이터만)
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            oneWeekAgo.setHours(0, 0, 0, 0); // 시간 초기화
             const weeklyData = completedData.filter(item => {
-                const itemDate = new Date(item.date);
+                const itemDateStr = this.formatDateOnly(item.date);
+                if (itemDateStr === '-') return false;
+                const itemDate = new Date(itemDateStr + 'T00:00:00'); // 로컬 시간으로 명시적 설정
                 return itemDate >= oneWeekAgo;
             });
             const weeklyOutbound = weeklyData.reduce((sum, item) => sum + (item.actualQty || 0), 0);
@@ -1134,7 +1226,9 @@ class OutboundSummary {
             const currentMonth = new Date().getMonth();
             const currentYear = new Date().getFullYear();
             const monthlyData = completedData.filter(item => {
-                const itemDate = new Date(item.date);
+                const itemDateStr = this.formatDateOnly(item.date);
+                if (itemDateStr === '-') return false;
+                const itemDate = new Date(itemDateStr + 'T00:00:00'); // 로컬 시간으로 명시적 설정
                 return itemDate.getMonth() === currentMonth && itemDate.getFullYear() === currentYear;
             });
             const monthlyOutbound = monthlyData.reduce((sum, item) => sum + (item.actualQty || 0), 0);
@@ -1431,11 +1525,17 @@ class OutboundSummary {
         summaryStructure.dates.forEach(date => {
             const sequences = summaryStructure.dateSequences[date] || [];
             if (sequences.length === 0) {
-                dateRow.push(date);
+                // 날짜에 +1일 추가
+                const dateObj = new Date(date);
+                dateObj.setDate(dateObj.getDate() + 1);
+                const adjustedDate = dateObj.toISOString().split('T')[0];
+                dateRow.push(adjustedDate);
                 sequenceRow.push('');
             } else {
                 sequences.forEach(sequence => {
                     const dateObj = new Date(date);
+                    // 날짜에 +1일 추가 (시간대 차이 보정)
+                    dateObj.setDate(dateObj.getDate() + 1);
                     const formattedDate = dateObj.toLocaleDateString('ko-KR', {
                         year: 'numeric',
                         month: '2-digit',
@@ -1538,6 +1638,8 @@ class OutboundSummary {
         // 각 주말 날짜별로 파트별 요약 생성
         summaryStructure.dates.forEach(date => {
             const dateObj = new Date(date);
+            // 날짜에 +1일 추가 (시간대 차이 보정)
+            dateObj.setDate(dateObj.getDate() + 1);
             const formattedDate = dateObj.toLocaleDateString('ko-KR');
             const dayOfWeek = dateObj.getDay();
             const dayName = dayOfWeek === 0 ? '일요일' : '토요일';

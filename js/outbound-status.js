@@ -471,7 +471,9 @@ handleSequenceChange(e) {
         const statusFilter = document.getElementById('statusFilter').value;
 
         this.filteredSequences = this.outboundSequences.filter(sequence => {
-            const matchesDate = !dateFilter || sequence.outbound_date === dateFilter;
+            // 날짜를 YYYY-MM-DD 형식으로 변환하여 비교 (시간대 차이 방지)
+            const sequenceDate = this.formatDateOnly(sequence.outbound_date);
+            const matchesDate = !dateFilter || sequenceDate === dateFilter;
             const matchesSeq = !seqFilter || sequence.sequence_number.toString() === seqFilter;
             const matchesStatus = !statusFilter || sequence.status === statusFilter;
 
@@ -565,7 +567,7 @@ handleSequenceChange(e) {
         console.log('renderSequences 완료');
     }
 
-    // 날짜만 표시하는 함수 (YYYY-MM-DD 형식)
+    // 날짜만 표시하는 함수 (YYYY-MM-DD 형식 - 로컬 시간 기준)
     formatDateOnly(dateValue) {
         try {
             if (!dateValue) return '-';
@@ -575,9 +577,22 @@ handleSequenceChange(e) {
                 return dateValue;
             }
             
-            // ISO 형식인 경우 날짜 부분만 추출
+            // ISO 형식인 경우 날짜 부분만 추출 (시간대 무시)
             if (typeof dateValue === 'string' && dateValue.includes('T')) {
-                return dateValue.split('T')[0];
+                // 타임스탬프가 있으면 날짜 부분만 추출 (T 이전 부분)
+                const datePart = dateValue.split('T')[0];
+                // YYYY-MM-DD 형식인지 확인
+                if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                    return datePart;
+                }
+            }
+            
+            // 날짜만 있는 문자열 형식 (예: "2024-11-03")
+            if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+                const datePart = dateValue.substring(0, 10);
+                if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                    return datePart;
+                }
             }
             
             // Date 객체로 변환 시도
@@ -587,7 +602,11 @@ handleSequenceChange(e) {
                 return '-';
             }
             
-            return date.toISOString().split('T')[0];
+            // 로컬 시간 기준으로 날짜 추출 (UTC가 아닌 로컬 시간대 사용)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         } catch (error) {
             console.error('날짜 포맷 오류:', error, '입력값:', dateValue);
             return '-';
@@ -635,6 +654,39 @@ handleSequenceChange(e) {
         this.updateConfirmButtons();
     }
 
+    // 파트 번호 정렬 함수 (이미지 순서 기준)
+    sortPartNumbers(partNumbers) {
+        // 정렬 순서 정의 (이미지 기준)
+        const sortOrder = [
+            '49560-DO000',
+            '49560-L1250',
+            '49560-P2600',
+            '49560-R5210',
+            '49560-S9420',
+            '49560-S9480',
+            '49600-R5000',
+            '49601-R5000',
+            '49600-S9000',
+            '49601-S9000'
+        ];
+        
+        return partNumbers.sort((a, b) => {
+            const indexA = sortOrder.indexOf(a);
+            const indexB = sortOrder.indexOf(b);
+            
+            // 정의된 순서에 있으면 그 순서대로
+            if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
+            }
+            // 둘 다 정의된 순서에 없으면 사전식 정렬
+            if (indexA === -1 && indexB === -1) {
+                return a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' });
+            }
+            // 정의된 순서에 있는 것이 먼저
+            return indexA !== -1 ? -1 : 1;
+        });
+    }
+
     renderParts(sequenceId) {
         const tbody = document.getElementById('partsTableBody');
         if (!tbody) return;
@@ -654,7 +706,12 @@ handleSequenceChange(e) {
             return;
         }
 
-        tbody.innerHTML = sequenceParts.map(part => {
+        // 파트 번호 순서대로 정렬
+        const sortedParts = this.sortPartNumbers(sequenceParts.map(p => p.part_number))
+            .map(partNumber => sequenceParts.find(p => p.part_number === partNumber))
+            .filter(p => p !== undefined);
+
+        tbody.innerHTML = sortedParts.map(part => {
             const statusClass = part.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
             const statusText = part.status === 'COMPLETED' ? '완료' : '대기';
             

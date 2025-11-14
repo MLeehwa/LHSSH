@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title data-i18n="pda_system">PDA - 이화 - 서한 시스템</title>
+    <title data-i18n="pda_system">이화-서한 프로젝트</title>
     
     <!-- Supabase 클라이언트 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -383,13 +383,13 @@
             <i class="fas fa-chevron-down ml-2"></i>
         </button>
         <div class="language-dropdown" id="languageDropdown">
-            <div class="language-option active" onclick="changeLanguage('ko', this)">
+            <div class="language-option active" data-lang="ko">
                 <i class="fas fa-flag mr-2"></i><span data-i18n="korean">한국어</span>
             </div>
-            <div class="language-option" onclick="changeLanguage('en', this)">
+            <div class="language-option" data-lang="en">
                 <i class="fas fa-flag mr-2"></i><span data-i18n="english">English</span>
             </div>
-            <div class="language-option" onclick="changeLanguage('es', this)">
+            <div class="language-option" data-lang="es">
                 <i class="fas fa-flag mr-2"></i><span data-i18n="spanish">Español</span>
             </div>
         </div>
@@ -403,7 +403,7 @@
                     <i class="fas fa-barcode text-white text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-gray-800" data-i18n="pda_system">PDA 시스템</h1>
+                    <h1 class="text-lg font-bold text-gray-800">이화-서한 프로젝트</h1>
                     <p class="text-xs text-gray-600" data-i18n="mobile_work_env">모바일 작업 환경</p>
                 </div>
             </div>
@@ -491,13 +491,24 @@
         // 언어 선택기 토글
         function toggleLanguageDropdown() {
             const dropdown = document.getElementById('languageDropdown');
-            dropdown.classList.toggle('show');
+            if (dropdown) {
+                dropdown.classList.toggle('show');
+            }
         }
 
         // 언어 변경
         function changeLanguage(lang, clickedElement) {
+            console.log('언어 변경 시도:', lang, clickedElement);
+            
+            // i18n이 로드되었는지 확인
+            if (typeof i18n === 'undefined' || !i18n) {
+                console.error('i18n이 로드되지 않았습니다.');
+                return;
+            }
+            
             // 언어 설정
             i18n.setLanguage(lang);
+            console.log('언어 설정 완료:', lang);
             
             // 현재 언어 표시 업데이트
             const currentLanguageElement = document.getElementById('currentLanguage');
@@ -508,6 +519,7 @@
             };
             if (currentLanguageElement) {
                 currentLanguageElement.textContent = languageNames[lang];
+                console.log('현재 언어 표시 업데이트:', languageNames[lang]);
             }
             
             // 드롭다운 닫기
@@ -524,7 +536,7 @@
                 clickedElement.classList.add('active');
             } else {
                 // clickedElement가 없을 경우 lang에 맞는 옵션 찾기
-                const targetOption = document.querySelector(`.language-option[onclick*="'${lang}'"]`);
+                const targetOption = document.querySelector(`.language-option[data-lang="${lang}"]`);
                 if (targetOption) {
                     targetOption.classList.add('active');
                 }
@@ -538,7 +550,49 @@
             window.location.href = '../login.html';
         }
 
-        // 페이지 외부 클릭 시 드롭다운 닫기
+        // 페이지 로드 시 언어 옵션에 이벤트 리스너 추가 (PDA 터치 이벤트 지원)
+        document.addEventListener('DOMContentLoaded', function() {
+            // 언어 옵션에 클릭/터치 이벤트 리스너 추가
+            document.querySelectorAll('.language-option').forEach(option => {
+                const lang = option.getAttribute('data-lang');
+                if (lang) {
+                    // 클릭 이벤트
+                    option.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        changeLanguage(lang, option);
+                    });
+                    
+                    // 터치 이벤트 (PDA 지원)
+                    option.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        changeLanguage(lang, option);
+                    });
+                }
+            });
+            
+            // 현재 언어 표시 업데이트
+            const currentLanguage = (typeof i18n !== 'undefined' && i18n) ? i18n.currentLanguage : 'ko';
+            const languageNames = {
+                'ko': '한국어',
+                'en': 'English',
+                'es': 'Español'
+            };
+            const currentLanguageElement = document.getElementById('currentLanguage');
+            if (currentLanguageElement) {
+                currentLanguageElement.textContent = languageNames[currentLanguage] || '한국어';
+            }
+            
+            // 활성 옵션 표시
+            const activeOption = document.querySelector(`.language-option[data-lang="${currentLanguage}"]`);
+            if (activeOption) {
+                document.querySelectorAll('.language-option').forEach(opt => opt.classList.remove('active'));
+                activeOption.classList.add('active');
+            }
+        });
+
+        // 페이지 외부 클릭/터치 시 드롭다운 닫기
         document.addEventListener('click', function(event) {
             const languageSelector = document.querySelector('.language-selector');
             if (languageSelector && !languageSelector.contains(event.target)) {
@@ -548,18 +602,15 @@
                 }
             }
         });
-
-        // 페이지 로드 시 현재 언어 표시 업데이트
-        document.addEventListener('DOMContentLoaded', function() {
-            const currentLanguage = i18n.currentLanguage;
-            const languageNames = {
-                'ko': '한국어',
-                'en': 'English',
-                'es': 'Español'
-            };
-            const currentLanguageElement = document.getElementById('currentLanguage');
-            if (currentLanguageElement) {
-                currentLanguageElement.textContent = languageNames[currentLanguage] || '한국어';
+        
+        // 터치 이벤트도 처리 (PDA 지원)
+        document.addEventListener('touchend', function(event) {
+            const languageSelector = document.querySelector('.language-selector');
+            if (languageSelector && !languageSelector.contains(event.target)) {
+                const languageDropdown = document.getElementById('languageDropdown');
+                if (languageDropdown) {
+                    languageDropdown.classList.remove('show');
+                }
             }
         });
     </script>
