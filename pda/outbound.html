@@ -22,9 +22,22 @@
     <!-- PDA 스캐너 전용 바코드 입력 처리 -->
     <script>
         // 바코드 입력 필드 설정 (contenteditable input event 기반)
+        let barcodeInputInitialized = false;
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (!barcodeInput) return;
+            
+            // 이미 초기화되었으면 중복 이벤트 리스너 추가 방지
+            if (barcodeInputInitialized) {
+                const partsSection = document.getElementById('partsSection');
+                if (partsSection && !partsSection.classList.contains('hidden') && currentShift) {
+                    // 포커스만 다시 설정
+                    setTimeout(() => {
+                        barcodeInput.focus();
+                    }, 100);
+                }
+                return;
+            }
             
             const partsSection = document.getElementById('partsSection');
             if (partsSection && !partsSection.classList.contains('hidden') && currentShift) {
@@ -63,6 +76,8 @@
                     }
                 }, 50);
             });
+            
+            barcodeInputInitialized = true;
         }
         
         // 바코드 값 가져오기
@@ -1217,10 +1232,54 @@
             currentShift = '';
         }
 
-        // 알림 표시
+        // 알림 표시 (Toast 스타일 - 비차단형)
         function showNotification(message, type = 'info') {
-            // 간단한 알림 구현
-            alert(message);
+            // 기존 알림이 있으면 제거
+            const existingNotification = document.getElementById('toastNotification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            // Toast 알림 요소 생성
+            const notification = document.createElement('div');
+            notification.id = 'toastNotification';
+            
+            // 타입에 따른 색상 설정
+            let bgColor = 'bg-blue-500';
+            let textColor = 'text-white';
+            if (type === 'error' || type === 'danger') {
+                bgColor = 'bg-red-500';
+            } else if (type === 'success') {
+                bgColor = 'bg-green-500';
+            } else if (type === 'warning') {
+                bgColor = 'bg-yellow-500';
+            }
+            
+            notification.className = `fixed top-4 left-1/2 transform -translate-x-1/2 z-50 ${bgColor} ${textColor} px-6 py-4 rounded-lg shadow-lg max-w-md text-center font-semibold text-sm whitespace-pre-line`;
+            notification.style.transition = 'opacity 0.3s ease-in-out';
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // 3초 후 자동으로 사라지기
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }, 3000);
+            
+            // 바코드 입력창 포커스 유지 (alert가 아니므로 포커스가 풀리지 않음)
+            const barcodeInput = document.getElementById('barcodeInput');
+            const partsSection = document.getElementById('partsSection');
+            if (barcodeInput && partsSection && !partsSection.classList.contains('hidden') && currentShift) {
+                // 약간의 지연 후 포커스 유지
+                setTimeout(() => {
+                    barcodeInput.focus();
+                }, 50);
+            }
         }
 
         // 현재 시간 업데이트

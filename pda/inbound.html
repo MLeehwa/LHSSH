@@ -22,9 +22,22 @@
     <!-- PDA 스캐너 전용 바코드 입력 처리 -->
     <script>
         // 바코드 입력 필드 설정 (contenteditable input event 기반)
+        let barcodeInputInitialized = false;
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (!barcodeInput) return;
+            
+            // 이미 초기화되었으면 중복 이벤트 리스너 추가 방지
+            if (barcodeInputInitialized) {
+                const partsSection = document.getElementById('partsSection');
+                if (partsSection && !partsSection.classList.contains('hidden')) {
+                    // 포커스만 다시 설정
+                    setTimeout(() => {
+                        barcodeInput.focus();
+                    }, 100);
+                }
+                return;
+            }
             
             const partsSection = document.getElementById('partsSection');
             if (partsSection && !partsSection.classList.contains('hidden')) {
@@ -63,6 +76,8 @@
                     }
                 }, 50);
             });
+            
+            barcodeInputInitialized = true;
         }
         
         // 바코드 값 가져오기
