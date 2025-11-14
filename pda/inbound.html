@@ -47,20 +47,47 @@
                 }, 300);
             }
             
+            // 바코드 입력 버퍼 (PDA 스캐너용)
+            let barcodeBuffer = '';
+            
             // contenteditable input 이벤트로 바코드 입력 처리
             barcodeInput.addEventListener('input', function() {
                 const code = (this.textContent || this.innerText || '').trim();
+                console.log('input 이벤트 발생:', code);
                 if (code.length > 0) {
+                    barcodeBuffer = code;
                     // 바코드 패턴 확인 후 자동 스캔
                     checkAndAutoScan(code);
                 }
             });
             
-            // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
+            // keydown 이벤트로도 처리 (PDA 스캐너 호환성)
             barcodeInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
+                console.log('keydown 이벤트:', e.key, e.keyCode);
+                
+                // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
+                if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault();
+                    // 버퍼에 값이 있으면 스캔 처리
+                    if (barcodeBuffer.trim().length > 0) {
+                        console.log('Enter 키로 스캔 처리:', barcodeBuffer);
+                        scanBarcode();
+                        barcodeBuffer = '';
+                    }
+                    return;
                 }
+                
+                // 일반 문자 입력은 버퍼에 추가
+                if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    barcodeBuffer += e.key;
+                    console.log('버퍼 업데이트:', barcodeBuffer);
+                    // contenteditable에 직접 입력되므로 input 이벤트가 발생할 것임
+                }
+            });
+            
+            // keypress 이벤트도 처리 (일부 PDA 호환성)
+            barcodeInput.addEventListener('keypress', function(e) {
+                console.log('keypress 이벤트:', e.key, e.keyCode);
             });
             
             barcodeInputInitialized = true;
@@ -1543,6 +1570,11 @@
             const containerSelect = document.getElementById('containerSelect');
             containerSelect.addEventListener('change', async function(e) {
                 const arnNumber = e.target.value;
+                
+                // 즉시 select에서 포커스 제거 (키보드 방지)
+                this.blur();
+                console.log('컨테이너 선택: select blur 처리');
+                
                 if (arnNumber) {
                     // 메모리 Set 초기화 (새 컨테이너 선택 시 이전 스캔 데이터 제거)
                     scannedUniqueCodes.clear();
@@ -1558,14 +1590,37 @@
                     document.getElementById('partsSection').classList.remove('hidden');
                     document.getElementById('actionButtonsSection').classList.remove('hidden');
                     
-                    // 바코드 입력 필드 설정 및 포커스
+                    // 바코드 입력 필드 설정 및 포커스 (select blur 후)
                     setTimeout(() => {
+                        // 다시 한번 select blur 확인
+                        const containerSelect = document.getElementById('containerSelect');
+                        if (containerSelect) {
+                            containerSelect.blur();
+                        }
+                        
+                        // 바코드 입력 필드 초기화 및 설정
                         setupBarcodeInput();
+                        
+                        // 바코드 입력 필드에 강제 포커스
                         const barcodeInput = document.getElementById('barcodeInput');
                         if (barcodeInput) {
                             barcodeInput.focus();
+                            console.log('바코드 입력 필드 포커스 설정 완료');
+                            
+                            // 포커스 확인
+                            setTimeout(() => {
+                                if (document.activeElement === barcodeInput) {
+                                    console.log('✅ 바코드 입력 필드 포커스 확인됨');
+                                } else {
+                                    console.warn('⚠️ 바코드 입력 필드 포커스 실패, 현재 포커스:', document.activeElement);
+                                    // 재시도
+                                    barcodeInput.focus();
+                                }
+                            }, 100);
+                        } else {
+                            console.error('❌ 바코드 입력 필드를 찾을 수 없음');
                         }
-                    }, 300);
+                    }, 500);
                 } else {
                     // UI 섹션 숨기기 (스캔 섹션은 이미 숨김)
                     document.getElementById('partsSection').classList.add('hidden');
