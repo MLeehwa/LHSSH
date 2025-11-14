@@ -3298,12 +3298,12 @@ handleSequenceChange(e) {
     }
 
     async createNewSequence(date, seq) {
-        // 0. 동일한 날짜와 차수의 중복 확인
+        // 0. 동일한 차수 번호의 중복 확인
+        const sequenceNumber = `${date.replace(/-/g, '')}-${seq}`;
         const { data: existingSequence, error: checkError } = await this.supabase
             .from('outbound_sequences')
             .select('id, sequence_number, outbound_date, status')
-            .eq('outbound_date', date)
-            .eq('sequence_number', `${date.replace(/-/g, '')}-${seq}`)
+            .eq('sequence_number', sequenceNumber)
             .maybeSingle();
 
         if (checkError) {
@@ -3319,8 +3319,7 @@ handleSequenceChange(e) {
         try {
             // 1. 출고 차수 생성
             const totalQuantity = this.registrationParts.reduce((sum, part) => sum + part.quantity, 0);
-            // 차수 번호 생성 (날짜 + 차수)
-            const sequenceNumber = `${date.replace(/-/g, '')}-${seq}`;
+            // 차수 번호는 이미 위에서 생성됨
             console.log('생성된 차수 번호:', sequenceNumber, '날짜:', date, '차수:', seq);
             
             const sequenceData = {
@@ -3338,6 +3337,14 @@ handleSequenceChange(e) {
 
             if (sequenceError) {
                 console.error('차수 생성 오류:', sequenceError);
+                // 409 오류는 중복 데이터를 의미
+                if (sequenceError.code === '23505' || sequenceError.status === 409 || sequenceError.message?.includes('duplicate') || sequenceError.message?.includes('unique')) {
+                    const errorMessage = sequenceError.details 
+                        ? `이미 등록된 차수입니다: ${sequenceNumber}\n(${sequenceError.details})`
+                        : `이미 등록된 차수입니다: ${sequenceNumber}`;
+                    this.showNotification(errorMessage, 'error');
+                    return;
+                }
                 throw sequenceError;
             }
             
@@ -3379,7 +3386,15 @@ handleSequenceChange(e) {
             
         } catch (error) {
             console.error('출고 등록 오류:', error);
-            this.showNotification('출고 등록 중 오류가 발생했습니다.', 'error');
+            // 409 오류는 중복 데이터를 의미
+            if (error.code === '23505' || error.status === 409 || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+                const errorMessage = error.details 
+                    ? `이미 등록된 차수입니다.\n중복 등록을 시도하지 마세요.\n(${error.details})`
+                    : '이미 등록된 차수입니다. 중복 등록을 시도하지 마세요.';
+                this.showNotification(errorMessage, 'error');
+            } else {
+                this.showNotification(`출고 등록 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`, 'error');
+            }
         }
     }
 }

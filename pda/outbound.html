@@ -640,6 +640,10 @@
             if (date && shift) {
                 console.log('날짜와 차수가 모두 선택됨, 화면 업데이트 시작');
                 
+                // 스캔 데이터 초기화 (현재 스캔 세션에서만 중복 확인)
+                scannedParts = {};
+                scannedUniqueCodes.clear();
+                scanCounts = {};
                 
                 // AS 차수인지 확인
                 if (shift === 'AS') {
@@ -647,7 +651,6 @@
                     showAsManualSection();
                     loadMasterParts(); // 마스터 파트 목록 로드
                     // AS 차수일 때는 기존 출고 데이터를 로드하지 않음
-                    scannedParts = {};
                 } else {
                     console.log('일반 차수 선택됨:', shift);
                     hideAsManualSection();
@@ -857,9 +860,9 @@
                 console.log('GS1-128 파싱 성공, 파트 번호:', parsedData.partNumber);
                 console.log('추출된 고유코드:', parsedData.uniqueNumber);
                 
-                // 고유코드 중복 검사
-                if (scannedUniqueCodes.has(parsedData.uniqueNumber)) {
-                    console.log('고유코드 중복 감지:', parsedData.uniqueNumber);
+                // 고유코드 중복 검사 (현재 스캔 세션에서만 확인, uniqueNumber가 있을 때만)
+                if (parsedData.uniqueNumber && scannedUniqueCodes.has(parsedData.uniqueNumber)) {
+                    console.log('고유코드 중복 감지 (현재 세션):', parsedData.uniqueNumber);
                     showNotification('❌ 중복이다', 'error');
                     
                     // 바코드 입력창에 시각적 피드백 제공
@@ -895,10 +898,12 @@
                     scanCounts[parsedData.partNumber] = 0; // 스캔 횟수 초기화
                 }
                 
-                // 고유코드를 스캔된 목록에 추가
-                scannedUniqueCodes.add(parsedData.uniqueNumber);
-                console.log('고유코드 등록됨:', parsedData.uniqueNumber);
-                console.log('현재 스캔된 고유코드 목록:', Array.from(scannedUniqueCodes));
+                // 고유코드를 스캔된 목록에 추가 (uniqueNumber가 있을 때만)
+                if (parsedData.uniqueNumber) {
+                    scannedUniqueCodes.add(parsedData.uniqueNumber);
+                    console.log('고유코드 등록됨:', parsedData.uniqueNumber);
+                    console.log('현재 스캔된 고유코드 목록:', Array.from(scannedUniqueCodes));
+                }
                 
                 // 스캔된 수량을 해당 파트에 추가
                 part.scannedQuantity += parsedData.quantity;
