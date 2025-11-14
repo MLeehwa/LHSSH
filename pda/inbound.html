@@ -39,11 +39,15 @@
                 return;
             }
             
+            // 바코드 입력 버퍼 (PDA 스캐너용)
+            let barcodeBuffer = '';
+            
             // contenteditable input 이벤트로 바코드 입력 처리
             barcodeInput.addEventListener('input', function() {
                 const code = (this.textContent || this.innerText || '').trim();
                 console.log('input 이벤트 발생:', code);
                 if (code.length > 0) {
+                    barcodeBuffer = code;
                     // 바코드 패턴 확인 후 자동 스캔
                     checkAndAutoScan(code);
                 }
@@ -56,13 +60,20 @@
                 // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
                 if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault();
-                    // contenteditable 값 확인
-                    const code = getBarcodeValue();
-                    if (code.trim().length > 0) {
-                        console.log('Enter 키로 스캔 처리:', code);
+                    // 버퍼에 값이 있으면 스캔 처리
+                    if (barcodeBuffer.trim().length > 0) {
+                        console.log('Enter 키로 스캔 처리:', barcodeBuffer);
                         scanBarcode();
+                        barcodeBuffer = '';
                     }
                     return;
+                }
+                
+                // 일반 문자 입력은 버퍼에 추가
+                if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    barcodeBuffer += e.key;
+                    console.log('버퍼 업데이트:', barcodeBuffer);
+                    // contenteditable에 직접 입력되므로 input 이벤트가 발생할 것임
                 }
             });
             
@@ -89,16 +100,10 @@
             if (barcodeInput) {
                 barcodeInput.textContent = value || '';
                 barcodeInput.innerText = value || '';
-                // 프로그래밍 방식으로 변경할 때 input 이벤트를 수동으로 트리거
-                // (전역 keydown에서 setBarcodeValue 호출 시 input 이벤트가 자동 발생하지 않음)
-                if (value && value.length > 0) {
-                    const inputEvent = new Event('input', { bubbles: true, cancelable: true });
-                    barcodeInput.dispatchEvent(inputEvent);
-                }
             }
         }
         
-        // 바코드 자동 스캔 (입력이 멈추면 자동으로 스캔)
+        // 바코드 패턴 확인 및 자동 스캔
         let barcodeTimer = null;
         function checkAndAutoScan(value) {
             if (!value || value.trim().length === 0) return;
@@ -108,15 +113,24 @@
                 clearTimeout(barcodeTimer);
             }
             
-            // 일정 시간(200ms) 입력이 없으면 자동으로 스캔
-            // 스캐너는 보통 빠르게 입력하므로 짧은 시간 후 자동 처리
-            barcodeTimer = setTimeout(() => {
-                const currentValue = getBarcodeValue();
-                if (currentValue && currentValue.trim().length > 0) {
-                    console.log('바코드 입력 완료 (자동 스캔):', currentValue);
+            // GS1-128 바코드 패턴 확인
+            const isGS1BarcodePattern = /^\[\)>\*06:.*P\d{5}[a-zA-Z]+\d{3,4}.*7Q\d+.*3S[^:]+.*\*EOT$/.test(value);
+            
+            // 바코드 길이가 30자 이상이거나 GS1 패턴이 맞으면 자동 스캔
+            if (value.length >= 30 || (value.length >= 20 && isGS1BarcodePattern)) {
+                barcodeTimer = setTimeout(() => {
+                    console.log('바코드 입력 완료 (자동):', value);
                     scanBarcode();
-                }
-            }, 200);
+                }, 100);
+            } else {
+                // 일정 시간 입력이 없으면 자동으로 처리
+                barcodeTimer = setTimeout(() => {
+                    if (value.trim().length > 0) {
+                        console.log('바코드 입력 완료 (타이머):', value);
+                        scanBarcode();
+                    }
+                }, 200);
+            }
         }
         
         // 페이지 로드 시 바코드 입력 필드 설정
