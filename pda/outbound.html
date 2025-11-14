@@ -1255,6 +1255,8 @@
 
                 console.log('출고 파트 생성 성공');
 
+                // 3. 재고 차감 및 거래 내역 기록은 관리자 모드에서만 수행 (PDA에서는 제외)
+
                 const totalScannedQuantity = Object.values(scannedParts).reduce((sum, part) => sum + part.scannedQuantity, 0);
                 console.log('PDA 출고 등록 완료:', {
                     sequenceId: newSequence.id,

@@ -1255,31 +1255,7 @@
                         }
                     }
 
-                    // 3. 거래 내역 기록 (관리자모드와 동일)
-                    const transactionDate = today.includes('T') ? today.split('T')[0] : today;
-                    const finalStock = inventoryData ? (inventoryData.current_stock || 0) + part.quantity : part.quantity;
-                    
-                    const transactionData = {
-                        transaction_date: transactionDate,
-                        part_number: part.part_number,
-                        transaction_type: 'INBOUND',
-                        quantity: part.quantity,
-                        reference_id: selectedContainer.arn_number,
-                        notes: `입고 처리 - ARN: ${selectedContainer.arn_number} (PDA)`
-                    };
-                    
-                    console.log('거래 내역 삽입:', transactionData);
-                    const { error: transactionError } = await supabase
-                        .from('inventory_transactions')
-                        .insert(transactionData);
-                    
-                    if (transactionError) {
-                        console.error(`파트 ${part.part_number} 거래 내역 기록 실패:`, transactionError);
-                        showNotification(`거래 내역 삽입 오류: ${transactionError.message}`, 'error');
-                        throw transactionError;
-                    }
-                    
-                    console.log(`파트 ${part.part_number} 거래 내역 기록 완료`);
+                    // 3. 거래 내역 기록은 관리자 모드에서만 수행 (PDA에서는 제외)
                 }
                 
                 // 4. 컨테이너 상태를 COMPLETED로 변경
