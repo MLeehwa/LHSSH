@@ -56,25 +56,11 @@
                 }
             });
             
-            // Enter 키 처리
+            // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
             barcodeInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    const code = (this.textContent || this.innerText || '').trim();
-                    if (code.length > 0) {
-                        scanBarcode();
-                    }
                 }
-            });
-            
-            // 포커스 유지 (파트 섹션이 보일 때만)
-            barcodeInput.addEventListener('blur', function() {
-                setTimeout(() => {
-                    const partsSection = document.getElementById('partsSection');
-                    if (partsSection && !partsSection.classList.contains('hidden')) {
-                        this.focus();
-                    }
-                }, 50);
             });
             
             barcodeInputInitialized = true;
