@@ -703,6 +703,7 @@
                 // 스캔 중에는 partsSection을 숨기지 않음
                 if (!currentDate && !currentShift) {
                     document.getElementById('partsSection').classList.add('hidden');
+                    document.getElementById('cartSummarySection').classList.add('hidden');
                     document.getElementById('confirmationButtons').classList.add('hidden');
                     hideAsManualSection();
                 }
