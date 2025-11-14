@@ -455,24 +455,6 @@
             </div>
         </div>
 
-        <!-- 컨펌 버튼들 (차수 선택과 스캔 목록 사이) -->
-        <div id="confirmationButtons" class="hidden">
-            <div class="glass-card rounded-lg p-2 animate-slide-up">
-                <div class="flex space-x-2">
-                    <button onclick="confirmOutbound()" 
-                            class="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-all duration-300 transform hover:scale-105">
-                        <i class="fas fa-check text-lg"></i>
-                        <span class="font-semibold text-sm" data-i18n="confirm">확정</span>
-                    </button>
-                    <button onclick="cancelOutbound()" 
-                            class="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-all duration-300 transform hover:scale-105">
-                        <i class="fas fa-times text-lg"></i>
-                        <span class="font-semibold text-sm" data-i18n="cancel">취소</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- 바코드 스캔 섹션 (숨김 - 스캐너만 작동) -->
         <div id="scanSection" class="hidden" style="display: none;">
             <h2 class="text-sm font-bold text-gray-800 mb-1" data-i18n="barcode_scan">바코드 스캔</h2>
@@ -554,6 +536,24 @@
                 <div class="text-right">
                     <div class="text-2xl font-bold text-blue-600" id="scannedCount">0</div>
                     <div class="text-xs text-gray-500">스캔됨</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 컨펌 버튼들 (스캔 목록 바로 위) -->
+        <div id="confirmationButtons" class="hidden">
+            <div class="glass-card rounded-lg p-2 animate-slide-up">
+                <div class="flex space-x-2">
+                    <button onclick="confirmOutbound()" 
+                            class="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-all duration-300 transform hover:scale-105">
+                        <i class="fas fa-check text-lg"></i>
+                        <span class="font-semibold text-sm" data-i18n="confirm">확정</span>
+                    </button>
+                    <button onclick="cancelOutbound()" 
+                            class="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-all duration-300 transform hover:scale-105">
+                        <i class="fas fa-times text-lg"></i>
+                        <span class="font-semibold text-sm" data-i18n="cancel">취소</span>
+                    </button>
                 </div>
             </div>
         </div>
