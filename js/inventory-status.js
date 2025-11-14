@@ -1585,9 +1585,10 @@ class InventoryStatus {
         for (const row of data) {
             const partNumber = this.extractPartNumber(row);
             const quantity = this.extractQuantity(row);
+            const date = this.extractDate(row) || today; // 각 행의 날짜를 추출, 없으면 오늘 날짜 사용
             
             if (partNumber && quantity) {
-                await this.processInbound(partNumber, quantity, today);
+                await this.processInbound(partNumber, quantity, date);
             }
         }
     }
@@ -1611,6 +1612,77 @@ class InventoryStatus {
             }
         }
         return 0;
+    }
+
+    extractDate(row) {
+        // 다양한 날짜 컬럼명 확인
+        const dateKeys = ['날짜', 'Date', '입고일', '입고 날짜', '입고일자', 'date', 'A', 'a'];
+        
+        for (const key of dateKeys) {
+            if (row[key]) {
+                const dateValue = row[key];
+                if (!dateValue) return null;
+                
+                // 날짜 형식 변환
+                const dateStr = dateValue.toString().trim();
+                
+                // 이미 YYYY-MM-DD 형식인 경우
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    return dateStr;
+                }
+                
+                // Excel 날짜 숫자 형식인 경우 (예: 44927)
+                if (/^\d+$/.test(dateStr)) {
+                    const excelDate = parseInt(dateStr);
+                    // Excel의 날짜는 1900-01-01부터의 일수
+                    const date = new Date((excelDate - 25569) * 86400 * 1000);
+                    return date.toISOString().split('T')[0];
+                }
+                
+                // YYYY/MM/DD 또는 MM/DD/YYYY 형식
+                if (dateStr.includes('/')) {
+                    const parts = dateStr.split('/');
+                    if (parts.length === 3) {
+                        // YYYY/MM/DD 형식
+                        if (parts[0].length === 4) {
+                            return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                        }
+                        // MM/DD/YYYY 형식
+                        else {
+                            return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                        }
+                    }
+                }
+                
+                // Date 객체인 경우
+                if (dateValue instanceof Date) {
+                    return dateValue.toISOString().split('T')[0];
+                }
+                
+                // 다른 형식 시도
+                const parsedDate = new Date(dateStr);
+                if (!isNaN(parsedDate.getTime())) {
+                    return parsedDate.toISOString().split('T')[0];
+                }
+            }
+        }
+        
+        // 첫 번째 컬럼이 날짜인 경우 (A열)
+        const firstKey = Object.keys(row)[0];
+        if (firstKey && row[firstKey]) {
+            const dateValue = row[firstKey];
+            const dateStr = dateValue.toString().trim();
+            
+            // 날짜 형식인지 확인
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || 
+                /^\d{4}\/\d{2}\/\d{2}$/.test(dateStr) ||
+                /^\d{2}\/\d{2}\/\d{4}$/.test(dateStr) ||
+                /^\d+$/.test(dateStr)) {
+                return this.extractDate({ [firstKey]: dateValue });
+            }
+        }
+        
+        return null;
     }
 
     async processInbound(partNumber, quantity, date) {

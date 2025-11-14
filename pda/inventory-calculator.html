@@ -461,17 +461,37 @@
                 </div>
             </div>
             <div class="overflow-x-auto w-full">
-                <table class="w-full border-collapse table-auto" style="min-width: 700px; width: 100%;">
+                <table class="w-full border-collapse table-auto" style="min-width: 1160px; width: 100%;">
                     <thead>
                         <tr class="bg-gray-100">
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center" style="width: 40px; min-width: 40px;" data-i18n="no">번호</th>
                             <th class="border-2 border-gray-400 px-2 py-2 text-sm font-semibold text-gray-800 text-center" style="width: 130px; min-width: 130px;" data-i18n="part_number">파트</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 55px; min-width: 55px;">박스<br>수량</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 40px; min-width: 40px;" data-i18n="box1_subtotal">박스<br>소계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 55px; min-width: 55px;">렉<br>수량</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 40px; min-width: 40px;" data-i18n="rack_subtotal">렉<br>소계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="5" style="min-width: 200px;">박스</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 50px; min-width: 50px;" data-i18n="box1_subtotal">박스<br>소계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="3" style="min-width: 120px;">렉</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 50px; min-width: 50px;" data-i18n="rack_subtotal">렉<br>소계</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 50px; min-width: 50px;" data-i18n="remaining_quantity">잔량</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-red-50" style="width: 80px; min-width: 80px; border-left: 3px solid #ef4444;" data-i18n="total">총합계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-sm font-bold text-gray-800 text-center bg-red-50" style="width: 80px; min-width: 80px; border-left: 3px solid #ef4444;" data-i18n="total">총합계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-sm font-bold text-blue-800 text-center bg-blue-50" style="width: 80px; min-width: 80px;" data-i18n="system_stock">시스템 재고</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-sm font-bold text-gray-800 text-center bg-gray-50" style="width: 80px; min-width: 80px;">차이</th>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center"></th>
+                            <th class="border-2 border-gray-400 px-2 py-2 text-sm font-semibold text-gray-800 text-center"></th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">1</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">2</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">3</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">4</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">5</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100"></th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">1</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">2</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">3</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100"></th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"></th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-red-50"></th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-blue-50"></th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"></th>
                         </tr>
                     </thead>
                     <tbody id="calculationTableBody">
@@ -481,20 +501,6 @@
             </div>
         </div>
 
-        <!-- 요약 정보 -->
-        <div class="glass-card p-4 mb-4">
-            <h2 class="text-lg font-bold text-gray-800 mb-3" data-i18n="summary">요약</h2>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <span class="text-sm text-gray-600" data-i18n="total_parts">총 파트 수:</span>
-                    <span class="text-lg font-bold text-gray-800 ml-2" id="summaryPartCount">0</span>
-                </div>
-                <div>
-                    <span class="text-sm text-gray-600" data-i18n="total_quantity">총 수량:</span>
-                    <span class="text-lg font-bold text-blue-600 ml-2" id="summaryTotalQuantity">0</span>
-                </div>
-            </div>
-        </div>
     </main>
 
     <!-- 하단 고정 버튼 -->
@@ -545,18 +551,14 @@
             }
             
             try {
-                const productTypeFilter = document.getElementById('productTypeFilter')?.value || 'all';
-                console.log('파트 목록 로드 시작... (필터:', productTypeFilter, ')');
+                console.log('파트 목록 로드 시작... (AS 파트 제외)');
                 
+                // AS 파트 제외하고 로드
                 let query = supabaseClient
                     .from('parts')
                     .select('part_number, description, category, product_type')
-                    .eq('status', 'ACTIVE');
-                
-                // 제품 유형 필터 적용
-                if (productTypeFilter !== 'all') {
-                    query = query.eq('product_type', productTypeFilter);
-                }
+                    .eq('status', 'ACTIVE')
+                    .neq('product_type', 'AS'); // AS 파트 제외
                 
                 const { data, error } = await query.order('part_number');
                 
@@ -689,7 +691,7 @@
                 const headerRow = document.createElement('tr');
                 headerRow.className = 'bg-blue-100 table-row';
                 headerRow.innerHTML = `
-                    <td colspan="14" class="border-2 border-gray-400 px-3 py-2 font-bold text-blue-800 text-center">
+                    <td colspan="16" class="border-2 border-gray-400 px-3 py-2 font-bold text-blue-800 text-center">
                         INNER (${innerParts.length}개)
                     </td>
                 `;
@@ -706,7 +708,7 @@
                 const headerRow = document.createElement('tr');
                 headerRow.className = 'bg-green-100 table-row';
                 headerRow.innerHTML = `
-                    <td colspan="14" class="border-2 border-gray-400 px-3 py-2 font-bold text-green-800 text-center">
+                    <td colspan="16" class="border-2 border-gray-400 px-3 py-2 font-bold text-green-800 text-center">
                         REAR (${allRearParts.length}개)
                     </td>
                 `;
@@ -753,7 +755,7 @@
                 const headerRow = document.createElement('tr');
                 headerRow.className = 'bg-gray-100 table-row';
                 headerRow.innerHTML = `
-                    <td colspan="14" class="border-2 border-gray-400 px-3 py-2 font-bold text-gray-800 text-center">
+                    <td colspan="16" class="border-2 border-gray-400 px-3 py-2 font-bold text-gray-800 text-center">
                         기타 (${otherParts.length}개)
                     </td>
                 `;
@@ -768,7 +770,6 @@
                 statusEl.textContent = `총 ${allParts.length}개 파트`;
             }
             
-            updateSummary();
         }
 
         // 개별 파트 행 추가
@@ -786,58 +787,68 @@
                 ? `${part.part_number} - ${part.description}`
                 : `${part.part_number}${part.category ? ' - ' + part.category : ''}`;
             
+            // 박스 5개 인풋 생성
+            let boxInputs = '';
+            for (let i = 1; i <= 5; i++) {
+                const nextInput = i === 5 ? 'rack1' : `box${i + 1}`;
+                boxInputs += `
+                    <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 40px; min-width: 40px;">
+                        <input type="number" class="table-input w-full rounded text-center" 
+                               min="0" oninput="calculateRowTotal('${rowId}')" 
+                               onkeydown="handleInputKeydown(event, '${rowId}', '${nextInput}')"
+                               onfocus="highlightRow('${rowId}')"
+                               onblur="unhighlightRow('${rowId}')"
+                               data-row="${rowId}" data-type="box${i}" placeholder="" id="box${i}-${rowId}" inputmode="numeric">
+                    </td>
+                `;
+            }
+            
+            // 렉 3개 인풋 생성
+            let rackInputs = '';
+            for (let i = 1; i <= 3; i++) {
+                const nextInput = i === 3 ? 'remaining' : `rack${i + 1}`;
+                rackInputs += `
+                    <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 40px; min-width: 40px;">
+                        <input type="number" class="table-input w-full rounded text-center" 
+                               min="0" oninput="calculateRowTotal('${rowId}')" 
+                               onkeydown="handleInputKeydown(event, '${rowId}', '${nextInput}')"
+                               onfocus="highlightRow('${rowId}')"
+                               onblur="unhighlightRow('${rowId}')"
+                               data-row="${rowId}" data-type="rack${i}" placeholder="" id="rack${i}-${rowId}" inputmode="numeric">
+                    </td>
+                `;
+            }
+            
             row.innerHTML = `
                 <td class="border-2 border-gray-400 px-1 py-1 text-center text-xs font-semibold" style="width: 40px; min-width: 40px;">${rowNumber}</td>
                 <td class="border-2 border-gray-400 px-2 py-1" id="part-cell-${rowId}" style="width: 130px; min-width: 130px;">
                     <div class="text-lg font-bold text-gray-800">${part.part_number}</div>
                     ${part.description ? `<div class="text-xs text-gray-600 mt-1">${part.description}</div>` : ''}
                 </td>
-                <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 55px; min-width: 55px;">
-                    <div class="quantity-control">
-                        <button type="button" class="quantity-btn decrease" onclick="adjustQuantity('${rowId}', 'box1-qty', -1)" title="감소">−</button>
-                        <input type="number" class="table-input rounded" 
-                               min="0" value="0" oninput="calculateRowTotal('${rowId}')" 
-                               onkeydown="handleInputKeydown(event, '${rowId}', 'rack-qty')"
-                               onfocus="highlightRow('${rowId}')"
-                               onblur="unhighlightRow('${rowId}')"
-                               data-row="${rowId}" data-type="box1-qty" placeholder="0" id="box1-qty-${rowId}" inputmode="numeric">
-                        <button type="button" class="quantity-btn" onclick="adjustQuantity('${rowId}', 'box1-qty', 1)" title="증가">+</button>
-                    </div>
+                ${boxInputs}
+                <td class="border-2 border-gray-400 px-1 py-1 text-center bg-gray-100" style="width: 50px; min-width: 50px;">
+                    <span class="subtotal-cell text-gray-800 font-bold text-sm" data-row="${rowId}" data-type="box-total">0</span>
                 </td>
-                <td class="border-2 border-gray-400 px-1 py-1 text-center bg-gray-100" style="width: 40px; min-width: 40px;">
-                    <span class="subtotal-cell text-gray-800 font-bold text-sm" data-row="${rowId}" data-type="box1-total">0</span>
-                </td>
-                <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 55px; min-width: 55px;">
-                    <div class="quantity-control">
-                        <button type="button" class="quantity-btn decrease" onclick="adjustQuantity('${rowId}', 'rack-qty', -1)" title="감소">−</button>
-                        <input type="number" class="table-input rounded" 
-                               min="0" value="0" oninput="calculateRowTotal('${rowId}')" 
-                               onkeydown="handleInputKeydown(event, '${rowId}', 'remaining')"
-                               onfocus="highlightRow('${rowId}')"
-                               onblur="unhighlightRow('${rowId}')"
-                               data-row="${rowId}" data-type="rack-qty" placeholder="0" id="rack-qty-${rowId}" inputmode="numeric">
-                        <button type="button" class="quantity-btn" onclick="adjustQuantity('${rowId}', 'rack-qty', 1)" title="증가">+</button>
-                    </div>
-                </td>
-                <td class="border-2 border-gray-400 px-1 py-1 text-center bg-gray-100" style="width: 40px; min-width: 40px;">
+                ${rackInputs}
+                <td class="border-2 border-gray-400 px-1 py-1 text-center bg-gray-100" style="width: 50px; min-width: 50px;">
                     <span class="subtotal-cell text-gray-800 font-bold text-sm" data-row="${rowId}" data-type="rack-total">0</span>
                 </td>
                 <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 50px; min-width: 50px;">
                     <input type="number" class="table-input w-full rounded" 
-                           min="0" value="0" oninput="calculateRowTotal('${rowId}')" 
+                           min="0" oninput="calculateRowTotal('${rowId}')" 
                            onkeydown="handleInputKeydown(event, '${rowId}', null)"
                            onfocus="highlightRow('${rowId}')"
                            onblur="unhighlightRow('${rowId}')"
-                           data-row="${rowId}" data-type="remaining" placeholder="0" id="remaining-${rowId}" inputmode="numeric">
+                           data-row="${rowId}" data-type="remaining" placeholder="" id="remaining-${rowId}" inputmode="numeric">
                 </td>
-                <td class="border-2 border-gray-400 px-1 py-1 text-center" id="total-cell-${rowId}" style="width: 80px; min-width: 80px; border-left: 3px solid #ef4444; background-color: #fee2e2;">
-                    <div class="flex flex-col items-center">
-                        <span class="total-cell text-red-800 font-bold text-base" data-row="${rowId}" data-type="total">0</span>
-                        <div class="text-xs mt-1">
-                            <div class="text-gray-600">시스템: <span class="font-semibold" data-row="${rowId}" data-type="system-stock">-</span></div>
-                            <div class="text-gray-600">차이: <span class="font-semibold" data-row="${rowId}" data-type="difference">-</span></div>
-                        </div>
-                    </div>
+                <td class="border-2 border-gray-400 px-1 py-2 text-center" id="total-cell-${rowId}" style="width: 80px; min-width: 80px; border-left: 3px solid #ef4444; background-color: #fee2e2;">
+                    <span class="total-cell text-red-800 font-bold text-lg" data-row="${rowId}" data-type="total">0</span>
+                </td>
+                <td class="border-2 border-gray-400 px-1 py-2 text-center bg-blue-50" style="width: 80px; min-width: 80px;">
+                    <span class="text-blue-800 font-bold text-lg" data-row="${rowId}" data-type="system-stock">-</span>
+                </td>
+                <td class="border-2 border-gray-400 px-1 py-2 text-center bg-gray-50" id="difference-cell-${rowId}" style="width: 80px; min-width: 80px;">
+                    <span class="font-bold text-lg" data-row="${rowId}" data-type="difference">-</span>
                 </td>
             `;
             
@@ -861,8 +872,9 @@
             const systemStockEl = document.querySelector(`[data-row="${rowId}"][data-type="system-stock"]`);
             const differenceEl = document.querySelector(`[data-row="${rowId}"][data-type="difference"]`);
             const totalCell = document.getElementById(`total-cell-${rowId}`);
+            const differenceCell = document.getElementById(`difference-cell-${rowId}`);
             
-            if (!totalEl || !systemStockEl || !differenceEl || !totalCell) return;
+            if (!totalEl || !systemStockEl || !differenceEl || !totalCell || !differenceCell) return;
             
             const total = parseFloat(totalEl.textContent.replace(/,/g, '')) || 0;
             const difference = total - systemStock;
@@ -870,22 +882,28 @@
             systemStockEl.textContent = systemStock.toLocaleString();
             differenceEl.textContent = difference > 0 ? `+${difference.toLocaleString()}` : difference.toLocaleString();
             
-            // 차이가 0이면 초록색 배경, 양수면 주황색 배경, 음수면 빨간색 배경
+            // 시스템 재고 스타일 (항상 파란색, 큰 글씨)
+            systemStockEl.className = 'text-blue-800 font-bold text-lg';
+            
+            // 총합계와 차이 셀 색상 설정
             if (difference === 0) {
-                differenceEl.className = 'font-semibold text-green-600';
-                totalEl.className = 'total-cell text-green-800 font-bold text-base';
+                differenceEl.className = 'font-bold text-lg text-green-700';
+                totalEl.className = 'total-cell text-green-800 font-bold text-lg';
                 totalCell.style.backgroundColor = '#dcfce7'; // 초록색 배경
                 totalCell.style.borderLeftColor = '#10b981';
+                differenceCell.style.backgroundColor = '#dcfce7';
             } else if (difference > 0) {
-                differenceEl.className = 'font-semibold text-orange-600';
-                totalEl.className = 'total-cell text-orange-800 font-bold text-base';
+                differenceEl.className = 'font-bold text-lg text-orange-700';
+                totalEl.className = 'total-cell text-orange-800 font-bold text-lg';
                 totalCell.style.backgroundColor = '#fed7aa'; // 주황색 배경
                 totalCell.style.borderLeftColor = '#f97316';
+                differenceCell.style.backgroundColor = '#fed7aa';
             } else {
-                differenceEl.className = 'font-semibold text-red-600';
-                totalEl.className = 'total-cell text-red-800 font-bold text-base';
+                differenceEl.className = 'font-bold text-lg text-red-700';
+                totalEl.className = 'total-cell text-red-800 font-bold text-lg';
                 totalCell.style.backgroundColor = '#fee2e2'; // 빨간색 배경
                 totalCell.style.borderLeftColor = '#ef4444';
+                differenceCell.style.backgroundColor = '#fee2e2';
             }
         }
 
@@ -963,34 +981,40 @@
             const row = document.getElementById(rowId);
             if (!row) return;
             
-            // 박스1: 파트 번호에 따라 자동으로 INNER/REAR 구분하여 계산
+            // 파트 번호에 따라 자동으로 INNER/REAR 구분하여 UNIT 결정
             const partNumber = row.dataset.partNumber;
-            const box1Qty = parseFloat(row.querySelector('[data-type="box1-qty"]').value) || 0;
-            let box1Unit = 0;
-            if (partNumber && partNumber.startsWith('49560')) {
-                box1Unit = 84; // INNER
-            } else if (partNumber && (partNumber.startsWith('49600') || partNumber.startsWith('49601'))) {
-                box1Unit = 80; // REAR
-            }
-            const box1Total = box1Unit * box1Qty;
-            
-            // 렉: 파트 번호에 따라 자동으로 INNER/REAR 구분하여 계산
-            const rackQty = parseFloat(row.querySelector('[data-type="rack-qty"]').value) || 0;
+            let boxUnit = 0;
             let rackUnit = 0;
+            
             if (partNumber && partNumber.startsWith('49560')) {
-                rackUnit = partNumber === '49560-DO000' ? 64 : 40; // INNER
+                boxUnit = 84; // INNER 박스 UNIT
+                rackUnit = partNumber === '49560-DO000' ? 64 : 40; // INNER 렉 UNIT
             } else if (partNumber && (partNumber.startsWith('49600') || partNumber.startsWith('49601'))) {
-                rackUnit = 50; // REAR
+                boxUnit = 80; // REAR 박스 UNIT
+                rackUnit = 50; // REAR 렉 UNIT
             }
-            const rackTotal = rackUnit * rackQty;
+            
+            // 박스 5개 합계 계산
+            let boxTotal = 0;
+            for (let i = 1; i <= 5; i++) {
+                const boxQty = parseFloat(row.querySelector(`[data-type="box${i}"]`)?.value) || 0;
+                boxTotal += boxUnit * boxQty;
+            }
+            
+            // 렉 3개 합계 계산
+            let rackTotal = 0;
+            for (let i = 1; i <= 3; i++) {
+                const rackQty = parseFloat(row.querySelector(`[data-type="rack${i}"]`)?.value) || 0;
+                rackTotal += rackUnit * rackQty;
+            }
             
             // 잔량
-            const remaining = parseFloat(row.querySelector('[data-type="remaining"]').value) || 0;
+            const remaining = parseFloat(row.querySelector('[data-type="remaining"]')?.value) || 0;
             
-            // 각 항목별 합계 표시 (총합만)
-            const box1TotalEl = row.querySelector('[data-type="box1-total"]');
-            if (box1TotalEl) {
-                box1TotalEl.textContent = box1Total.toLocaleString();
+            // 각 항목별 합계 표시
+            const boxTotalEl = row.querySelector('[data-type="box-total"]');
+            if (boxTotalEl) {
+                boxTotalEl.textContent = boxTotal.toLocaleString();
             }
             
             const rackTotalEl = row.querySelector('[data-type="rack-total"]');
@@ -999,7 +1023,7 @@
             }
             
             // 총 합계
-            const total = box1Total + rackTotal + remaining;
+            const total = boxTotal + rackTotal + remaining;
             
             // 총합계 표시
             const totalEl = row.querySelector('[data-type="total"]');
@@ -1025,7 +1049,6 @@
             }
             
             // 요약 업데이트
-            updateSummary();
         }
 
 
@@ -1148,10 +1171,10 @@
                     return;
                 }
                 
-                // nextType이 'box1-total'이나 'rack-total'이면 다음 입력 필드로 이동
+                // nextType이 'box-total'이나 'rack-total'이면 다음 입력 필드로 이동
                 let nextInput = null;
-                if (nextType === 'box1-total') {
-                    nextInput = document.querySelector(`[data-row="${rowId}"][data-type="rack-qty"]`);
+                if (nextType === 'box-total') {
+                    nextInput = document.querySelector(`[data-row="${rowId}"][data-type="rack1"]`);
                 } else if (nextType === 'rack-total') {
                     nextInput = document.querySelector(`[data-row="${rowId}"][data-type="remaining"]`);
                 } else {
@@ -1186,8 +1209,8 @@
                 // 모든 입력 필드 초기화
                 const inputs = row.querySelectorAll('input[type="number"]');
                 inputs.forEach(input => {
-                    // 모든 수량 필드는 0으로 초기화
-                    input.value = '0';
+                    // 모든 수량 필드는 빈 값으로 초기화
+                    input.value = '';
                 });
                 
                 // 합계 재계산
@@ -1197,7 +1220,6 @@
             });
             
             // 요약 정보 업데이트
-            updateSummary();
             
             // 세션 선택 초기화 (선택 사항)
             // selectedSessionId는 유지하여 같은 세션에 계속 추가할 수 있도록 함
@@ -1595,30 +1617,41 @@
                 }
                 
                 // 입력값 수집
-                // 박스1: 파트 번호에 따라 자동으로 INNER/REAR 구분하여 계산
-                const box1Qty = parseFloat(row.querySelector('[data-type="box1-qty"]')?.value) || 0;
-                let box1Unit = 0;
-                if (partNumber && partNumber.startsWith('49560')) {
-                    box1Unit = 84; // INNER
-                } else if (partNumber && (partNumber.startsWith('49600') || partNumber.startsWith('49601'))) {
-                    box1Unit = 80; // REAR
-                }
-                const box1Total = box1Unit * box1Qty;
-                
-                // 렉: 파트 번호에 따라 자동으로 INNER/REAR 구분하여 계산
-                const rackQty = parseFloat(row.querySelector('[data-type="rack-qty"]')?.value) || 0;
+                // 파트 번호에 따라 자동으로 INNER/REAR 구분하여 UNIT 결정
+                let boxUnit = 0;
                 let rackUnit = 0;
                 if (partNumber && partNumber.startsWith('49560')) {
-                    rackUnit = partNumber === '49560-DO000' ? 64 : 40; // INNER
+                    boxUnit = 84; // INNER 박스 UNIT
+                    rackUnit = partNumber === '49560-DO000' ? 64 : 40; // INNER 렉 UNIT
                 } else if (partNumber && (partNumber.startsWith('49600') || partNumber.startsWith('49601'))) {
-                    rackUnit = 50; // REAR
+                    boxUnit = 80; // REAR 박스 UNIT
+                    rackUnit = 50; // REAR 렉 UNIT
                 }
-                const rackTotal = rackUnit * rackQty;
+                
+                // 박스 5개 합계 계산
+                let boxTotal = 0;
+                const boxes = [];
+                for (let i = 1; i <= 5; i++) {
+                    const boxQty = parseFloat(row.querySelector(`[data-type="box${i}"]`)?.value) || 0;
+                    const boxValue = boxUnit * boxQty;
+                    boxTotal += boxValue;
+                    if (boxValue > 0) boxes.push(boxValue);
+                }
+                
+                // 렉 3개 합계 계산
+                let rackTotal = 0;
+                const racks = [];
+                for (let i = 1; i <= 3; i++) {
+                    const rackQty = parseFloat(row.querySelector(`[data-type="rack${i}"]`)?.value) || 0;
+                    const rackValue = rackUnit * rackQty;
+                    rackTotal += rackValue;
+                    if (rackValue > 0) racks.push(rackValue);
+                }
                 
                 const remaining = parseFloat(row.querySelector('[data-type="remaining"]')?.value) || 0;
                 
                 // 합계 계산
-                const total = box1Total + rackTotal + remaining;
+                const total = boxTotal + rackTotal + remaining;
                 
                 // 숫자를 하나도 세지 않은 파트는 제외 (실사재고를 하지 않은 것으로 처리)
                 // 0으로 저장하지 않고, 해당 파트는 실사재고 목록에 포함되지 않음
@@ -1628,12 +1661,6 @@
                 const part = allParts.find(p => p.part_number === partNumber);
                 
                 // 계산 상세 정보
-                const boxes = [];
-                if (box1Total > 0) boxes.push(box1Total);
-                
-                const racks = [];
-                if (rackTotal > 0) racks.push(rackTotal);
-                
                 const remainings = remaining > 0 ? [remaining] : [];
                 
                 parts.push({

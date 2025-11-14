@@ -94,25 +94,78 @@
             });
         }
         
-        // 바코드 입력 필드 특별 처리
+        // contenteditable 헬퍼 함수
+        function getBarcodeValue() {
+            const barcodeInput = document.getElementById('barcodeInput');
+            if (!barcodeInput) return '';
+            return (barcodeInput.textContent || barcodeInput.innerText || '').trim();
+        }
+        
+        function setBarcodeValue(value) {
+            const barcodeInput = document.getElementById('barcodeInput');
+            if (barcodeInput) {
+                barcodeInput.textContent = value || '';
+                barcodeInput.innerText = value || '';
+            }
+        }
+        
+        // 바코드 입력 필드 특별 처리 (contenteditable 사용, 키보드 비활성화)
         function setupBarcodeInput() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
-                // 바코드 입력 시 키보드 숨김 (입력 완료 후)
-                barcodeInput.addEventListener('input', function() {
-                    // 입력이 완료된 후 키보드 숨김
-                    setTimeout(hideKeyboard, 500);
-                });
+                // contenteditable은 키보드를 띄우지 않음
+                // 자동 포커스 설정
+                setTimeout(() => {
+                    barcodeInput.focus();
+                }, 300);
                 
-                // 바코드 입력 완료 시 키보드 숨김
-                barcodeInput.addEventListener('keypress', function(e) {
+                // 키 입력 이벤트 처리
+                barcodeInput.addEventListener('keydown', function(e) {
+                    // Enter 키 처리
                     if (e.key === 'Enter') {
-                        setTimeout(hideKeyboard, 200);
+                        e.preventDefault();
+                        const text = getBarcodeValue();
+                        if (text.trim()) {
+                            scanBarcode();
+                        }
+                        setBarcodeValue('');
+                        return;
+                    }
+                    // 일반 문자 입력은 자동으로 contenteditable에 추가됨
+                    // 입력 후 약간의 지연을 두고 처리
+                    if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                        setTimeout(() => {
+                            const text = getBarcodeValue();
+                            if (text) {
+                                checkAndAutoScan(text);
+                            }
+                        }, 10);
                     }
                 });
                 
-                // 바코드 입력 필드 포커스는 자유롭게 허용
-                // (스캔을 위해 포커스 제어하지 않음)
+                // paste 이벤트 처리
+                barcodeInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    if (pastedText) {
+                        setBarcodeValue(pastedText);
+                        setTimeout(() => {
+                            const text = getBarcodeValue();
+                            if (text) {
+                                checkAndAutoScan(text);
+                            }
+                        }, 10);
+                    }
+                });
+                
+                // 포커스 유지
+                barcodeInput.addEventListener('blur', function() {
+                    setTimeout(() => {
+                        if (currentShift) {
+                            this.focus();
+                        }
+                    }, 100);
+                });
             }
         }
         
@@ -473,8 +526,28 @@
         </div>
 
 
-        <!-- Hidden Barcode Input (for global scanning) -->
-        <input type="text" id="barcodeInput" class="hidden" autocomplete="off">
+        <!-- 바코드 스캔 섹션 -->
+        <div id="scanSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="barcode_scan">바코드 스캔</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="part_number_scan">파트 번호 스캔</label>
+                    <div class="flex space-x-2">
+                        <!-- 보이지 않는 contenteditable 박스 (스캐너 전용) -->
+                        <div id="barcodeInput" contenteditable="true" 
+                             class="absolute opacity-0 pointer-events-none" 
+                             style="position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px;"
+                             autocomplete="off"></div>
+                        <div class="scan-input flex-1 flex items-center justify-center text-gray-500" style="min-height: 48px;">
+                            <span data-i18n="scan_barcode_placeholder">바코드를 스캔하세요</span>
+                        </div>
+                        <button onclick="clearScan()" class="action-button cancel-btn px-4 py-3 text-white" title="초기화">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- AS Manual Input Section (only visible for AS shift) -->
         <div id="asManualSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
@@ -647,13 +720,22 @@
                     });
                 }
                 
+                // 바코드 스캔 섹션 표시
+                document.getElementById('scanSection').classList.remove('hidden');
                 document.getElementById('partsSection').classList.remove('hidden');
                 
-                // 전역 바코드 스캔이 활성화되어 있으므로 별도 포커스 불필요
+                // 바코드 입력 필드에 포커스
+                setTimeout(() => {
+                    const barcodeInput = document.getElementById('barcodeInput');
+                    if (barcodeInput) {
+                        barcodeInput.focus();
+                    }
+                }, 300);
                 
                 console.log('화면 업데이트 완료');
             } else {
                 console.log('날짜 또는 차수가 선택되지 않음, 화면 숨김');
+                document.getElementById('scanSection').classList.add('hidden');
                 document.getElementById('partsSection').classList.add('hidden');
                 document.getElementById('confirmationButtons').classList.add('hidden');
                 hideAsManualSection();
@@ -757,16 +839,15 @@
                     const barcodeInput = document.getElementById('barcodeInput');
                     barcodeInput.style.backgroundColor = '#fee2e2'; // 빨간색 배경
                     barcodeInput.style.borderColor = '#ef4444'; // 빨간색 테두리
-                    barcodeInput.placeholder = `중복 스캔: ${parsedData.uniqueNumber}`;
+                    // contenteditable은 placeholder를 지원하지 않음
                     
                     // 1.5초 후 원래 상태로 복원
                     setTimeout(() => {
                         barcodeInput.style.backgroundColor = '';
                         barcodeInput.style.borderColor = '';
-                        barcodeInput.placeholder = i18n.t('scan_barcode_placeholder');
-                        barcodeInput.value = '';
+                        // contenteditable은 placeholder를 지원하지 않음
+                        setBarcodeValue('');
                         barcodeInput.focus();
-                        barcodeInput.select();
                     }, 1500);
                     
                     return false;
@@ -808,10 +889,10 @@
                 
                 // 입력 필드 초기화 및 포커스 유지
                 const barcodeInput = document.getElementById('barcodeInput');
-                barcodeInput.value = '';
+                setBarcodeValue('');
                 setTimeout(() => {
                     barcodeInput.focus();
-                    barcodeInput.select();
+                    // contenteditable은 select()를 지원하지 않음
                 }, 100);
                 
                 return true;
@@ -877,10 +958,10 @@
                 
                 // 입력 필드 초기화 및 포커스 유지
                 const barcodeInput = document.getElementById('barcodeInput');
-                barcodeInput.value = '';
+                setBarcodeValue('');
                 setTimeout(() => {
                     barcodeInput.focus();
-                    barcodeInput.select();
+                    // contenteditable은 select()를 지원하지 않음
                 }, 100);
                 
                 return true;
@@ -1057,11 +1138,15 @@
 
         // 바코드 스캔 시뮬레이션
         function scanBarcode() {
-            const input = document.getElementById('barcodeInput');
-            const barcode = input.value.trim();
+            const barcode = getBarcodeValue();
             
             if (barcode) {
                 handleBarcodeScan(barcode);
+                setBarcodeValue(''); // 스캔 후 초기화
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (barcodeInput) {
+                    setTimeout(() => barcodeInput.focus(), 100);
+                }
             } else {
                 showNotification('바코드를 입력하거나 스캔하세요.', 'warning');
             }
@@ -1077,7 +1162,7 @@
             // UI 초기화
             renderPartsList();
             updateProgress();
-            document.getElementById('barcodeInput').value = '';
+            setBarcodeValue('');
             
             // 진행 상황 및 확인 버튼 숨기기
             document.getElementById('scanProgressSection').classList.add('hidden');
@@ -1211,7 +1296,7 @@
             // UI 초기화
             renderPartsList();
             updateProgress();
-            document.getElementById('barcodeInput').value = '';
+            setBarcodeValue('');
             document.getElementById('confirmationSection').classList.add('hidden');
             
             showNotification('출고가 취소되었습니다.', 'info');
@@ -1225,6 +1310,7 @@
             
             document.getElementById('dateSelect').value = '';
             document.getElementById('shiftSelect').value = '';
+            document.getElementById('scanSection').classList.add('hidden');
             document.getElementById('partsSection').classList.add('hidden');
             document.getElementById('scanProgressSection').classList.add('hidden');
             document.getElementById('confirmationButtons').classList.add('hidden');
@@ -1259,6 +1345,37 @@
         let globalBarcodeBuffer = '';
         let globalBarcodeTimer = null;
         const BARCODE_TIMEOUT = 100; // 바코드 입력 완료 판단 시간 (ms)
+        
+        // 바코드 패턴 확인 및 자동 스캔 함수
+        function checkAndAutoScan(value) {
+            if (!value || !value.trim().length === 0) {
+                return;
+            }
+            
+            // 타이머 리셋 (연속 입력 중)
+            if (globalBarcodeTimer) {
+                clearTimeout(globalBarcodeTimer);
+            }
+            
+            // GS1-128 바코드 패턴 확인
+            const isGS1BarcodePattern = /^\[\)>\*06:.*P\d{5}[a-zA-Z]+\d{3,4}.*7Q\d+.*3S[^:]+.*\*EOT$/.test(value);
+            
+            // 바코드 길이가 30자 이상이거나 GS1 패턴이 맞으면 자동 스캔
+            if (value.length >= 30 || (value.length >= 20 && isGS1BarcodePattern)) {
+                globalBarcodeTimer = setTimeout(() => {
+                    console.log('바코드 입력 완료 (자동):', value);
+                    scanBarcode();
+                }, 100);
+            } else {
+                // 일정 시간 입력이 없으면 자동으로 처리
+                globalBarcodeTimer = setTimeout(() => {
+                    if (value.trim().length > 0) {
+                        console.log('바코드 입력 완료 (타이머):', value);
+                        scanBarcode();
+                    }
+                }, BARCODE_TIMEOUT);
+            }
+        }
         let isGlobalBarcodeEnabled = false; // 차수 선택 후에만 활성화
 
         // 전역 바코드 입력 상태 표시
@@ -1398,7 +1515,7 @@
                     // 바코드 입력창에 값 설정하고 스캔 실행
                     const barcodeInput = document.getElementById('barcodeInput');
                     if (barcodeInput) {
-                        barcodeInput.value = globalBarcodeBuffer;
+                        setBarcodeValue(globalBarcodeBuffer);
                         scanBarcode();
                     }
                     
@@ -1454,7 +1571,7 @@
                             // 바코드 입력창에 값 설정하고 스캔 실행
                             const barcodeInput = document.getElementById('barcodeInput');
                             if (barcodeInput) {
-                                barcodeInput.value = globalBarcodeBuffer;
+                                setBarcodeValue(globalBarcodeBuffer);
                                 scanBarcode();
                             }
                             
@@ -1485,8 +1602,10 @@
                 }
                 
                 // 파트 섹션이 보일 때만 전역 바코드 입력 처리
+                const scanSection = document.getElementById('scanSection');
                 const partsSection = document.getElementById('partsSection');
-                if (partsSection && !partsSection.classList.contains('hidden')) {
+                if (scanSection && !scanSection.classList.contains('hidden') && 
+                    partsSection && !partsSection.classList.contains('hidden')) {
                     // Ctrl+V (붙여넣기) 처리
                     if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
                         e.preventDefault();
@@ -1494,15 +1613,15 @@
                         const barcodeInput = document.getElementById('barcodeInput');
                         if (barcodeInput) {
                             barcodeInput.focus();
-                            barcodeInput.select();
+                            // contenteditable은 select()를 지원하지 않음
                             // 클립보드에서 붙여넣기 (비동기)
                             navigator.clipboard.readText().then(text => {
                                 console.log('클립보드에서 붙여넣기:', text);
-                                barcodeInput.value = text;
+                                setBarcodeValue(text);
                                 // 바코드가 입력되면 자동 스캔
                                 setTimeout(() => {
-                                    if (barcodeInput.value.trim().length > 0) {
-                                        console.log('붙여넣기 후 자동 스캔:', barcodeInput.value);
+                                    if (getBarcodeValue().length > 0) {
+                                        console.log('붙여넣기 후 자동 스캔:', getBarcodeValue());
                                         scanBarcode();
                                     }
                                 }, 150);
@@ -1530,8 +1649,10 @@
             
             // 붙여넣기 이벤트 리스너 추가 (모든 경우 처리)
             document.addEventListener('paste', function(e) {
+                const scanSection = document.getElementById('scanSection');
                 const partsSection = document.getElementById('partsSection');
-                if (!partsSection || partsSection.classList.contains('hidden')) {
+                if (!scanSection || scanSection.classList.contains('hidden') ||
+                    !partsSection || partsSection.classList.contains('hidden')) {
                     return;
                 }
                 
@@ -1546,17 +1667,17 @@
                     e.preventDefault();
                     e.stopPropagation();
                     barcodeInput.focus();
-                    barcodeInput.select();
+                    // contenteditable은 select()를 지원하지 않음
                     
                     // 클립보드 데이터 가져오기
                     const pastedText = (e.clipboardData || window.clipboardData).getData('text');
                     if (pastedText) {
                         console.log('붙여넣기 이벤트:', pastedText);
-                        barcodeInput.value = pastedText;
+                        setBarcodeValue(pastedText);
                         // 바코드가 입력되면 자동 스캔
                         setTimeout(() => {
-                            if (barcodeInput.value.trim().length > 0) {
-                                console.log('붙여넣기 후 자동 스캔:', barcodeInput.value);
+                            if (getBarcodeValue().length > 0) {
+                                console.log('붙여넣기 후 자동 스캔:', getBarcodeValue());
                                 scanBarcode();
                             }
                         }, 150);
@@ -1577,7 +1698,7 @@
 
             // 바코드 입력 필드 포커스
             document.getElementById('barcodeInput').addEventListener('focus', function() {
-                this.select();
+                // contenteditable은 select()를 지원하지 않음
             });
 
             // 자동 엔터키 처리 (바코드 스캐너용)
@@ -1626,7 +1747,6 @@
                 if (barcodeInput && !barcodeInput.classList.contains('hidden')) {
                     setTimeout(() => {
                         barcodeInput.focus();
-                        barcodeInput.select();
                     }, 100);
                 }
             });
@@ -1646,7 +1766,7 @@
                 if (barcodeInput && !barcodeInput.classList.contains('hidden') && 
                     event.target.id !== 'barcodeInput') {
                     barcodeInput.focus();
-                    barcodeInput.select();
+                    // contenteditable은 select()를 지원하지 않음
                 }
             });
         }

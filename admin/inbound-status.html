@@ -361,14 +361,24 @@
                         <h3 class="text-lg font-semibold text-gray-800">컨테이너 목록</h3>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-white/20">
+                        <table id="containerTable" class="min-w-full divide-y divide-white/20">
                             <thead class="bg-white/10">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">ARN 번호</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">컨테이너 번호</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">도착 예정일</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">상태</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">파트 정보</th>
+                                    <th data-sort="arn_number" class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20 select-none">
+                                        ARN 번호 <i class="fas fa-sort text-gray-400 ml-1 sort-icon"></i>
+                                    </th>
+                                    <th data-sort="container_number" class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20 select-none">
+                                        컨테이너 번호 <i class="fas fa-sort text-gray-400 ml-1 sort-icon"></i>
+                                    </th>
+                                    <th data-sort="arrival_date" class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20 select-none">
+                                        도착 예정일 <i class="fas fa-sort text-gray-400 ml-1 sort-icon"></i>
+                                    </th>
+                                    <th data-sort="status" class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20 select-none">
+                                        상태 <i class="fas fa-sort text-gray-400 ml-1 sort-icon"></i>
+                                    </th>
+                                    <th data-sort="parts_count" class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20 select-none">
+                                        파트 정보 <i class="fas fa-sort text-gray-400 ml-1 sort-icon"></i>
+                                    </th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-800/80 uppercase tracking-wider">작업</th>
                                 </tr>
                             </thead>

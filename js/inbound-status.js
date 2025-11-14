@@ -21,6 +21,10 @@ class InboundStatus {
         this.isLoading = false;
         this.domCache = new Map();
         
+        // 정렬 상태
+        this.sortColumn = null; // 현재 정렬 컬럼
+        this.sortDirection = 'asc'; // 정렬 방향: 'asc' 또는 'desc'
+        
         // Supabase 클라이언트 초기화
         this.initializeSupabase();
         
@@ -385,6 +389,17 @@ class InboundStatus {
         document.getElementById('applyFilter')?.addEventListener('click', () => this.applyFilters());
         document.getElementById('resetFilter')?.addEventListener('click', () => this.resetFilters());
         document.getElementById('refreshData')?.addEventListener('click', () => this.loadData());
+        
+        // 테이블 헤더 정렬 이벤트
+        const sortableHeaders = document.querySelectorAll('#containerTable thead th[data-sort]');
+        sortableHeaders.forEach(header => {
+            header.addEventListener('click', (e) => {
+                const sortColumn = header.getAttribute('data-sort');
+                if (sortColumn) {
+                    this.sortContainers(sortColumn);
+                }
+            });
+        });
     }
 
     async loadData() {
@@ -404,8 +419,15 @@ class InboundStatus {
                 console.error('마스터 파트 로드 실패, 계속 진행:', error);
             }
             
+            // 초기 필터: 오늘 날짜로 설정 (날짜 필터가 비어있을 때만)
+            const dateFilterElement = document.getElementById('dateFilter');
+            if (dateFilterElement && !dateFilterElement.value) {
+                const today = new Date().toISOString().split('T')[0];
+                dateFilterElement.value = today;
+            }
+            
             this.updateStatistics();
-            this.renderContainers();
+            this.applyFilters(); // 필터 적용하여 렌더링
             this.lastDataUpdate = Date.now();
             
         } catch (error) {
@@ -504,6 +526,90 @@ class InboundStatus {
         this.domCache.get('pendingArn').textContent = pendingArn;
     }
 
+    sortContainers(column) {
+        // 같은 컬럼을 클릭하면 정렬 방향 토글
+        if (this.sortColumn === column) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+        
+        // 정렬된 배열 생성
+        const sorted = [...this.filteredContainers].sort((a, b) => {
+            let aValue, bValue;
+            
+            switch(column) {
+                case 'arn_number':
+                    aValue = a.arn_number || '';
+                    bValue = b.arn_number || '';
+                    break;
+                case 'container_number':
+                    aValue = a.container_number || '';
+                    bValue = b.container_number || '';
+                    break;
+                case 'arrival_date':
+                    aValue = this.convertToKoreanTime(a.arrival_date) || '';
+                    bValue = this.convertToKoreanTime(b.arrival_date) || '';
+                    break;
+                case 'status':
+                    aValue = a.status || '';
+                    bValue = b.status || '';
+                    break;
+                case 'parts_count':
+                    aValue = a.parts_count || 0;
+                    bValue = b.parts_count || 0;
+                    break;
+                default:
+                    return 0;
+            }
+            
+            // 숫자 비교 (parts_count)
+            if (column === 'parts_count') {
+                return this.sortDirection === 'asc' 
+                    ? aValue - bValue 
+                    : bValue - aValue;
+            }
+            
+            // 문자열 비교
+            if (aValue < bValue) {
+                return this.sortDirection === 'asc' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return this.sortDirection === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+        
+        this.filteredContainers = sorted;
+        this.updateSortIcons();
+        this.renderContainers();
+    }
+    
+    updateSortIcons() {
+        // 모든 헤더의 정렬 아이콘 초기화
+        const headers = document.querySelectorAll('#containerTable thead th[data-sort]');
+        headers.forEach(header => {
+            const icon = header.querySelector('.sort-icon');
+            if (icon) {
+                icon.className = 'sort-icon fas fa-sort text-gray-400 ml-1';
+            }
+        });
+        
+        // 현재 정렬된 컬럼의 아이콘 업데이트
+        const activeHeader = document.querySelector(`#containerTable thead th[data-sort="${this.sortColumn}"]`);
+        if (activeHeader) {
+            const icon = activeHeader.querySelector('.sort-icon');
+            if (icon) {
+                if (this.sortDirection === 'asc') {
+                    icon.className = 'sort-icon fas fa-sort-up text-blue-500 ml-1';
+                } else {
+                    icon.className = 'sort-icon fas fa-sort-down text-blue-500 ml-1';
+                }
+            }
+        }
+    }
+
     renderContainers() {
         const tbody = this.domCache.get('containerTableBody');
         if (!tbody) return;
@@ -511,7 +617,7 @@ class InboundStatus {
         if (this.filteredContainers.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
                         등록된 컨테이너가 없습니다.
                     </td>
                 </tr>
@@ -677,10 +783,13 @@ class InboundStatus {
             // 쉼표가 포함된 숫자 처리 (1,120 -> 1120)
             const quantity = parseInt(row['Quantity'].toString().replace(/,/g, '')) || 0;
             
+            // 각 행에서 도착 예정일 추출
+            const arrivalDate = this.extractArrivalDate(row);
+            
             if (!containerGroups[containerNumber]) {
                 containerGroups[containerNumber] = {
                     containerNumber: containerNumber,
-                    arrivalDate: row['Arrival_Date'],
+                    arrivalDate: arrivalDate, // 추출한 날짜 사용
                     parts: {}
                 };
             }
@@ -732,6 +841,132 @@ class InboundStatus {
         this.resetCsvUpload();
     }
 
+    extractArrivalDate(row) {
+        // 다양한 도착 예정일 컬럼명 확인
+        const dateKeys = [
+            'Arrival_Date', 'arrival_date', 'Arrival Date', 'arrival date',
+            '도착예정일', '도착 예정일', '도착일', '도착 일',
+            '날짜', 'Date', 'date', '입고예정일', '입고 예정일'
+        ];
+        
+        // 먼저 명시적인 컬럼명으로 찾기
+        for (const key of dateKeys) {
+            if (row[key] && row[key].toString().trim()) {
+                const dateValue = row[key].toString().trim();
+                const normalizedDate = this.normalizeDate(dateValue);
+                if (normalizedDate) {
+                    return normalizedDate;
+                }
+            }
+        }
+        
+        // 첫 번째 컬럼(A열)이 날짜 형식인지 확인
+        const firstKey = Object.keys(row)[0];
+        if (firstKey && row[firstKey]) {
+            const dateValue = row[firstKey].toString().trim();
+            const normalizedDate = this.normalizeDate(dateValue);
+            if (normalizedDate) {
+                return normalizedDate;
+            }
+        }
+        
+        // 모든 컬럼을 순회하며 날짜 형식 찾기
+        for (const key in row) {
+            if (row[key]) {
+                const value = row[key].toString().trim();
+                const normalizedDate = this.normalizeDate(value);
+                if (normalizedDate) {
+                    return normalizedDate;
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    normalizeDate(dateValue) {
+        if (!dateValue) return null;
+        
+        const dateStr = dateValue.toString().trim();
+        
+        // 이미 YYYY-MM-DD 형식인 경우
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return dateStr;
+        }
+        
+        // Excel 날짜 숫자 형식인 경우 (예: 44927)
+        if (/^\d+$/.test(dateStr) && dateStr.length > 4) {
+            const excelDate = parseInt(dateStr);
+            // Excel의 날짜는 1900-01-01부터의 일수 (실제로는 1899-12-30부터)
+            const date = new Date((excelDate - 25569) * 86400 * 1000);
+            return date.toISOString().split('T')[0];
+        }
+        
+        // YYYY/MM/DD 또는 MM/DD/YYYY 또는 MM/DD/YY 형식
+        if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                // YYYY/MM/DD 형식 (첫 번째가 4자리)
+                if (parts[0].length === 4) {
+                    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                }
+                // MM/DD/YYYY 형식 (세 번째가 4자리)
+                else if (parts[2].length === 4) {
+                    return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+                // MM/DD/YY 형식 (2자리 연도)
+                else if (parts[2].length === 2) {
+                    // 2자리 연도를 4자리로 변환 (00-30은 2000-2030, 31-99는 1931-1999)
+                    let year = parseInt(parts[2]);
+                    if (year <= 30) {
+                        year = 2000 + year;
+                    } else {
+                        year = 1900 + year;
+                    }
+                    return `${year}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+            }
+        }
+        
+        // YYYY.MM.DD 형식
+        if (dateStr.includes('.')) {
+            const parts = dateStr.split('.');
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                } else if (parts[2].length === 4) {
+                    return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                } else if (parts[2].length === 2) {
+                    let year = parseInt(parts[2]);
+                    if (year <= 30) {
+                        year = 2000 + year;
+                    } else {
+                        year = 1900 + year;
+                    }
+                    return `${year}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+            }
+        }
+        
+        // Date 객체인 경우
+        if (dateValue instanceof Date) {
+            return dateValue.toISOString().split('T')[0];
+        }
+        
+        // 다른 형식 시도 - MM/DD/YYYY 또는 MM/DD/YY 형식으로 파싱
+        // JavaScript Date는 MM/DD/YYYY 형식을 잘 파싱합니다
+        const parsedDate = new Date(dateStr);
+        if (!isNaN(parsedDate.getTime())) {
+            // Date 객체가 유효한지 확인 (1900-2100 범위)
+            const year = parsedDate.getFullYear();
+            if (year >= 1900 && year <= 2100) {
+                return parsedDate.toISOString().split('T')[0];
+            }
+        }
+        
+        return null;
+    }
+
     async processCsvUpload() {
         if (!this.fileData || this.fileData.length === 0) {
             this.showError('처리할 데이터가 없습니다.');
@@ -749,12 +984,25 @@ class InboundStatus {
                 // 쉼표가 포함된 숫자 처리 (1,120 -> 1120)
                 const quantity = parseInt(row['Quantity'].toString().replace(/,/g, '')) || 0;
                 
+                // 각 행에서 도착 예정일 추출
+                const arrivalDate = this.extractArrivalDate(row);
+                
                 if (!containerGroups[containerNumber]) {
                     containerGroups[containerNumber] = {
                         containerNumber: containerNumber,
-                        arrivalDate: row['Arrival_Date'],
+                        arrivalDate: arrivalDate, // 추출한 날짜 사용
                         parts: {}
                     };
+                } else {
+                    // 같은 컨테이너의 다른 행에서 날짜가 있고, 기존 날짜가 없으면 업데이트
+                    if (arrivalDate && !containerGroups[containerNumber].arrivalDate) {
+                        containerGroups[containerNumber].arrivalDate = arrivalDate;
+                    }
+                    // 날짜가 있고 기존 날짜와 다르면 경고 (디버깅용)
+                    if (arrivalDate && containerGroups[containerNumber].arrivalDate && 
+                        arrivalDate !== containerGroups[containerNumber].arrivalDate) {
+                        console.warn(`컨테이너 ${containerNumber}: 날짜 불일치 - 기존: ${containerGroups[containerNumber].arrivalDate}, 새: ${arrivalDate}`);
+                    }
                 }
                 
                 // 같은 파트가 이미 있으면 수량 합산
@@ -771,7 +1019,29 @@ class InboundStatus {
                 
                 // ASN 번호 생성
             const arnNumber = await this.generateArnNumber();
-                const arrivalDate = this.convertToCentralTime(group.arrivalDate || new Date().toISOString().split('T')[0]);
+                // 추출한 날짜가 없으면 오늘 날짜 사용
+                let finalArrivalDate = group.arrivalDate;
+                
+                // 날짜가 null, undefined, 빈 문자열인 경우에만 오늘 날짜 사용
+                if (!finalArrivalDate || finalArrivalDate.trim() === '') {
+                    finalArrivalDate = new Date().toISOString().split('T')[0];
+                } else {
+                    // 이미 YYYY-MM-DD 형식인지 확인
+                    if (!/^\d{4}-\d{2}-\d{2}$/.test(finalArrivalDate)) {
+                        // 정규화되지 않은 날짜를 다시 정규화 시도
+                        const normalized = this.normalizeDate(finalArrivalDate);
+                        if (normalized) {
+                            finalArrivalDate = normalized;
+                        } else {
+                            // 정규화 실패 시 오늘 날짜 사용
+                            console.warn(`컨테이너 ${containerNumber}: 날짜 정규화 실패 (${finalArrivalDate}), 오늘 날짜 사용`);
+                            finalArrivalDate = new Date().toISOString().split('T')[0];
+                        }
+                    }
+                }
+                
+                // 날짜 형식 변환 (이미 YYYY-MM-DD 형식이면 그대로 사용)
+                const arrivalDate = this.convertToCentralTime(finalArrivalDate);
                 
                 // 컨테이너 생성
                 const { data: container, error: containerError } = await this.supabase
@@ -1460,27 +1730,56 @@ class InboundStatus {
     // 필터 관련 메서드들
     applyFilters() {
         const dateFilter = document.getElementById('dateFilter').value;
-        const containerFilter = document.getElementById('containerFilter').value.toLowerCase();
+        const containerFilter = document.getElementById('containerFilter').value.trim().toLowerCase();
         const statusFilter = document.getElementById('statusFilter').value;
+        
+        // 오늘 날짜 (YYYY-MM-DD 형식)
+        const today = new Date().toISOString().split('T')[0];
 
         this.filteredContainers = this.containers.filter(container => {
-            const matchesDate = !dateFilter || this.convertToKoreanTime(container.arrival_date) === dateFilter;
+            // 컨테이너 번호가 입력되면 날짜 필터 무시 (컨테이너 번호 우선순위)
+            if (containerFilter) {
+                // 컨테이너 번호로만 필터링
+                const matchesContainer = container.container_number.toLowerCase().includes(containerFilter);
+                const matchesStatus = !statusFilter || container.status === statusFilter;
+                return matchesContainer && matchesStatus;
+            }
+            
+            // 날짜 필터 로직: 오늘 날짜 또는 지난 날짜 중 대기 상태인 컨테이너
+            const containerDate = this.convertToKoreanTime(container.arrival_date);
+            const isToday = containerDate === today;
+            const isPastDate = containerDate < today;
+            const isPending = container.status === 'PENDING';
+            
+            // 오늘 날짜의 모든 컨테이너 또는 지난 날짜 중 대기 상태인 컨테이너
+            const matchesDate = isToday || (isPastDate && isPending);
+            
+            // 날짜 필터가 설정되어 있으면 해당 날짜도 포함
+            const matchesDateFilter = !dateFilter || containerDate === dateFilter;
+            
             const matchesContainer = !containerFilter || container.container_number.toLowerCase().includes(containerFilter);
             const matchesStatus = !statusFilter || container.status === statusFilter;
 
-            return matchesDate && matchesContainer && matchesStatus;
+            return (matchesDate || matchesDateFilter) && matchesContainer && matchesStatus;
         });
-
-        this.renderContainers();
+        
+        // 정렬이 설정되어 있으면 정렬 적용
+        if (this.sortColumn) {
+            this.sortContainers(this.sortColumn);
+        } else {
+            this.updateSortIcons();
+            this.renderContainers();
+        }
     }
 
     resetFilters() {
-        document.getElementById('dateFilter').value = '';
+        // 오늘 날짜로 리셋
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateFilter').value = today;
         document.getElementById('containerFilter').value = '';
         document.getElementById('statusFilter').value = '';
         
-        this.filteredContainers = [...this.containers];
-        this.renderContainers();
+        this.applyFilters(); // 필터 적용하여 렌더링
     }
 
     // UI 관련 메서드들
@@ -1489,6 +1788,12 @@ class InboundStatus {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('manualArrivalDate').value = today;
         document.getElementById('inboundDate').value = today;
+        
+        // 날짜 필터도 오늘 날짜로 초기화
+        const dateFilterElement = document.getElementById('dateFilter');
+        if (dateFilterElement) {
+            dateFilterElement.value = today;
+        }
     }
 
     showLoading(show) {
@@ -1499,13 +1804,62 @@ class InboundStatus {
     }
 
     showError(message) {
-        const prefix = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('error_prefix') : '오류: ';
-        alert(prefix + message);
+        this.showNotification(message, 'error');
     }
 
     showSuccess(message) {
-        const prefix = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('success_prefix') : '성공: ';
-        alert(prefix + message);
+        this.showNotification(message, 'success');
+    }
+
+    showNotification(message, type = 'info') {
+        // 기존 알림이 있으면 제거
+        const existingNotification = document.getElementById('inboundToastNotification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        // Toast 알림 요소 생성
+        const notification = document.createElement('div');
+        notification.id = 'inboundToastNotification';
+        
+        // 타입에 따른 색상 및 아이콘 설정
+        let bgColor = 'bg-blue-500';
+        let icon = 'fa-info-circle';
+        if (type === 'error') {
+            bgColor = 'bg-red-500';
+            icon = 'fa-exclamation-circle';
+        } else if (type === 'success') {
+            bgColor = 'bg-green-500';
+            icon = 'fa-check-circle';
+        } else if (type === 'warning') {
+            bgColor = 'bg-yellow-500';
+            icon = 'fa-exclamation-triangle';
+        }
+        
+        notification.className = `fixed top-4 right-4 z-50 ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg max-w-md transition-all duration-300 transform translate-x-full`;
+        notification.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas ${icon} mr-3"></i>
+                <span class="font-semibold">${message}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // 애니메이션으로 나타나기
+        setTimeout(() => {
+            notification.classList.remove('translate-x-full');
+        }, 100);
+        
+        // 3초 후 자동으로 사라지기
+        setTimeout(() => {
+            notification.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }, 3000);
     }
 }
 
