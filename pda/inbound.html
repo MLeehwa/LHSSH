@@ -381,13 +381,13 @@
             <i class="fas fa-chevron-down ml-2"></i>
         </button>
         <div class="language-dropdown" id="languageDropdown">
-            <div class="language-option active" onclick="changeLanguage('ko')">
+            <div class="language-option active" onclick="changeLanguage('ko', this)">
                 <i class="fas fa-flag mr-2"></i><span data-i18n="korean">한국어</span>
             </div>
-            <div class="language-option" onclick="changeLanguage('en')">
+            <div class="language-option" onclick="changeLanguage('en', this)">
                 <i class="fas fa-flag mr-2"></i><span data-i18n="english">English</span>
             </div>
-            <div class="language-option" onclick="changeLanguage('es')">
+            <div class="language-option" onclick="changeLanguage('es', this)">
                 <i class="fas fa-flag mr-2"></i><span data-i18n="spanish">Español</span>
             </div>
         </div>
@@ -1618,6 +1618,60 @@
             window.location.reload();
         }
 
+        // 언어 선택기 토글
+        function toggleLanguageDropdown() {
+            const dropdown = document.getElementById('languageDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // 언어 변경
+        function changeLanguage(lang, clickedElement) {
+            // 언어 설정
+            i18n.setLanguage(lang);
+            
+            // 현재 언어 표시 업데이트
+            const currentLanguageElement = document.getElementById('currentLanguage');
+            const languageNames = {
+                'ko': '한국어',
+                'en': 'English',
+                'es': 'Español'
+            };
+            if (currentLanguageElement) {
+                currentLanguageElement.textContent = languageNames[lang];
+            }
+            
+            // 드롭다운 닫기
+            const languageDropdown = document.getElementById('languageDropdown');
+            if (languageDropdown) {
+                languageDropdown.classList.remove('show');
+            }
+            
+            // 활성 옵션 업데이트
+            document.querySelectorAll('.language-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            if (clickedElement) {
+                clickedElement.classList.add('active');
+            } else {
+                // clickedElement가 없을 경우 lang에 맞는 옵션 찾기
+                const targetOption = document.querySelector(`.language-option[onclick*="'${lang}'"]`);
+                if (targetOption) {
+                    targetOption.classList.add('active');
+                }
+            }
+        }
+
+        // 페이지 외부 클릭 시 드롭다운 닫기
+        document.addEventListener('click', function(event) {
+            const languageSelector = document.querySelector('.language-selector');
+            if (languageSelector && !languageSelector.contains(event.target)) {
+                const languageDropdown = document.getElementById('languageDropdown');
+                if (languageDropdown) {
+                    languageDropdown.classList.remove('show');
+                }
+            }
+        });
+
         // 페이지 로드 시 초기화
         document.addEventListener('DOMContentLoaded', function() {
             // Supabase 초기화
@@ -1631,6 +1685,18 @@
             // 시간 업데이트 시작
             updateCurrentTime();
             setInterval(updateCurrentTime, 1000);
+            
+            // 현재 언어 표시 업데이트
+            const currentLanguage = i18n.currentLanguage;
+            const languageNames = {
+                'ko': '한국어',
+                'en': 'English',
+                'es': 'Español'
+            };
+            const currentLanguageElement = document.getElementById('currentLanguage');
+            if (currentLanguageElement) {
+                currentLanguageElement.textContent = languageNames[currentLanguage] || '한국어';
+            }
         });
 
         // 터치 이벤트 최적화
