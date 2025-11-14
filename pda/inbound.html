@@ -890,10 +890,9 @@
                     showNotification(`❌ 중복 스캔: 이미 스캔된 바코드입니다.\n바코드: ${barcode}`, 'error');
                     
                     const barcodeInput = document.getElementById('barcodeInput');
-                    barcodeInput.value = '';
+                    setBarcodeValue('');
                     setTimeout(() => {
                         barcodeInput.focus();
-                        barcodeInput.select();
                     }, 100);
                     
                     return false;
@@ -1594,15 +1593,17 @@
 
         // 전역 바코드 입력 처리 함수 (개선된 버전 - 키 입력 시 자동 포커스)
         function handleGlobalBarcodeInput(e) {
-            // 파트 섹션이 보이지 않으면 무시 (스캔 섹션은 숨김)
-            const partsSection = document.getElementById('partsSection');
-            if (!partsSection || partsSection.classList.contains('hidden')) {
-                return;
-            }
+            console.log('handleGlobalBarcodeInput 호출:', e.key);
             
             // 바코드 입력창 가져오기
             const barcodeInput = document.getElementById('barcodeInput');
-            if (!barcodeInput || barcodeInput.classList.contains('hidden')) {
+            if (!barcodeInput) {
+                console.log('barcodeInput 없음');
+                return;
+            }
+            
+            if (barcodeInput.classList.contains('hidden')) {
+                console.log('barcodeInput 숨김');
                 return;
             }
             
@@ -1788,18 +1789,23 @@
 
             // 전역 키보드 이벤트 리스너 (바코드 스캐너용) - 항상 활성화
             document.addEventListener('keydown', function(e) {
+                console.log('전역 키보드 이벤트 발생:', e.key, 'partsSection 체크 시작');
+                
                 // 컨테이너 선택 드롭다운이나 버튼에 포커스가 있으면 무시
                 const activeElement = document.activeElement;
                 if (activeElement && (
                     activeElement.id === 'containerSelect' ||
                     activeElement.closest('button')
                 )) {
+                    console.log('드롭다운/버튼 포커스 - 무시');
                     return;
                 }
                 
                 // 파트 섹션이 보일 때만 전역 바코드 입력 처리 (스캔 섹션은 숨김)
                 const partsSection = document.getElementById('partsSection');
                 if (partsSection && !partsSection.classList.contains('hidden')) {
+                    console.log('partsSection 보임 - 바코드 입력 처리');
+                    
                     // Ctrl+V (붙여넣기) 처리
                     if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
                         e.preventDefault();
@@ -1827,6 +1833,8 @@
                     }
                     
                     handleGlobalBarcodeInput(e);
+                } else {
+                    console.log('partsSection 숨김 또는 없음 - 이벤트 무시');
                 }
             });
             
