@@ -1838,9 +1838,8 @@
                     }
                 }
                 
-                // 3. 실사 항목 및 거래 내역 생성
+                // 3. 실사 항목 생성 (재고 반영은 관리자 확정 시에만 수행)
                 const inventoryItems = [];
-                const transactions = [];
                 
                 for (const part of parts) {
                     const difference = part.difference;
@@ -1854,19 +1853,8 @@
                         notes: `계산기 - ${part.calculation ? JSON.stringify(part.calculation) : ''} (차이: ${difference > 0 ? '+' : ''}${difference})`
                     });
                     
-                    // 차이가 있으면 ADJUSTMENT 거래 내역 추가
-                    // 주의: difference는 양수(증가) 또는 음수(감소)일 수 있습니다.
-                    // DB 제약 조건이 ADJUSTMENT의 경우 음수도 허용하도록 수정되어야 합니다.
-                    if (difference !== 0) {
-                        transactions.push({
-                            transaction_date: sessionDate,
-                            part_number: part.partNumber,
-                            transaction_type: 'ADJUSTMENT',
-                            quantity: difference, // 양수면 증가, 음수면 감소
-                            reference_id: `PHYSICAL_INV_SESSION_${sessionId}`,
-                            notes: `재고 실사 조정 (계산기) - 세션: ${sessionName}`
-                        });
-                    }
+                    // 주의: 재고 계산기에서는 inventory_transactions에 저장하지 않습니다.
+                    // 재고 반영은 관리자가 실사 관리 화면에서 확정할 때만 수행됩니다.
                 }
                 
                 // 4. 실사 항목 저장 (배치 처리)
@@ -1884,26 +1872,9 @@
                     }
                 }
                 
-                // 5. inventory_transactions에 거래 내역 추가 (배치 처리)
-                // 주의: DB 트리거(track_inventory_movement)가 자동으로 inventory 테이블을 업데이트하므로
-                // 여기서는 수동으로 inventory를 업데이트하지 않습니다.
-                if (transactions.length > 0) {
-                    const BATCH_SIZE = 1000;
-                    for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
-                        const batch = transactions.slice(i, i + BATCH_SIZE);
-                        const { error: transError } = await supabaseClient
-                            .from('inventory_transactions')
-                            .insert(batch);
-                        
-                        if (transError) {
-                            throw new Error(`거래 내역 저장 실패: ${transError.message}`);
-                        }
-                    }
-                }
-                
-                // 6. inventory 테이블 업데이트는 DB 트리거(track_inventory_movement)가 자동으로 처리합니다.
-                // inventory_transactions에 ADJUSTMENT를 삽입하면 트리거가 자동으로 inventory.current_stock을 업데이트합니다.
-                // 따라서 여기서는 수동으로 업데이트하지 않습니다. (중복 업데이트 방지)
+                // 5. inventory_transactions 저장 제거
+                // 재고 계산기에서는 실사 데이터만 저장하고, 재고 반영은 하지 않습니다.
+                // 재고 반영은 관리자가 실사 관리 화면에서 확정할 때만 수행됩니다.
                 
                 // 저장 성공
                 alert(`✅ 저장 완료!\n총 ${parts.length}개 파트가 저장되었습니다.\n날짜: ${sessionDate}\n세션: ${sessionName}`);
