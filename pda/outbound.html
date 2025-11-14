@@ -1433,6 +1433,74 @@
                 updateOutboundInfo();
             });
             
+            // 전역 keydown 이벤트 (PDA 스캐너용 - partsSection이 보일 때만)
+            document.addEventListener('keydown', function(e) {
+                const partsSection = document.getElementById('partsSection');
+                if (!partsSection || partsSection.classList.contains('hidden')) {
+                    return;
+                }
+                
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (!barcodeInput) return;
+                
+                // select나 button에 포커스가 있으면 무시
+                const activeElement = document.activeElement;
+                if (activeElement && (
+                    activeElement.tagName === 'SELECT' ||
+                    activeElement.closest('button')
+                )) {
+                    return;
+                }
+                
+                // Ctrl, Alt, Meta 키는 무시
+                if (e.ctrlKey || e.altKey || e.metaKey) {
+                    return;
+                }
+                
+                // 특수 키는 Enter만 처리
+                if (e.key.length > 1 && e.key !== 'Enter' && e.key !== 'Backspace') {
+                    return;
+                }
+                
+                // 바코드 입력 필드에 포커스가 없으면 포커스 설정
+                if (activeElement !== barcodeInput) {
+                    barcodeInput.focus();
+                }
+                
+                // Enter 키 처리
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const code = getBarcodeValue();
+                    if (code.trim().length > 0) {
+                        console.log('전역 Enter 키로 스캔 처리:', code);
+                        scanBarcode();
+                    }
+                    return;
+                }
+                
+                // Backspace 키 처리
+                if (e.key === 'Backspace' || e.keyCode === 8) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const currentValue = getBarcodeValue();
+                    setBarcodeValue(currentValue.slice(0, -1));
+                    return;
+                }
+                
+                // 일반 문자 입력 처리
+                if (e.key.length === 1) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const currentValue = getBarcodeValue();
+                    const newValue = currentValue + e.key;
+                    setBarcodeValue(newValue);
+                    console.log('전역 keydown으로 바코드 입력:', e.key, '현재 값:', newValue);
+                    // 바코드 패턴 확인 후 자동 스캔
+                    checkAndAutoScan(newValue);
+                }
+            }, true); // capture phase
+            
             // 붙여넣기 이벤트 리스너 (바코드 입력창에만)
             document.addEventListener('paste', function(e) {
                 const partsSection = document.getElementById('partsSection');
