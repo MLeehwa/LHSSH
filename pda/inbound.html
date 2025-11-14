@@ -43,6 +43,13 @@
             
             // contenteditable input 이벤트로 바코드 입력 처리 (정석 구조)
             barcodeInput.addEventListener('input', function() {
+                // partsSection이 보이는지 확인 (스캔 가능 상태인지 체크)
+                const partsSection = document.getElementById('partsSection');
+                if (!partsSection || partsSection.classList.contains('hidden')) {
+                    console.log('partsSection이 숨겨져 있음 - 스캔 무시');
+                    return;
+                }
+                
                 const code = (this.textContent || this.innerText || '').trim();
                 console.log('input 이벤트 발생:', code);
                 
@@ -57,15 +64,23 @@
                         const currentCode = (barcodeInput.textContent || barcodeInput.innerText || '').trim();
                         if (currentCode && currentCode.length > 0) {
                             console.log('바코드 입력 완료 (자동 스캔):', currentCode);
-                            handleBarcodeScan(currentCode).then(result => {
-                                if (result) {
-                                    // 스캔 성공 시 입력 필드 초기화
-                                    barcodeInput.textContent = '';
-                                    barcodeInput.innerText = '';
-                                }
-                            }).catch(error => {
-                                console.error('handleBarcodeScan 오류:', error);
-                            });
+                            // partsSection이 여전히 보이는지 다시 확인
+                            const partsSectionCheck = document.getElementById('partsSection');
+                            if (partsSectionCheck && !partsSectionCheck.classList.contains('hidden')) {
+                                handleBarcodeScan(currentCode).then(result => {
+                                    if (result) {
+                                        // 스캔 성공 시 입력 필드 초기화
+                                        barcodeInput.textContent = '';
+                                        barcodeInput.innerText = '';
+                                        // 포커스 유지
+                                        setTimeout(() => {
+                                            barcodeInput.focus();
+                                        }, 50);
+                                    }
+                                }).catch(error => {
+                                    console.error('handleBarcodeScan 오류:', error);
+                                });
+                            }
                         }
                     }, 200);
                 }
@@ -75,6 +90,14 @@
             barcodeInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault();
+                    
+                    // partsSection이 보이는지 확인
+                    const partsSection = document.getElementById('partsSection');
+                    if (!partsSection || partsSection.classList.contains('hidden')) {
+                        console.log('partsSection이 숨겨져 있음 - Enter 키 무시');
+                        return;
+                    }
+                    
                     const code = (this.textContent || this.innerText || '').trim();
                     if (code.length > 0) {
                         console.log('Enter 키로 스캔 처리:', code);
@@ -88,6 +111,10 @@
                                 // 스캔 성공 시 입력 필드 초기화
                                 barcodeInput.textContent = '';
                                 barcodeInput.innerText = '';
+                                // 포커스 유지
+                                setTimeout(() => {
+                                    barcodeInput.focus();
+                                }, 50);
                             }
                         }).catch(error => {
                             console.error('handleBarcodeScan 오류:', error);
@@ -432,7 +459,7 @@
              contenteditable="true"
              tabindex="0"
              style="
-                position:absolute;
+                position:fixed;
                 top:0;
                 left:0;
                 width:1px;
@@ -440,6 +467,8 @@
                 opacity:0;
                 z-index:1;
                 outline:none;
+                border:none;
+                overflow:hidden;
              "></div>
 
         <!-- Save/Cancel Buttons -->
