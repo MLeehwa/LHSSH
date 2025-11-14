@@ -70,20 +70,20 @@
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
                 // contenteditable은 키보드를 띄울 수 있으므로, 전역 키보드 이벤트로 처리
-                // 자동 포커스 설정 (스캔 섹션이 보일 때만)
-                const scanSection = document.getElementById('scanSection');
-                if (scanSection && !scanSection.classList.contains('hidden')) {
+                // 자동 포커스 설정 (파트 섹션이 보일 때만)
+                const partsSection = document.getElementById('partsSection');
+                if (partsSection && !partsSection.classList.contains('hidden')) {
                     setTimeout(() => {
                         barcodeInput.focus();
                         console.log('바코드 입력 필드 포커스 설정됨');
                     }, 500);
                 }
                 
-                // 포커스 유지 (스캔 섹션이 보일 때만)
+                // 포커스 유지 (파트 섹션이 보일 때만)
                 barcodeInput.addEventListener('blur', function() {
                     setTimeout(() => {
-                        const scanSection = document.getElementById('scanSection');
-                        if (scanSection && !scanSection.classList.contains('hidden')) {
+                        const partsSection = document.getElementById('partsSection');
+                        if (partsSection && !partsSection.classList.contains('hidden')) {
                             this.focus();
                             console.log('바코드 입력 필드 포커스 복원');
                         }
@@ -441,27 +441,27 @@
     </header>
 
     <!-- Main Content -->
-    <main class="p-4 space-y-6">
+    <main class="p-2 space-y-2">
         <!-- Container Selection -->
-        <div class="glass-card rounded-2xl p-6 animate-slide-up">
-            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="container_selection">컨테이너 선택</h2>
-            <div class="space-y-4">
+        <div class="glass-card rounded-lg p-2 animate-slide-up">
+            <h2 class="text-sm font-bold text-gray-800 mb-1" data-i18n="container_selection">컨테이너 선택</h2>
+            <div class="space-y-1">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="pending_container">PENDING 컨테이너</label>
-                    <select id="containerSelect" class="dropdown-select">
+                    <label class="block text-xs font-medium text-gray-700 mb-1" data-i18n="pending_container">PENDING 컨테이너</label>
+                    <select id="containerSelect" class="dropdown-select text-sm py-1">
                         <option value="" data-i18n="select_container">컨테이너를 선택하세요</option>
                     </select>
                 </div>
             </div>
         </div>
 
-        <!-- Scan Section -->
-        <div id="scanSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
-            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="barcode_scan">바코드 스캔</h2>
-            <div class="space-y-4">
+        <!-- Scan Section (숨김 - 스캐너만 작동) -->
+        <div id="scanSection" class="hidden" style="display: none;">
+            <h2 class="text-sm font-bold text-gray-800 mb-1" data-i18n="barcode_scan">바코드 스캔</h2>
+            <div class="space-y-1">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="part_number_scan">파트 번호 스캔</label>
-                    <div class="flex space-x-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1" data-i18n="part_number_scan">파트 번호 스캔</label>
+                    <div class="flex space-x-1">
                         <!-- 보이지 않는 contenteditable 박스 (스캐너 전용) -->
                         <div id="barcodeInput" contenteditable="true" 
                              class="absolute opacity-0" 
@@ -472,10 +472,10 @@
                              data-gramm_editor="false"
                              data-enable-grammarly="false"
                              tabindex="-1"></div>
-                        <div class="scan-input flex-1 flex items-center justify-center text-gray-500" style="min-height: 48px;">
+                        <div class="scan-input flex-1 flex items-center justify-center text-gray-500 text-xs" style="min-height: 32px;">
                             <span data-i18n="scan_barcode_placeholder">바코드를 스캔하세요</span>
                         </div>
-                        <button onclick="clearScan()" class="action-button cancel-btn px-4 py-3 text-white" title="초기화">
+                        <button onclick="clearScan()" class="action-button cancel-btn px-2 py-1 text-white text-xs" title="초기화">
                             <i class="fas fa-redo"></i>
                         </button>
                     </div>
@@ -484,28 +484,28 @@
         </div>
 
         <!-- Save/Cancel Buttons -->
-        <div id="actionButtonsSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
-            <div class="flex space-x-3">
-                <button onclick="confirmInbound()" class="action-button px-6 py-3 text-white flex-1">
-                    <i class="fas fa-save mr-2"></i>저장
+        <div id="actionButtonsSection" class="glass-card rounded-lg p-2 animate-slide-up hidden">
+            <div class="flex space-x-2">
+                <button onclick="confirmInbound()" class="action-button px-3 py-1.5 text-white flex-1 text-sm">
+                    <i class="fas fa-save mr-1"></i>저장
                 </button>
-                <button onclick="cancelInbound()" class="action-button cancel-btn px-6 py-3 text-white flex-1">
-                    <i class="fas fa-times mr-2"></i>취소
+                <button onclick="cancelInbound()" class="action-button cancel-btn px-3 py-1.5 text-white flex-1 text-sm">
+                    <i class="fas fa-times mr-1"></i>취소
                 </button>
             </div>
         </div>
 
         <!-- Parts List -->
-        <div id="partsSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
-            <h2 class="text-lg font-bold text-gray-800 mb-4" data-i18n="parts_list">파트 목록</h2>
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
+        <div id="partsSection" class="glass-card rounded-lg p-2 animate-slide-up hidden">
+            <h2 class="text-sm font-bold text-gray-800 mb-1" data-i18n="parts_list">파트 목록</h2>
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden max-h-96 overflow-y-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-gray-50 sticky top-0">
                         <tr>
-                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-600" data-i18n="part_number">파트</th>
-                            <th class="px-4 py-3 text-center text-sm font-medium text-gray-600" data-i18n="registered_quantity">등록 수량</th>
-                            <th class="px-4 py-3 text-center text-sm font-medium text-gray-600" data-i18n="scanned_quantity">스캔 수량</th>
-                            <th class="px-4 py-3 text-center text-sm font-medium text-gray-600" data-i18n="remaining_quantity">남은 수량</th>
+                            <th class="px-2 py-1 text-left text-xs font-medium text-gray-600" data-i18n="part_number">파트</th>
+                            <th class="px-2 py-1 text-center text-xs font-medium text-gray-600" data-i18n="registered_quantity">등록 수량</th>
+                            <th class="px-2 py-1 text-center text-xs font-medium text-gray-600" data-i18n="scanned_quantity">스캔 수량</th>
+                            <th class="px-2 py-1 text-center text-xs font-medium text-gray-600" data-i18n="remaining_quantity">남은 수량</th>
                         </tr>
                     </thead>
                     <tbody id="partsList" class="divide-y divide-gray-200">
@@ -675,27 +675,27 @@
                 }
 
                 partItem.innerHTML = `
-                    <td class="px-4 py-3">
+                    <td class="px-2 py-1">
                         <div>
-                            <div class="font-semibold text-gray-800">${part.part_number}</div>
-                            <div class="text-sm text-gray-500">카테고리: ${part.category || 'N/A'}</div>
+                            <div class="text-xs font-semibold text-gray-800">${part.part_number}</div>
+                            <div class="text-xs text-gray-500">카테고리: ${part.category || 'N/A'}</div>
                         </div>
                     </td>
-                    <td class="px-4 py-3 text-center">
-                        <span class="font-medium text-gray-700">${part.quantity || 0}</span>
+                    <td class="px-2 py-1 text-center">
+                        <span class="text-xs font-medium text-gray-700">${part.quantity || 0}</span>
                     </td>
-                    <td class="px-4 py-3 text-center">
+                    <td class="px-2 py-1 text-center">
                         ${isCompleted ? 
-                            `<span class="font-medium text-green-600">${part.scannedQuantity}</span>` :
+                            `<span class="text-xs font-medium text-green-600">${part.scannedQuantity}</span>` :
                             isOver ? 
-                                `<span class="font-medium text-orange-600">${part.scannedQuantity} <span class="text-xs">(+${part.scannedQuantity - part.quantity})</span></span>` :
-                                `<span class="font-medium text-red-600">${part.scannedQuantity}</span>`
+                                `<span class="text-xs font-medium text-orange-600">${part.scannedQuantity} <span class="text-xs">(+${part.scannedQuantity - part.quantity})</span></span>` :
+                                `<span class="text-xs font-medium text-red-600">${part.scannedQuantity}</span>`
                         }
                     </td>
-                    <td class="px-4 py-3 text-center">
+                    <td class="px-2 py-1 text-center">
                         ${isCompleted ? 
-                            `<span class="font-medium text-green-600">0</span>` :
-                            `<span class="font-medium ${remainingQuantity < part.quantity * 0.5 ? 'text-yellow-600' : 'text-gray-500'}">${remainingQuantity}</span>`
+                            `<span class="text-xs font-medium text-green-600">0</span>` :
+                            `<span class="text-xs font-medium ${remainingQuantity < part.quantity * 0.5 ? 'text-yellow-600' : 'text-gray-500'}">${remainingQuantity}</span>`
                         }
                     </td>
                 `;
@@ -1498,7 +1498,6 @@
             containerParts = [];
             
             document.getElementById('containerSelect').value = '';
-            document.getElementById('scanSection').classList.add('hidden');
             document.getElementById('partsSection').classList.add('hidden');
             document.getElementById('actionButtonsSection').classList.add('hidden');
             document.getElementById('partsList').innerHTML = '';
@@ -1547,12 +1546,11 @@
             
             // 바코드 입력창 포커스 유지 (alert가 아니므로 포커스가 풀리지 않음)
             const barcodeInput = document.getElementById('barcodeInput');
-            const scanSection = document.getElementById('scanSection');
-            if (barcodeInput && scanSection && !scanSection.classList.contains('hidden')) {
+            const partsSection = document.getElementById('partsSection');
+            if (barcodeInput && partsSection && !partsSection.classList.contains('hidden')) {
                 // 약간의 지연 후 포커스 유지
                 setTimeout(() => {
                     barcodeInput.focus();
-                    barcodeInput.select();
                 }, 50);
             }
         }
@@ -1596,9 +1594,9 @@
 
         // 전역 바코드 입력 처리 함수 (개선된 버전 - 키 입력 시 자동 포커스)
         function handleGlobalBarcodeInput(e) {
-            // 스캔 섹션이 보이지 않으면 무시
-            const scanSection = document.getElementById('scanSection');
-            if (!scanSection || scanSection.classList.contains('hidden')) {
+            // 파트 섹션이 보이지 않으면 무시 (스캔 섹션은 숨김)
+            const partsSection = document.getElementById('partsSection');
+            if (!partsSection || partsSection.classList.contains('hidden')) {
                 return;
             }
             
@@ -1762,8 +1760,7 @@
                     // 컨테이너 파트 로드
                     await loadContainerParts(arnNumber);
                     
-                    // UI 섹션 표시
-                    document.getElementById('scanSection').classList.remove('hidden');
+                    // UI 섹션 표시 (스캔 섹션은 숨김 상태 유지)
                     document.getElementById('partsSection').classList.remove('hidden');
                     document.getElementById('actionButtonsSection').classList.remove('hidden');
                     
@@ -1782,8 +1779,7 @@
                         }
                     }, 500);
                 } else {
-                    // UI 섹션 숨기기
-                    document.getElementById('scanSection').classList.add('hidden');
+                    // UI 섹션 숨기기 (스캔 섹션은 이미 숨김)
                     document.getElementById('partsSection').classList.add('hidden');
                     document.getElementById('actionButtonsSection').classList.add('hidden');
                     selectedContainer = null;
@@ -1801,9 +1797,9 @@
                     return;
                 }
                 
-                // 스캔 섹션이 보일 때만 전역 바코드 입력 처리
-                const scanSection = document.getElementById('scanSection');
-                if (scanSection && !scanSection.classList.contains('hidden')) {
+                // 파트 섹션이 보일 때만 전역 바코드 입력 처리 (스캔 섹션은 숨김)
+                const partsSection = document.getElementById('partsSection');
+                if (partsSection && !partsSection.classList.contains('hidden')) {
                     // Ctrl+V (붙여넣기) 처리
                     if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
                         e.preventDefault();
@@ -1836,8 +1832,8 @@
             
             // 붙여넣기 이벤트 리스너 추가 (모든 경우 처리)
             document.addEventListener('paste', function(e) {
-                const scanSection = document.getElementById('scanSection');
-                if (!scanSection || scanSection.classList.contains('hidden')) {
+                const partsSection = document.getElementById('partsSection');
+                if (!partsSection || partsSection.classList.contains('hidden')) {
                     return;
                 }
                 
