@@ -47,15 +47,15 @@
                 }, 300);
             }
             
-            // 바코드 입력 버퍼 (PDA 스캐너용)
-            let barcodeBuffer = '';
+            // 바코드 입력 버퍼 (PDA 스캐너용 - 전역 keydown과 동기화)
+            window.barcodeBuffer = '';
             
             // contenteditable input 이벤트로 바코드 입력 처리
             barcodeInput.addEventListener('input', function() {
                 const code = (this.textContent || this.innerText || '').trim();
                 console.log('input 이벤트 발생:', code);
                 if (code.length > 0) {
-                    barcodeBuffer = code;
+                    window.barcodeBuffer = code;
                     // 바코드 패턴 확인 후 자동 스캔
                     checkAndAutoScan(code);
                 }
@@ -68,19 +68,21 @@
                 // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
                 if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault();
-                    // 버퍼에 값이 있으면 스캔 처리
-                    if (barcodeBuffer.trim().length > 0) {
-                        console.log('Enter 키로 스캔 처리:', barcodeBuffer);
+                    // 버퍼나 contenteditable 값 확인
+                    const code = getBarcodeValue() || window.barcodeBuffer;
+                    if (code.trim().length > 0) {
+                        console.log('Enter 키로 스캔 처리:', code);
+                        setBarcodeValue(code);
                         scanBarcode();
-                        barcodeBuffer = '';
+                        window.barcodeBuffer = '';
                     }
                     return;
                 }
                 
                 // 일반 문자 입력은 버퍼에 추가
                 if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                    barcodeBuffer += e.key;
-                    console.log('버퍼 업데이트:', barcodeBuffer);
+                    window.barcodeBuffer += e.key;
+                    console.log('버퍼 업데이트:', window.barcodeBuffer);
                     // contenteditable에 직접 입력되므로 input 이벤트가 발생할 것임
                 }
             });
@@ -93,17 +95,26 @@
             barcodeInputInitialized = true;
         }
         
-        // 바코드 값 가져오기
+        // 바코드 값 가져오기 (전역 버퍼 우선)
         function getBarcodeValue() {
+            // 전역 버퍼가 있으면 우선 사용
+            if (window.barcodeBuffer && window.barcodeBuffer.trim().length > 0) {
+                return window.barcodeBuffer.trim();
+            }
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
-                return (barcodeInput.textContent || barcodeInput.innerText || '').trim();
+                const value = (barcodeInput.textContent || barcodeInput.innerText || '').trim();
+                if (value) {
+                    window.barcodeBuffer = value;
+                    return value;
+                }
             }
             return '';
         }
         
-        // 바코드 값 설정
+        // 바코드 값 설정 (전역 버퍼와 동기화)
         function setBarcodeValue(value) {
+            window.barcodeBuffer = value || '';
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
                 barcodeInput.textContent = value || '';
@@ -1574,7 +1585,13 @@
                 
                 // 즉시 select에서 포커스 제거 (키보드 방지)
                 this.blur();
-                console.log('컨테이너 선택: select blur 처리');
+                // 추가 포커스 제거 처리
+                if (document.activeElement) {
+                    document.activeElement.blur();
+                }
+                // body에 포커스 이동 (키보드 완전히 숨김)
+                document.body.focus();
+                console.log('컨테이너 선택: select blur 처리 완료');
                 
                 if (arnNumber) {
                     // 메모리 Set 초기화 (새 컨테이너 선택 시 이전 스캔 데이터 제거)
@@ -1689,7 +1706,8 @@
                 if (e.key.length === 1) {
                     e.preventDefault();
                     e.stopPropagation();
-                    const currentValue = getBarcodeValue();
+                    // 전역 버퍼에 직접 추가 (getBarcodeValue()는 버퍼를 우선 사용)
+                    const currentValue = window.barcodeBuffer || getBarcodeValue();
                     const newValue = currentValue + e.key;
                     setBarcodeValue(newValue);
                     console.log('전역 keydown으로 바코드 입력:', e.key, '현재 값:', newValue);
