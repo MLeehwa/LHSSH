@@ -31,6 +31,13 @@
             
             // 이미 초기화되었으면 중복 이벤트 리스너 추가 방지
             if (barcodeInputInitialized) {
+                // 포커스만 다시 설정
+                const partsSection = document.getElementById('partsSection');
+                if (partsSection && !partsSection.classList.contains('hidden')) {
+                    setTimeout(() => {
+                        barcodeInput.focus();
+                    }, 100);
+                }
                 return;
             }
             
@@ -423,6 +430,7 @@
         <!-- 화면에는 안 보이지만 DOM에 살아있고, PDA가 인식 가능 -->
         <div id="barcodeInput"
              contenteditable="true"
+             tabindex="0"
              style="
                 position:absolute;
                 top:0;
@@ -430,7 +438,8 @@
                 width:1px;
                 height:1px;
                 opacity:0;
-                z-index:1; 
+                z-index:1;
+                outline:none;
              "></div>
 
         <!-- Save/Cancel Buttons -->
@@ -1531,6 +1540,13 @@
                         
                         // 바코드 입력 필드 초기화 및 설정
                         setupBarcodeInput();
+                        
+                        // 바코드 입력 필드에 포커스 설정 (PDA 스캐너가 입력할 수 있도록)
+                        const barcodeInput = document.getElementById('barcodeInput');
+                        if (barcodeInput) {
+                            barcodeInput.focus();
+                            console.log('바코드 입력 필드 포커스 설정 완료');
+                        }
                         
                         console.log('바코드 입력 필드 설정 완료 (input 이벤트 기반)');
                     }, 300);
