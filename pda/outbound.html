@@ -463,15 +463,6 @@
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1" data-i18n="part_number_scan">파트 번호 스캔</label>
                     <div class="flex space-x-1">
-                        <!-- 보이지 않는 contenteditable 박스 (스캐너 전용, 키보드 방지) -->
-                        <div id="barcodeInput" contenteditable="true" 
-                             style="position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; outline: none; border: none; overflow: hidden;"
-                             autocomplete="off"
-                             spellcheck="false"
-                             data-gramm="false"
-                             data-gramm_editor="false"
-                             data-enable-grammarly="false"
-                             tabindex="0"></div>
                         <div class="scan-input flex-1 flex items-center justify-center text-gray-500 text-xs" style="min-height: 32px;">
                             <span data-i18n="scan_barcode_placeholder">바코드를 스캔하세요</span>
                         </div>
@@ -482,6 +473,16 @@
                 </div>
             </div>
         </div>
+        
+        <!-- 보이지 않는 contenteditable 박스 (스캐너 전용, body 바로 아래 배치 - 포커스 가능) -->
+        <div id="barcodeInput" contenteditable="true" 
+             style="position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; outline: none; border: none; overflow: hidden; z-index: 9999;"
+             autocomplete="off"
+             spellcheck="false"
+             data-gramm="false"
+             data-gramm_editor="false"
+             data-enable-grammarly="false"
+             tabindex="0"></div>
 
         <!-- AS Manual Input Section (only visible for AS shift) -->
         <div id="asManualSection" class="glass-card rounded-2xl p-6 animate-slide-up hidden">
