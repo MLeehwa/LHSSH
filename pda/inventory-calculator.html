@@ -544,7 +544,7 @@
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 45px; min-width: 45px;" data-i18n="box1_subtotal">박스<br>소계</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="3" style="min-width: 110px;">렉</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 45px; min-width: 45px;" data-i18n="rack_subtotal">렉<br>소계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 45px; min-width: 45px;" data-i18n="remaining_quantity">잔량</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="2" style="min-width: 90px;" data-i18n="remaining_quantity">잔량</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-red-50" style="width: 70px; min-width: 70px; border-left: 3px solid #ef4444;" data-i18n="total">총합계</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-blue-800 text-center bg-blue-50" style="width: 70px; min-width: 70px;" data-i18n="system_stock">시스템<br>재고</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-gray-50" style="width: 60px; min-width: 60px;">차이</th>
@@ -562,7 +562,8 @@
                             <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">2</th>
                             <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">3</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100"></th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"></th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">1</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">2</th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-red-50"></th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-blue-50"></th>
                             <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"></th>
@@ -882,7 +883,7 @@
             // 렉 3개 인풋 생성
             let rackInputs = '';
             for (let i = 1; i <= 3; i++) {
-                const nextInput = i === 3 ? 'remaining' : `rack${i + 1}`;
+                const nextInput = i === 3 ? 'remaining1' : `rack${i + 1}`;
                 rackInputs += `
                     <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 40px; min-width: 40px;">
                         <input type="number" class="table-input w-full rounded text-center" 
@@ -891,6 +892,22 @@
                                onfocus="highlightRow('${rowId}')"
                                onblur="unhighlightRow('${rowId}')"
                                data-row="${rowId}" data-type="rack${i}" placeholder="" id="rack${i}-${rowId}" inputmode="numeric">
+                    </td>
+                `;
+            }
+            
+            // 잔량 2개 인풋 생성
+            let remainingInputs = '';
+            for (let i = 1; i <= 2; i++) {
+                const nextInput = i === 2 ? null : `remaining${i + 1}`;
+                remainingInputs += `
+                    <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 40px; min-width: 40px;">
+                        <input type="number" class="table-input w-full rounded text-center" 
+                               min="0" oninput="calculateRowTotal('${rowId}')" 
+                               onkeydown="handleInputKeydown(event, '${rowId}', ${nextInput ? `'${nextInput}'` : 'null'})"
+                               onfocus="highlightRow('${rowId}')"
+                               onblur="unhighlightRow('${rowId}')"
+                               data-row="${rowId}" data-type="remaining${i}" placeholder="" id="remaining${i}-${rowId}" inputmode="numeric">
                     </td>
                 `;
             }
@@ -909,14 +926,7 @@
                 <td class="border-2 border-gray-400 px-1 py-1 text-center bg-gray-100" style="width: 50px; min-width: 50px;">
                     <span class="subtotal-cell text-gray-800 font-bold text-sm" data-row="${rowId}" data-type="rack-total">0</span>
                 </td>
-                <td class="border-2 border-gray-400 px-1 py-1 bg-gray-50" style="width: 50px; min-width: 50px;">
-                    <input type="number" class="table-input w-full rounded" 
-                           min="0" oninput="calculateRowTotal('${rowId}')" 
-                           onkeydown="handleInputKeydown(event, '${rowId}', null)"
-                           onfocus="highlightRow('${rowId}')"
-                           onblur="unhighlightRow('${rowId}')"
-                           data-row="${rowId}" data-type="remaining" placeholder="" id="remaining-${rowId}" inputmode="numeric">
-                </td>
+                ${remainingInputs}
                 <td class="border-2 border-gray-400 px-1 py-2 text-center" id="total-cell-${rowId}" style="width: 80px; min-width: 80px; border-left: 3px solid #ef4444; background-color: #fee2e2;">
                     <span class="total-cell text-red-800 font-bold text-lg" data-row="${rowId}" data-type="total">0</span>
                 </td>
@@ -1084,8 +1094,12 @@
                 rackTotal += rackUnit * rackQty;
             }
             
-            // 잔량
-            const remaining = parseFloat(row.querySelector('[data-type="remaining"]')?.value) || 0;
+            // 잔량 2개 합계 계산
+            let remainingTotal = 0;
+            for (let i = 1; i <= 2; i++) {
+                const remainingQty = parseFloat(row.querySelector(`[data-type="remaining${i}"]`)?.value) || 0;
+                remainingTotal += remainingQty;
+            }
             
             // 각 항목별 합계 표시
             const boxTotalEl = row.querySelector('[data-type="box-total"]');
@@ -1099,7 +1113,7 @@
             }
             
             // 총 합계
-            const total = boxTotal + rackTotal + remaining;
+            const total = boxTotal + rackTotal + remainingTotal;
             
             // 총합계 표시
             const totalEl = row.querySelector('[data-type="total"]');
@@ -1252,7 +1266,7 @@
                 if (nextType === 'box-total') {
                     nextInput = document.querySelector(`[data-row="${rowId}"][data-type="rack1"]`);
                 } else if (nextType === 'rack-total') {
-                    nextInput = document.querySelector(`[data-row="${rowId}"][data-type="remaining"]`);
+                    nextInput = document.querySelector(`[data-row="${rowId}"][data-type="remaining1"]`);
                 } else {
                     nextInput = document.querySelector(`[data-row="${rowId}"][data-type="${nextType}"]`);
                 }
@@ -1426,8 +1440,8 @@
                 boxTotal += parseInt(input.value) || 0;
             });
             
-            // 잔량 합계
-            const remainingInputs = document.querySelectorAll('input[data-type="remaining"]');
+            // 잔량 합계 (테이블 내 잔량만 계산)
+            const remainingInputs = document.querySelectorAll('input[data-type^="remaining"][data-row]');
             let remainingTotal = 0;
             remainingInputs.forEach(input => {
                 remainingTotal += parseInt(input.value) || 0;
@@ -1553,7 +1567,8 @@
             });
             
             const remainings = [];
-            document.querySelectorAll('input[data-type="remaining"]').forEach(input => {
+            // 테이블 내 잔량만 수집 (data-row 속성이 있는 것만)
+            document.querySelectorAll('input[data-type^="remaining"][data-row]').forEach(input => {
                 const qty = parseInt(input.value) || 0;
                 if (qty > 0) remainings.push(qty);
             });
@@ -1724,10 +1739,17 @@
                     if (rackValue > 0) racks.push(rackValue);
                 }
                 
-                const remaining = parseFloat(row.querySelector('[data-type="remaining"]')?.value) || 0;
+                // 잔량 2개 합계 계산
+                let remainingTotal = 0;
+                const remainings = [];
+                for (let i = 1; i <= 2; i++) {
+                    const remainingQty = parseFloat(row.querySelector(`[data-type="remaining${i}"]`)?.value) || 0;
+                    remainingTotal += remainingQty;
+                    if (remainingQty > 0) remainings.push(remainingQty);
+                }
                 
                 // 합계 계산
-                const total = boxTotal + rackTotal + remaining;
+                const total = boxTotal + rackTotal + remainingTotal;
                 
                 // 숫자를 하나도 세지 않은 파트는 제외 (실사재고를 하지 않은 것으로 처리)
                 // 0으로 저장하지 않고, 해당 파트는 실사재고 목록에 포함되지 않음
@@ -1735,9 +1757,6 @@
                 
                 // 파트 정보 가져오기
                 const part = allParts.find(p => p.part_number === partNumber);
-                
-                // 계산 상세 정보
-                const remainings = remaining > 0 ? [remaining] : [];
                 
                 parts.push({
                     partNumber: partNumber,
