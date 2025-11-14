@@ -47,20 +47,47 @@
                 }, 300);
             }
             
+            // 바코드 입력 버퍼 (PDA 스캐너용)
+            let barcodeBuffer = '';
+            
             // contenteditable input 이벤트로 바코드 입력 처리
             barcodeInput.addEventListener('input', function() {
                 const code = (this.textContent || this.innerText || '').trim();
+                console.log('input 이벤트 발생:', code);
                 if (code.length > 0) {
+                    barcodeBuffer = code;
                     // 바코드 패턴 확인 후 자동 스캔
                     checkAndAutoScan(code);
                 }
             });
             
-            // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
+            // keydown 이벤트로도 처리 (PDA 스캐너 호환성)
             barcodeInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
+                console.log('keydown 이벤트:', e.key, e.keyCode);
+                
+                // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
+                if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault();
+                    // 버퍼에 값이 있으면 스캔 처리
+                    if (barcodeBuffer.trim().length > 0) {
+                        console.log('Enter 키로 스캔 처리:', barcodeBuffer);
+                        scanBarcode();
+                        barcodeBuffer = '';
+                    }
+                    return;
                 }
+                
+                // 일반 문자 입력은 버퍼에 추가
+                if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    barcodeBuffer += e.key;
+                    console.log('버퍼 업데이트:', barcodeBuffer);
+                    // contenteditable에 직접 입력되므로 input 이벤트가 발생할 것임
+                }
+            });
+            
+            // keypress 이벤트도 처리 (일부 PDA 호환성)
+            barcodeInput.addEventListener('keypress', function(e) {
+                console.log('keypress 이벤트:', e.key, e.keyCode);
             });
             
             barcodeInputInitialized = true;
