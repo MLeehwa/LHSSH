@@ -1593,17 +1593,13 @@
 
         // 전역 바코드 입력 처리 함수 (개선된 버전 - 키 입력 시 자동 포커스)
         function handleGlobalBarcodeInput(e) {
-            console.log('handleGlobalBarcodeInput 호출:', e.key);
-            
             // 바코드 입력창 가져오기
             const barcodeInput = document.getElementById('barcodeInput');
             if (!barcodeInput) {
-                console.log('barcodeInput 없음');
                 return;
             }
             
             if (barcodeInput.classList.contains('hidden')) {
-                console.log('barcodeInput 숨김');
                 return;
             }
             
@@ -1670,7 +1666,6 @@
                     e.stopPropagation();
                     const currentValue = getBarcodeValue();
                     setBarcodeValue(currentValue + e.key);
-                    console.log('contenteditable 포커스 상태에서 전역 이벤트로 입력:', e.key, '현재 값:', getBarcodeValue());
                     checkAndAutoScan(getBarcodeValue());
                 }
                 return;
@@ -1789,54 +1784,46 @@
 
             // 전역 키보드 이벤트 리스너 (바코드 스캐너용) - 항상 활성화
             document.addEventListener('keydown', function(e) {
-                console.log('전역 키보드 이벤트 발생:', e.key, 'partsSection 체크 시작');
-                
                 // 컨테이너 선택 드롭다운이나 버튼에 포커스가 있으면 무시
                 const activeElement = document.activeElement;
                 if (activeElement && (
                     activeElement.id === 'containerSelect' ||
                     activeElement.closest('button')
                 )) {
-                    console.log('드롭다운/버튼 포커스 - 무시');
                     return;
                 }
                 
                 // 파트 섹션이 보일 때만 전역 바코드 입력 처리 (스캔 섹션은 숨김)
                 const partsSection = document.getElementById('partsSection');
-                if (partsSection && !partsSection.classList.contains('hidden')) {
-                    console.log('partsSection 보임 - 바코드 입력 처리');
-                    
-                    // Ctrl+V (붙여넣기) 처리
-                    if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const barcodeInput = document.getElementById('barcodeInput');
-                        if (barcodeInput) {
-                            barcodeInput.focus();
-                            // 클립보드에서 붙여넣기 (비동기)
-                            navigator.clipboard.readText().then(text => {
-                                console.log('클립보드에서 붙여넣기:', text);
-                                setBarcodeValue(text);
-                                // 바코드가 입력되면 자동 스캔
-                                setTimeout(() => {
-                                    if (getBarcodeValue().length > 0) {
-                                        console.log('붙여넣기 후 자동 스캔:', getBarcodeValue());
-                                        scanBarcode();
-                                    }
-                                }, 150);
-                            }).catch(err => {
-                                console.error('클립보드 읽기 실패:', err);
-                                // 폴백: paste 이벤트가 처리할 것임
-                            });
-                        }
-                        return;
-                    }
-                    
-                    handleGlobalBarcodeInput(e);
-                } else {
-                    console.log('partsSection 숨김 또는 없음 - 이벤트 무시');
+                if (!partsSection || partsSection.classList.contains('hidden')) {
+                    return;
                 }
-            });
+                
+                // Ctrl+V (붙여넣기) 처리
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const barcodeInput = document.getElementById('barcodeInput');
+                    if (barcodeInput) {
+                        barcodeInput.focus();
+                        // 클립보드에서 붙여넣기 (비동기)
+                        navigator.clipboard.readText().then(text => {
+                            setBarcodeValue(text);
+                            // 바코드가 입력되면 자동 스캔
+                            setTimeout(() => {
+                                if (getBarcodeValue().length > 0) {
+                                    scanBarcode();
+                                }
+                            }, 150);
+                        }).catch(err => {
+                            console.error('클립보드 읽기 실패:', err);
+                        });
+                    }
+                    return;
+                }
+                
+                handleGlobalBarcodeInput(e);
+            }, true); // capture phase에서 이벤트 캡처
             
             // 붙여넣기 이벤트 리스너 추가 (모든 경우 처리)
             document.addEventListener('paste', function(e) {
