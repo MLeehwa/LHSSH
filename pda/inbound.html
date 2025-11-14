@@ -31,7 +31,7 @@
             if (barcodeInputInitialized) {
                 const partsSection = document.getElementById('partsSection');
                 if (partsSection && !partsSection.classList.contains('hidden')) {
-                    // 포커스만 다시 설정
+                    // 포커스만 다시 설정 (inputmode="none"으로 키보드 방지)
                     setTimeout(() => {
                         barcodeInput.focus();
                     }, 100);
@@ -39,18 +39,11 @@
                 return;
             }
             
-            // 포커스는 전역 keydown 이벤트에서 자동으로 처리됨
-            // 직접 focus()를 호출하면 키보드가 뜰 수 있으므로 제거
-            
-            // 바코드 입력 버퍼 (PDA 스캐너용 - 전역 keydown과 동기화)
-            window.barcodeBuffer = '';
-            
             // contenteditable input 이벤트로 바코드 입력 처리
             barcodeInput.addEventListener('input', function() {
                 const code = (this.textContent || this.innerText || '').trim();
                 console.log('input 이벤트 발생:', code);
                 if (code.length > 0) {
-                    window.barcodeBuffer = code;
                     // 바코드 패턴 확인 후 자동 스캔
                     checkAndAutoScan(code);
                 }
@@ -63,22 +56,13 @@
                 // Enter 키는 PDA 스캐너가 자동으로 보내므로 preventDefault()만 처리
                 if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault();
-                    // 버퍼나 contenteditable 값 확인
-                    const code = getBarcodeValue() || window.barcodeBuffer;
+                    // contenteditable 값 확인
+                    const code = getBarcodeValue();
                     if (code.trim().length > 0) {
                         console.log('Enter 키로 스캔 처리:', code);
-                        setBarcodeValue(code);
                         scanBarcode();
-                        window.barcodeBuffer = '';
                     }
                     return;
-                }
-                
-                // 일반 문자 입력은 버퍼에 추가
-                if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                    window.barcodeBuffer += e.key;
-                    console.log('버퍼 업데이트:', window.barcodeBuffer);
-                    // contenteditable에 직접 입력되므로 input 이벤트가 발생할 것임
                 }
             });
             
@@ -90,26 +74,17 @@
             barcodeInputInitialized = true;
         }
         
-        // 바코드 값 가져오기 (전역 버퍼 우선)
+        // 바코드 값 가져오기
         function getBarcodeValue() {
-            // 전역 버퍼가 있으면 우선 사용
-            if (window.barcodeBuffer && window.barcodeBuffer.trim().length > 0) {
-                return window.barcodeBuffer.trim();
-            }
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
-                const value = (barcodeInput.textContent || barcodeInput.innerText || '').trim();
-                if (value) {
-                    window.barcodeBuffer = value;
-                    return value;
-                }
+                return (barcodeInput.textContent || barcodeInput.innerText || '').trim();
             }
             return '';
         }
         
-        // 바코드 값 설정 (전역 버퍼와 동기화)
+        // 바코드 값 설정
         function setBarcodeValue(value) {
-            window.barcodeBuffer = value || '';
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
                 barcodeInput.textContent = value || '';
@@ -1653,16 +1628,9 @@
                     return;
                 }
                 
-                // 바코드 입력 필드에 포커스가 없으면 포커스 설정 (키보드가 뜨지 않도록 주의)
-                // PDA에서는 포커스 없이도 전역 keydown으로 입력이 가능하므로,
-                // 포커스는 최소한으로만 설정
-                if (activeElement !== barcodeInput && activeElement !== containerSelect) {
-                    // select가 아닐 때만 포커스 설정
-                    try {
-                        barcodeInput.focus();
-                    } catch (err) {
-                        console.warn('포커스 설정 실패:', err);
-                    }
+                // 바코드 입력 필드에 포커스가 없으면 포커스 설정 (inputmode="none"으로 키보드 방지)
+                if (activeElement !== barcodeInput) {
+                    barcodeInput.focus();
                 }
                 
                 // Enter 키 처리
@@ -1692,8 +1660,7 @@
                 if (e.key.length === 1) {
                     e.preventDefault();
                     e.stopPropagation();
-                    // 전역 버퍼에 직접 추가 (getBarcodeValue()는 버퍼를 우선 사용)
-                    const currentValue = window.barcodeBuffer || getBarcodeValue();
+                    const currentValue = getBarcodeValue();
                     const newValue = currentValue + e.key;
                     setBarcodeValue(newValue);
                     console.log('전역 keydown으로 바코드 입력:', e.key, '현재 값:', newValue);
