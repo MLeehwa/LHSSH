@@ -680,6 +680,12 @@
             if (date && shift) {
                 console.log('날짜와 차수가 모두 선택됨, 화면 업데이트 시작');
                 
+                // select에서 즉시 포커스 제거 (키보드 방지)
+                const dateSelect = document.getElementById('dateSelect');
+                const shiftSelect = document.getElementById('shiftSelect');
+                if (dateSelect) dateSelect.blur();
+                if (shiftSelect) shiftSelect.blur();
+                
                 // 전역 바코드 스캔 활성화
                 isGlobalBarcodeEnabled = true;
                 console.log('전역 바코드 스캔 활성화됨');
@@ -689,6 +695,9 @@
                 
                 // 차수 선택 후 포커스 제어 적용
                 setTimeout(preventInputFocus, 100);
+                
+                // 바코드 입력 필드 설정 (차수 선택 후)
+                setupBarcodeInput();
                 
                 // AS 차수인지 확인
                 if (shift === 'AS') {
@@ -1584,8 +1593,20 @@
         // 이벤트 리스너 설정
         function setupEventListeners() {
             // 날짜 및 차수 선택 이벤트
-            document.getElementById('dateSelect').addEventListener('change', updateOutboundInfo);
-            document.getElementById('shiftSelect').addEventListener('change', updateOutboundInfo);
+            const dateSelect = document.getElementById('dateSelect');
+            const shiftSelect = document.getElementById('shiftSelect');
+            
+            dateSelect.addEventListener('change', function(e) {
+                // select에서 즉시 포커스 제거 (키보드 방지)
+                this.blur();
+                updateOutboundInfo();
+            });
+            
+            shiftSelect.addEventListener('change', function(e) {
+                // select에서 즉시 포커스 제거 (키보드 방지)
+                this.blur();
+                updateOutboundInfo();
+            });
 
             // 전역 키보드 이벤트 리스너 (바코드 스캐너용) - 항상 활성화
             document.addEventListener('keydown', function(e) {

@@ -1746,7 +1746,10 @@
         // 이벤트 리스너 설정
         function setupEventListeners() {
             // 컨테이너 선택 이벤트
-            document.getElementById('containerSelect').addEventListener('change', async function(e) {
+            const containerSelect = document.getElementById('containerSelect');
+            containerSelect.addEventListener('change', async function(e) {
+                // select에서 즉시 포커스 제거 (키보드 방지)
+                this.blur();
                 const arnNumber = e.target.value;
                 if (arnNumber) {
                     // 메모리 Set 초기화 (새 컨테이너 선택 시 이전 스캔 데이터 제거)
