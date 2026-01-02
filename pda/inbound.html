@@ -516,12 +516,21 @@
     </div>
 
     <!-- Supabase 설정 및 스크립트 -->
-    <script src="../js/config.js"></script>
     <script>
-        // Supabase 클라이언트 초기화
-        let supabase;
-        let selectedContainer = null;
-        let containerParts = [];
+        // 중복 실행 방지 - 스크립트를 IIFE로 감싸서 스코프 분리
+        (function() {
+            'use strict';
+            
+            // 이미 실행된 경우 중단
+            if (window.INBOUND_SCRIPT_EXECUTED) {
+                return;
+            }
+            window.INBOUND_SCRIPT_EXECUTED = true;
+            
+            // Supabase 클라이언트 초기화
+            let supabase;
+            let selectedContainer = null;
+            let containerParts = [];
         
         function initializeSupabase() {
             try {
@@ -1678,6 +1687,7 @@
         // 터치 이벤트 최적화
         document.addEventListener('touchstart', function() {}, {passive: true});
         document.addEventListener('touchmove', function() {}, {passive: true});
+        })(); // IIFE 종료 - 중복 실행 방지
     </script>
 </body>
 </html> 
