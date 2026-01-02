@@ -30,7 +30,7 @@
             // 이미 초기화되었으면 중복 이벤트 리스너 추가 방지
             if (barcodeInputInitialized) {
                 const partsSection = document.getElementById('partsSection');
-                if (partsSection && !partsSection.classList.contains('hidden') && currentShift) {
+                if (partsSection && !partsSection.classList.contains('hidden') && window.outboundCurrentShift) {
                     // 포커스만 다시 설정
                     setTimeout(() => {
                         barcodeInput.focus();
@@ -40,7 +40,7 @@
             }
             
             const partsSection = document.getElementById('partsSection');
-            if (partsSection && !partsSection.classList.contains('hidden') && currentShift) {
+            if (partsSection && !partsSection.classList.contains('hidden') && window.outboundCurrentShift) {
                 // 파트 섹션이 보이고 차수가 선택되었을 때만 포커스 설정
                 setTimeout(() => {
                     barcodeInput.focus();
@@ -57,7 +57,9 @@
                 if (code.length > 0) {
                     barcodeBuffer = code;
                     // 바코드 패턴 확인 후 자동 스캔
-                    checkAndAutoScan(code);
+                    if (window.outboundCheckAndAutoScan) {
+                        window.outboundCheckAndAutoScan(code);
+                    }
                 }
             });
             
@@ -71,7 +73,9 @@
                     // 버퍼에 값이 있으면 스캔 처리
                     if (barcodeBuffer.trim().length > 0) {
                         console.log('Enter 키로 스캔 처리:', barcodeBuffer);
-                        scanBarcode();
+                        if (window.outboundScanBarcode) {
+                            window.outboundScanBarcode();
+                        }
                         barcodeBuffer = '';
                     }
                     return;
@@ -93,7 +97,7 @@
             barcodeInputInitialized = true;
         }
         
-        // 바코드 값 가져오기
+        // 바코드 값 가져오기 (전역 접근 가능하도록)
         function getBarcodeValue() {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
@@ -101,8 +105,9 @@
             }
             return '';
         }
+        window.getBarcodeValue = getBarcodeValue; // 전역 접근
         
-        // 바코드 값 설정
+        // 바코드 값 설정 (전역 접근 가능하도록)
         function setBarcodeValue(value) {
             const barcodeInput = document.getElementById('barcodeInput');
             if (barcodeInput) {
@@ -110,6 +115,7 @@
                 barcodeInput.innerText = value || '';
             }
         }
+        window.setBarcodeValue = setBarcodeValue; // 전역 접근
         
         // 바코드 패턴 확인 및 자동 스캔
         let barcodeTimer = null;
@@ -128,14 +134,18 @@
             if (value.length >= 30 || (value.length >= 20 && isGS1BarcodePattern)) {
                 barcodeTimer = setTimeout(() => {
                     console.log('바코드 입력 완료 (자동):', value);
-                    scanBarcode();
+                    if (window.outboundScanBarcode) {
+                        window.outboundScanBarcode();
+                    }
                 }, 100);
             } else {
                 // 일정 시간 입력이 없으면 자동으로 처리
                 barcodeTimer = setTimeout(() => {
                     if (value.trim().length > 0) {
                         console.log('바코드 입력 완료 (타이머):', value);
-                        scanBarcode();
+                        if (window.outboundScanBarcode) {
+                            window.outboundScanBarcode();
+                        }
                     }
                 }, 200);
             }
@@ -582,15 +592,32 @@
     </main>
 
     <!-- Supabase 설정 및 스크립트 -->
-    <script src="../js/config.js"></script>
     <script>
-        // Supabase 클라이언트 초기화
-        let supabase;
-        let scannedParts = {};
-        let currentDate = '';
-        let currentShift = '';
-        let scannedUniqueCodes = new Set();
-        let scanCounts = {}; // 파트별 스캔 횟수 추적
+        // 중복 실행 방지 - 스크립트를 IIFE로 감싸서 스코프 분리
+        (function() {
+            'use strict';
+            
+            // 이미 실행된 경우 중단
+            if (window.OUTBOUND_SCRIPT_EXECUTED) {
+                return;
+            }
+            window.OUTBOUND_SCRIPT_EXECUTED = true;
+            
+            // Supabase 클라이언트 초기화
+            let supabase;
+            let scannedParts = {};
+            let currentDate = '';
+            let currentShift = '';
+            let scannedUniqueCodes = new Set();
+            let scanCounts = {}; // 파트별 스캔 횟수 추적
+            
+            // 전역 접근을 위해 window 객체에 할당 (외부 함수에서 접근 가능하도록)
+            window.outboundSupabase = supabase;
+            window.outboundScannedParts = scannedParts;
+            window.outboundCurrentDate = currentDate;
+            window.outboundCurrentShift = currentShift;
+            window.outboundScannedUniqueCodes = scannedUniqueCodes;
+            window.outboundScanCounts = scanCounts;
         
         function initializeSupabase() {
             try {
@@ -636,6 +663,10 @@
             
             currentDate = date;
             currentShift = shift;
+            
+            // window 객체에도 업데이트
+            window.outboundCurrentDate = currentDate;
+            window.outboundCurrentShift = currentShift;
             
             if (date && shift) {
                 console.log('날짜와 차수가 모두 선택됨, 화면 업데이트 시작');
@@ -1168,11 +1199,15 @@
 
         // 바코드 스캔 시뮬레이션
         function scanBarcode() {
-            const barcode = getBarcodeValue();
+            const barcode = window.getBarcodeValue ? window.getBarcodeValue() : getBarcodeValue();
             
             if (barcode) {
                 handleBarcodeScan(barcode);
-                setBarcodeValue(''); // 스캔 후 초기화
+                if (window.setBarcodeValue) {
+                    window.setBarcodeValue(''); // 스캔 후 초기화
+                } else {
+                    setBarcodeValue(''); // 스캔 후 초기화
+                }
                 const barcodeInput = document.getElementById('barcodeInput');
                 if (barcodeInput) {
                     setTimeout(() => barcodeInput.focus(), 100);
@@ -1801,6 +1836,14 @@
                 currentLanguageElement.textContent = languageNames[currentLanguage] || '한국어';
             }
         });
+        
+        // 외부에서 접근 가능하도록 window 객체에 함수 할당
+        window.outboundScanBarcode = scanBarcode;
+        window.outboundHandleBarcodeScan = handleBarcodeScan;
+        window.outboundGetBarcodeValue = getBarcodeValue;
+        window.outboundSetBarcodeValue = setBarcodeValue;
+        window.outboundCheckAndAutoScan = checkAndAutoScan;
+        })(); // IIFE 종료 - 중복 실행 방지
     </script>
 </body>
 </html> 
