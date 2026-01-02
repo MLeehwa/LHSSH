@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>테스트용 바코드 생성기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        .barcode-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+        }
+        .barcode-text {
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            color: #374151;
+        }
+        .part-info {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">테스트용 바코드 생성기</h1>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">설명</h2>
+            <ul class="space-y-2 text-gray-700">
+                <li>• 아래 바코드들을 PDA에서 스캔하여 테스트할 수 있습니다</li>
+                <li>• 각 바코드는 GS1-128 형식으로 생성되었습니다</li>
+                <li>• 바코드 아래의 텍스트를 직접 입력해도 됩니다</li>
+                <li>• 파트 번호와 수량이 포함되어 있습니다</li>
+            </ul>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 파트 1: 49600-S9000 (REAR) -->
+            <div class="barcode-container">
+                <h3 class="text-lg font-semibold mb-4 text-center">49600-S9000 (REAR)</h3>
+                <div id="barcode1"></div>
+                <div class="barcode-text" id="barcodeText1"></div>
+                <div class="part-info">수량: 35개</div>
+            </div>
+
+            <!-- 파트 2: 49560-P2600 (INNER) -->
+            <div class="barcode-container">
+                <h3 class="text-lg font-semibold mb-4 text-center">49560-P2600 (INNER)</h3>
+                <div id="barcode2"></div>
+                <div class="barcode-text" id="barcodeText2"></div>
+                <div class="part-info">수량: 20개</div>
+            </div>
+
+            <!-- 파트 3: 49560-CW100 (INNER) -->
+            <div class="barcode-container">
+                <h3 class="text-lg font-semibold mb-4 text-center">49560-CW100 (INNER)</h3>
+                <div id="barcode3"></div>
+                <div class="barcode-text" id="barcodeText3"></div>
+                <div class="part-info">수량: 10개</div>
+            </div>
+
+            <!-- 파트 4: 49601-X5000 (REAR) -->
+            <div class="barcode-container">
+                <h3 class="text-lg font-semibold mb-4 text-center">49601-X5000 (REAR)</h3>
+                <div id="barcode4"></div>
+                <div class="barcode-text" id="barcodeText4"></div>
+                <div class="part-info">수량: 5개</div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-blue-800 mb-3">사용 방법</h3>
+            <ol class="space-y-2 text-blue-700">
+                <li>1. PDA 입고 페이지에서 컨테이너를 선택하세요</li>
+                <li>2. 입고일을 입력하세요</li>
+                <li>3. 위의 바코드를 스캔하거나 아래 텍스트를 직접 입력하세요</li>
+                <li>4. 스캔된 수량이 자동으로 업데이트되는지 확인하세요</li>
+            </ol>
+        </div>
+
+        <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-yellow-800 mb-3">직접 입력용 텍스트</h3>
+            <div class="space-y-2">
+                <div class="font-mono text-sm bg-white p-2 rounded border">
+                    <strong>49600-S9000:</strong> <span id="text1"></span>
+                </div>
+                <div class="font-mono text-sm bg-white p-2 rounded border">
+                    <strong>49560-P2600:</strong> <span id="text2"></span>
+                </div>
+                <div class="font-mono text-sm bg-white p-2 rounded border">
+                    <strong>49560-CW100:</strong> <span id="text3"></span>
+                </div>
+                <div class="font-mono text-sm bg-white p-2 rounded border">
+                    <strong>49601-X5000:</strong> <span id="text4"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // GS1-128 바코드 생성 함수
+        function generateGS1Barcode(partNumber, quantity) {
+            // GS1-128 형식: (01)GTIN(30)수량(21)고유번호
+            // 실제로는 더 복잡하지만 테스트용으로 단순화
+            
+            // 파트 번호를 14자리 GTIN으로 변환 (패딩)
+            const paddedPartNumber = partNumber.padEnd(14, '0');
+            
+            // 고유 번호 생성 (현재 시간 기반)
+            const uniqueNumber = Date.now().toString().slice(-6);
+            
+            // GS1-128 데이터 생성
+            const gs1Data = `01${paddedPartNumber}30${quantity.toString().padStart(6, '0')}21${uniqueNumber}`;
+            
+            return {
+                data: gs1Data,
+                partNumber: partNumber,
+                quantity: quantity,
+                uniqueNumber: uniqueNumber
+            };
+        }
+
+        // 바코드 생성 및 표시
+        function createBarcode(containerId, partNumber, quantity) {
+            const barcodeData = generateGS1Barcode(partNumber, quantity);
+            
+            // 바코드 생성
+            JsBarcode(`#${containerId}`, barcodeData.data, {
+                format: "CODE128",
+                width: 2,
+                height: 80,
+                displayValue: false,
+                margin: 10
+            });
+            
+            // 텍스트 표시
+            document.getElementById(`${containerId}Text`).textContent = barcodeData.data;
+            document.getElementById(`text${containerId.slice(-1)}`).textContent = barcodeData.data;
+            
+            return barcodeData;
+        }
+
+        // 페이지 로드 시 바코드 생성
+        document.addEventListener('DOMContentLoaded', function() {
+            // 바코드 생성
+            createBarcode('barcode1', '49600-S9000', 35);
+            createBarcode('barcode2', '49560-P2600', 20);
+            createBarcode('barcode3', '49560-CW100', 10);
+            createBarcode('barcode4', '49601-X5000', 5);
+            
+            console.log('테스트용 바코드 생성 완료');
+        });
+
+        // 바코드 클릭 시 텍스트 복사
+        document.addEventListener('click', function(e) {
+            if (e.target.tagName === 'svg' || e.target.closest('.barcode-container')) {
+                const textElement = e.target.closest('.barcode-container').querySelector('.barcode-text');
+                if (textElement) {
+                    navigator.clipboard.writeText(textElement.textContent).then(() => {
+                        alert('바코드 텍스트가 클립보드에 복사되었습니다!');
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>

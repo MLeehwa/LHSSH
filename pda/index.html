@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title data-i18n="pda_system">이화-서한 프로젝트</title>
+    
+    <!-- Supabase 클라이언트 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- i18n 스크립트 -->
+    <script src="../js/i18n.js"></script>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- 키보드 숨김 기능 -->
+    <script>
+        // 강화된 키보드 숨김 함수
+        function hideKeyboard() {
+            // 1. 모든 입력 필드에서 포커스 제거
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                input.blur();
+                input.setAttribute('readonly', 'readonly');
+                input.setAttribute('tabindex', '-1');
+                setTimeout(() => {
+                    input.removeAttribute('readonly');
+                    input.removeAttribute('tabindex');
+                }, 100);
+            });
+            
+            // 2. 화면을 터치하여 키보드 숨김
+            document.body.click();
+            
+            // 3. 모바일에서 키보드 숨김을 위한 추가 처리
+            if (window.scrollTo) {
+                window.scrollTo(0, 0);
+            }
+            
+            // 4. 가상 키보드 숨김을 위한 추가 처리
+            document.activeElement && document.activeElement.blur();
+            
+            // 5. 포커스를 body로 이동
+            document.body.focus();
+            
+            // 6. 입력 필드 비활성화 후 재활성화
+            inputs.forEach(input => {
+                input.disabled = true;
+                setTimeout(() => {
+                    input.disabled = false;
+                }, 50);
+            });
+        }
+        
+        // 입력 필드 포커스 방지 함수
+        function preventInputFocus() {
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                // 포커스 이벤트 방지
+                input.addEventListener('focus', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+                
+                // 클릭 이벤트 방지
+                input.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+                
+                // 터치 이벤트 방지
+                input.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    e.target.blur();
+                    hideKeyboard();
+                });
+            });
+        }
+        
+        // 페이지 로드 시 키보드 숨김
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(hideKeyboard, 100);
+            setTimeout(hideKeyboard, 500);
+            setTimeout(hideKeyboard, 1000);
+            setTimeout(preventInputFocus, 200);
+        });
+        
+        // 화면 터치 시 키보드 숨김
+        document.addEventListener('touchstart', function(e) {
+            if (!e.target.matches('input, textarea, select, button')) {
+                hideKeyboard();
+            }
+        });
+        
+        // 포커스 이벤트 시 키보드 숨김
+        document.addEventListener('focusin', function(e) {
+            if (!e.target.matches('input, textarea, select')) {
+                hideKeyboard();
+            }
+        });
+        
+        // 키보드 이벤트 시 키보드 숨김
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideKeyboard();
+            }
+        });
+    </script>
+    
+    <script>
+        // Tailwind 설정은 CDN 로드 후에 실행
+        function configureTailwind() {
+            if (window.tailwind) {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#3B82F6',
+                                secondary: '#64748B',
+                                success: '#10B981',
+                                warning: '#F59E0B',
+                                danger: '#EF4444'
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.5s ease-in-out',
+                                'slide-up': 'slideUp 0.5s ease-out',
+                                'bounce-in': 'bounceIn 0.6s ease-out',
+                                'float': 'float 3s ease-in-out infinite',
+                                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0' },
+                                    '100%': { opacity: '1' }
+                                },
+                                slideUp: {
+                                    '0%': { transform: 'translateY(20px)', opacity: '0' },
+                                    '100%': { transform: 'translateY(0)', opacity: '1' }
+                                },
+                                bounceIn: {
+                                    '0%': { transform: 'scale(0.3)', opacity: '0' },
+                                    '50%': { transform: 'scale(1.05)' },
+                                    '70%': { transform: 'scale(0.9)' },
+                                    '100%': { transform: 'scale(1)', opacity: '1' }
+                                },
+                                float: {
+                                    '0%, 100%': { transform: 'translateY(0px)' },
+                                    '50%': { transform: 'translateY(-10px)' }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // CDN이 아직 로드되지 않았다면 잠시 후 다시 시도
+                setTimeout(configureTailwind, 100);
+            }
+        }
+        
+        // 페이지 로드 시 Tailwind 설정
+        document.addEventListener('DOMContentLoaded', configureTailwind);
+    </script>
+    <style>
+        /* PDA 최적화 스타일 */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .action-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .action-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .action-button:active::before {
+            left: 100%;
+        }
+        
+        .action-button:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .inbound-btn {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+        
+        .outbound-btn {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        }
+        
+        .inventory-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+        
+        .calculator-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+        
+        .status-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+        
+        .menu-item {
+            transition: all 0.3s ease;
+        }
+        
+        .menu-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .menu-item:active {
+            transform: scale(0.95);
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .floating-icon {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .language-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .language-btn {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 25px;
+            padding: 8px 16px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .language-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: none;
+        }
+        
+        .language-dropdown.show {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .language-option {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .language-option:last-child {
+            border-bottom: none;
+        }
+        
+        .language-option:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .language-option.active {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        
+        /* Physical Inventory Button Styles */
+        .physical-inventory-btn {
+            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .physical-inventory-btn:hover {
+            background: linear-gradient(135deg, #7C3AED 0%, #9333EA 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+        }
+        
+        /* Welcome Card Animation */
+        @keyframes wave {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(20deg); }
+            75% { transform: rotate(-20deg); }
+        }
+        
+        .fa-hand-wave {
+            animation: wave 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- 언어 선택기 -->
+    <div class="language-selector">
+        <button class="language-btn" onclick="toggleLanguageDropdown()">
+            <i class="fas fa-globe mr-2"></i>
+            <span id="currentLanguage">한국어</span>
+            <i class="fas fa-chevron-down ml-2"></i>
+        </button>
+        <div class="language-dropdown" id="languageDropdown">
+            <div class="language-option active" data-lang="ko">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="korean">한국어</span>
+            </div>
+            <div class="language-option" data-lang="en">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="english">English</span>
+            </div>
+            <div class="language-option" data-lang="es">
+                <i class="fas fa-flag mr-2"></i><span data-i18n="spanish">Español</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="glass-effect p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mr-3 animate-bounce-in">
+                    <i class="fas fa-barcode text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-gray-800">이화-서한 프로젝트</h1>
+                    <p class="text-xs text-gray-600" data-i18n="mobile_work_env">모바일 작업 환경</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-gray-600 text-sm"></i>
+                </div>
+                <button onclick="hideKeyboard()" class="text-gray-600 hover:text-gray-800 transition-colors" title="키보드 숨김">
+                    <i class="fas fa-keyboard text-sm"></i>
+                </button>
+                <button onclick="logout()" class="text-gray-600 hover:text-gray-800 transition-colors">
+                    <i class="fas fa-sign-out-alt text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Action Buttons -->
+    <main class="p-4 pb-24">
+        <div class="space-y-4 animate-slide-up">
+            <!-- Welcome Section -->
+            <div class="glass-card rounded-2xl p-4 mb-6">
+                <div class="flex items-center justify-center mb-2">
+                    <i class="fas fa-hand-wave text-yellow-500 text-2xl mr-2"></i>
+                    <h2 class="text-lg font-bold text-gray-800" data-i18n="hello">안녕하세요!</h2>
+                </div>
+                <p class="text-sm text-gray-600 text-center" data-i18n="select_work_mode">작업할 모드를 선택하세요</p>
+            </div>
+
+            <!-- Menu Grid -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Inbound Button -->
+                <button onclick="window.location.href='inbound.html'" 
+                        class="action-button inbound-btn flex flex-col items-center justify-center text-white menu-item rounded-2xl p-6 min-h-[140px]">
+                    <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                        <i class="fas fa-arrow-down text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-center mb-1" data-i18n="inbound_work">입고 작업</h3>
+                    <p class="text-xs text-white/80 text-center" data-i18n="new_item_inbound">새로운 물품 입고 처리</p>
+                </button>
+
+                <!-- Outbound Button -->
+                <button onclick="window.location.href='outbound.html'" 
+                        class="action-button outbound-btn flex flex-col items-center justify-center text-white menu-item rounded-2xl p-6 min-h-[140px]">
+                    <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                        <i class="fas fa-arrow-up text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-center mb-1" data-i18n="outbound_work">출고 작업</h3>
+                    <p class="text-xs text-white/80 text-center" data-i18n="item_outbound_delivery">물품 출고 및 배송 처리</p>
+                </button>
+
+                <!-- Physical Inventory Button -->
+                <button onclick="window.location.href='physical-inventory.html'" 
+                        class="action-button physical-inventory-btn flex flex-col items-center justify-center text-white menu-item rounded-2xl p-6 min-h-[140px]">
+                    <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                        <i class="fas fa-clipboard-check text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-center mb-1" data-i18n="physical_inventory">실사 재고</h3>
+                    <p class="text-xs text-white/80 text-center" data-i18n="physical_inventory_desc">바코드 스캔 및 수동 등록</p>
+                </button>
+
+                <!-- Inventory Calculator Button -->
+                <button onclick="window.location.href='inventory-calculator.html'" 
+                        class="action-button calculator-btn flex flex-col items-center justify-center text-white menu-item rounded-2xl p-6 min-h-[140px]">
+                    <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                        <i class="fas fa-calculator text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-center mb-1" data-i18n="inventory_calculator">재고 계산기</h3>
+                    <p class="text-xs text-white/80 text-center" data-i18n="inventory_calculator_desc">박스/잔량/렉 수량 계산</p>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- 하단 고정 홈 버튼 -->
+    <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <button onclick="window.location.href='../login.html'" 
+                class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-8 py-4 rounded-full shadow-lg flex items-center space-x-2 transition-all duration-300 transform hover:scale-105">
+            <i class="fas fa-home text-xl"></i>
+            <span class="font-semibold" data-i18n="logout">로그아웃</span>
+        </button>
+    </div>
+
+    <script>
+        // 언어 선택기 토글
+        function toggleLanguageDropdown() {
+            const dropdown = document.getElementById('languageDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('show');
+            }
+        }
+
+        // 언어 변경
+        function changeLanguage(lang, clickedElement) {
+            console.log('언어 변경 시도:', lang, clickedElement);
+            
+            // i18n이 로드되었는지 확인
+            if (typeof i18n === 'undefined' || !i18n) {
+                console.error('i18n이 로드되지 않았습니다.');
+                return;
+            }
+            
+            // 언어 설정
+            i18n.setLanguage(lang);
+            console.log('언어 설정 완료:', lang);
+            
+            // 현재 언어 표시 업데이트
+            const currentLanguageElement = document.getElementById('currentLanguage');
+            const languageNames = {
+                'ko': '한국어',
+                'en': 'English',
+                'es': 'Español'
+            };
+            if (currentLanguageElement) {
+                currentLanguageElement.textContent = languageNames[lang];
+                console.log('현재 언어 표시 업데이트:', languageNames[lang]);
+            }
+            
+            // 드롭다운 닫기
+            const languageDropdown = document.getElementById('languageDropdown');
+            if (languageDropdown) {
+                languageDropdown.classList.remove('show');
+            }
+            
+            // 활성 옵션 업데이트
+            document.querySelectorAll('.language-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            if (clickedElement) {
+                clickedElement.classList.add('active');
+            } else {
+                // clickedElement가 없을 경우 lang에 맞는 옵션 찾기
+                const targetOption = document.querySelector(`.language-option[data-lang="${lang}"]`);
+                if (targetOption) {
+                    targetOption.classList.add('active');
+                }
+            }
+        }
+
+        // 로그아웃 함수
+        function logout() {
+            // 로그아웃 로직 구현
+            alert(i18n.t('logout_success'));
+            window.location.href = '../login.html';
+        }
+
+        // 페이지 로드 시 언어 옵션에 이벤트 리스너 추가 (PDA 터치 이벤트 지원)
+        document.addEventListener('DOMContentLoaded', function() {
+            // 언어 옵션에 클릭/터치 이벤트 리스너 추가
+            document.querySelectorAll('.language-option').forEach(option => {
+                const lang = option.getAttribute('data-lang');
+                if (lang) {
+                    // 클릭 이벤트
+                    option.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        changeLanguage(lang, option);
+                    });
+                    
+                    // 터치 이벤트 (PDA 지원)
+                    option.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        changeLanguage(lang, option);
+                    });
+                }
+            });
+            
+            // 현재 언어 표시 업데이트
+            const currentLanguage = (typeof i18n !== 'undefined' && i18n) ? i18n.currentLanguage : 'ko';
+            const languageNames = {
+                'ko': '한국어',
+                'en': 'English',
+                'es': 'Español'
+            };
+            const currentLanguageElement = document.getElementById('currentLanguage');
+            if (currentLanguageElement) {
+                currentLanguageElement.textContent = languageNames[currentLanguage] || '한국어';
+            }
+            
+            // 활성 옵션 표시
+            const activeOption = document.querySelector(`.language-option[data-lang="${currentLanguage}"]`);
+            if (activeOption) {
+                document.querySelectorAll('.language-option').forEach(opt => opt.classList.remove('active'));
+                activeOption.classList.add('active');
+            }
+        });
+
+        // 페이지 외부 클릭/터치 시 드롭다운 닫기
+        document.addEventListener('click', function(event) {
+            const languageSelector = document.querySelector('.language-selector');
+            if (languageSelector && !languageSelector.contains(event.target)) {
+                const languageDropdown = document.getElementById('languageDropdown');
+                if (languageDropdown) {
+                    languageDropdown.classList.remove('show');
+                }
+            }
+        });
+        
+        // 터치 이벤트도 처리 (PDA 지원)
+        document.addEventListener('touchend', function(event) {
+            const languageSelector = document.querySelector('.language-selector');
+            if (languageSelector && !languageSelector.contains(event.target)) {
+                const languageDropdown = document.getElementById('languageDropdown');
+                if (languageDropdown) {
+                    languageDropdown.classList.remove('show');
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
