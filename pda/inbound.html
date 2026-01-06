@@ -67,7 +67,9 @@
                             // partsSection이 여전히 보이는지 다시 확인
                             const partsSectionCheck = document.getElementById('partsSection');
                             if (partsSectionCheck && !partsSectionCheck.classList.contains('hidden')) {
-                                handleBarcodeScan(currentCode).then(result => {
+                                const scanHandler = window.inboundHandleBarcodeScan || handleBarcodeScan;
+                                if (scanHandler) {
+                                    scanHandler(currentCode).then(result => {
                                     if (result) {
                                         // 스캔 성공 시 입력 필드 초기화
                                         barcodeInput.textContent = '';
@@ -77,9 +79,10 @@
                                             barcodeInput.focus();
                                         }, 50);
                                     }
-                                }).catch(error => {
-                                    console.error('handleBarcodeScan 오류:', error);
-                                });
+                                    }).catch(error => {
+                                        console.error('handleBarcodeScan 오류:', error);
+                                    });
+                                }
                             }
                         }
                     }, 200);
@@ -106,7 +109,9 @@
                             clearTimeout(barcodeTimer);
                             barcodeTimer = null;
                         }
-                        handleBarcodeScan(code).then(result => {
+                        const scanHandler = window.inboundHandleBarcodeScan || handleBarcodeScan;
+                        if (scanHandler) {
+                            scanHandler(code).then(result => {
                             if (result) {
                                 // 스캔 성공 시 입력 필드 초기화
                                 barcodeInput.textContent = '';
@@ -116,9 +121,10 @@
                                     barcodeInput.focus();
                                 }, 50);
                             }
-                        }).catch(error => {
-                            console.error('handleBarcodeScan 오류:', error);
-                        });
+                            }).catch(error => {
+                                console.error('handleBarcodeScan 오류:', error);
+                            });
+                        }
                     }
                 }
             });
@@ -521,14 +527,23 @@
         (function() {
             'use strict';
             
-            // 이미 실행된 경우 중단
-            if (window.INBOUND_SCRIPT_EXECUTED) {
+            // 이미 실행된 경우 중단 (더 엄격한 체크)
+            if (window.INBOUND_SCRIPT_EXECUTED && window.INBOUND_SCRIPT_EXECUTED === true) {
+                console.warn('inbound.html 스크립트가 이미 실행되었습니다. 중복 실행 방지.');
                 return;
             }
+            
+            // 실행 플래그 설정
             window.INBOUND_SCRIPT_EXECUTED = true;
             
-            // Supabase 클라이언트 초기화
+            // Supabase 클라이언트 초기화 (이미 선언되어 있지 않은 경우에만)
+            if (typeof window._inboundSupabase !== 'undefined') {
+                console.warn('supabase 변수가 이미 선언되어 있습니다.');
+                return;
+            }
+            
             let supabase;
+            window._inboundSupabase = supabase; // 중복 선언 방지용 플래그
             let selectedContainer = null;
             let containerParts = [];
         
@@ -1687,6 +1702,18 @@
         // 터치 이벤트 최적화
         document.addEventListener('touchstart', function() {}, {passive: true});
         document.addEventListener('touchmove', function() {}, {passive: true});
+        
+        // 외부에서 접근 가능하도록 window 객체에 함수 할당
+        window.inboundHandleBarcodeScan = handleBarcodeScan;
+        window.inboundSetupBarcodeInput = setupBarcodeInput;
+        
+        // onclick에서 호출되는 함수들을 window 객체에 할당
+        window.confirmInbound = confirmInbound;
+        window.cancelInbound = cancelInbound;
+        window.clearScan = clearScan;
+        window.refreshPage = refreshPage;
+        window.toggleLanguageDropdown = toggleLanguageDropdown;
+        window.changeLanguage = changeLanguage;
         })(); // IIFE 종료 - 중복 실행 방지
     </script>
 </body>

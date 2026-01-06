@@ -1843,6 +1843,15 @@
         window.outboundGetBarcodeValue = getBarcodeValue;
         window.outboundSetBarcodeValue = setBarcodeValue;
         window.outboundCheckAndAutoScan = checkAndAutoScan;
+        
+        // onclick에서 호출되는 함수들을 window 객체에 할당
+        window.confirmOutbound = confirmOutbound;
+        window.cancelOutbound = cancelOutbound;
+        window.clearScan = clearScan;
+        window.addAsPart = addAsPart;
+        window.clearAsInput = clearAsInput;
+        window.toggleLanguageDropdown = toggleLanguageDropdown;
+        window.changeLanguage = changeLanguage;
         })(); // IIFE 종료 - 중복 실행 방지
     </script>
 </body>
