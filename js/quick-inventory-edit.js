@@ -527,6 +527,12 @@ class QuickInventoryEdit {
                 const currentStock = item?.current_stock || 0;
                 const diff = change.newStock - currentStock;
 
+                // 재고가 변경되지 않은 경우 스킵
+                if (diff === 0) {
+                    console.log(`재고 변경 없음 (${partNumber}): ${currentStock}`);
+                    continue;
+                }
+
                 // 1. 재고 업데이트
                 const { error: updateError } = await this.supabase
                     .from('inventory')
