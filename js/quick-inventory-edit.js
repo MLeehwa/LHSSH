@@ -548,8 +548,7 @@ class QuickInventoryEdit {
                     part_number: partNumber,
                     transaction_type: 'ADJUSTMENT',
                     quantity: Math.abs(diff),
-                    balance_after: change.newStock,
-                    reference_number: `ADJ-${Date.now()}`,
+                    reference_id: `ADJ-${Date.now()}`,
                     notes: globalMemo || `실사 조정: ${currentStock} → ${change.newStock}`
                 };
 

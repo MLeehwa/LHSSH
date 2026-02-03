@@ -525,12 +525,11 @@ class InventoryService extends DatabaseService {
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
                 .insert([{
-                    date: new Date().toISOString().split('T')[0],
+                    transaction_date: new Date().toISOString().split('T')[0],
                     part_number: partNumber,
-                    type: type,
+                    transaction_type: type,
                     quantity: quantity,
-                    balance_after: newStock,
-                    reference_number: `${type}-${Date.now()}`
+                    reference_id: `${type}-${Date.now()}`
                 }]);
             
             if (transactionError) throw transactionError;
