@@ -4,7 +4,7 @@
   "description": "바코드 관리 시스템 with Supabase",
   "main": "index.html",
   "scripts": {
-    "dev": "npx http-server -p 8000",
+    "dev": "npx http-server -p 8000 -o /login.html",
     "build": "echo 'Static site - no build needed'",
     "start": "npx http-server -p 8000",
     "deploy": "gh-pages -d ."
@@ -29,4 +29,4 @@
     "last 2 versions",
     "not dead"
   ]
-} 
+}

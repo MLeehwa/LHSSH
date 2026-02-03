@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>실사 재고 - 이화 - 서한 시스템</title>
-    
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Supabase 클라이언트 라이브러리 추가 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -57,10 +58,10 @@
                 setTimeout(configureTailwind, 100);
             }
         }
-        
+
         // 페이지 로드 시 Tailwind 설정
         document.addEventListener('DOMContentLoaded', configureTailwind);
-        
+
         // 개발 환경 플래그 설정
         window.NODE_ENV = 'development';
     </script>
@@ -71,37 +72,46 @@
             border: 1px solid rgba(0, 0, 0, 0.1);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
+
         .glass-sidebar {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(15px);
             border-right: 1px solid rgba(0, 0, 0, 0.1);
             box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
         }
+
         .gradient-bg {
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         }
+
         .card-shadow {
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
+
         .stat-card {
             transition: all 0.3s ease;
         }
+
         .stat-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         }
+
         .nav-item {
             transition: all 0.3s ease;
             position: relative;
         }
+
         .nav-item:hover {
             background: rgba(0, 0, 0, 0.05);
             transform: translateX(5px);
         }
+
         .nav-item.active {
             background: rgba(59, 130, 246, 0.1);
             border-right: 3px solid #3b82f6;
         }
+
         .nav-item.active::before {
             content: '';
             position: absolute;
@@ -111,16 +121,19 @@
             width: 3px;
             background: linear-gradient(135deg, #3B82F6, #1D4ED8);
         }
+
         .animate-fade-in {
             animation: fadeIn 0.5s ease-in-out;
         }
+
         .animate-slide-up {
             animation: slideUp 0.5s ease-out;
         }
+
         .animate-bounce-in {
             animation: bounceIn 0.6s ease-out;
         }
-        
+
         /* 상태 배지 스타일 */
         .status-badge {
             padding: 4px 8px;
@@ -128,61 +141,62 @@
             font-size: 12px;
             font-weight: bold;
         }
-        
+
         .status-active {
             background: #dbeafe;
             color: #1e40af;
         }
-        
+
         .status-completed {
             background: #dcfce7;
             color: #166534;
         }
-        
+
         .status-cancelled {
             background: #fee2e2;
             color: #991b1b;
         }
-        
+
         .status-pending {
             background: #fef3c7;
             color: #92400e;
         }
-        
+
         .status-matched {
             background: #dcfce7;
             color: #166534;
         }
-        
+
         .status-difference {
             background: #fef3c7;
             color: #92400e;
         }
-        
+
         .status-adjusted {
             background: #dbeafe;
             color: #1e40af;
         }
-        
+
         .status-default {
             background: #f3f4f6;
             color: #374151;
         }
-        
+
         /* 텍스트 색상 */
         .text-success {
             color: #059669;
         }
-        
+
         .text-danger {
             color: #dc2626;
         }
-        
+
         .text-muted {
             color: #6b7280;
         }
     </style>
 </head>
+
 <body class="gradient-bg min-h-screen">
     <div class="flex h-screen">
         <!-- Sidebar -->
@@ -201,50 +215,63 @@
                 <div class="px-4">
                     <h3 class="text-xs font-semibold text-gray-800/60 uppercase tracking-wider mb-3">메뉴</h3>
                 </div>
-                
+
                 <div class="space-y-1">
                     <!-- Dashboard -->
-                    <a href="index.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
+                    <a href="index.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
                         <span>대시보드</span>
                     </a>
 
                     <!-- Part Registration -->
-                    <a href="part-registration.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
+                    <a href="part-registration.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-plus w-5 h-5 mr-3"></i>
                         <span>파트 등록</span>
                     </a>
 
                     <!-- Inbound Status -->
-                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
+                    <a href="inbound-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
                         <span>입고 현황</span>
                     </a>
 
                     <!-- Outbound Status -->
-                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
+                    <a href="outbound-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
                         <span>출고 현황</span>
                     </a>
 
                     <!-- Inventory Status -->
-                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
+                    <a href="inventory-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-boxes w-5 h-5 mr-3"></i>
                         <span>재고 현황</span>
                     </a>
-                    
+
                     <!-- Outbound Summary -->
-                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
+                    <a href="outbound-summary.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
                         <span>출하 현황</span>
                     </a>
 
                     <!-- Physical Inventory -->
-                    <a href="physical-inventory.html" class="nav-item active flex items-center px-4 py-3 bg-orange-100 border-l-4 border-orange-600 text-orange-800">
+                    <a href="physical-inventory.html"
+                        class="nav-item active flex items-center px-4 py-3 bg-orange-50 border-l-4 border-orange-500 text-orange-700 transition-all duration-200 font-bold">
                         <i class="fas fa-clipboard-check w-5 h-5 mr-3 text-orange-600"></i>
                         <span class="font-bold">실사재고</span>
                     </a>
 
+                    <!-- Quick Inventory Edit -->
+                    <a href="quick-inventory-edit.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-purple-50 hover:text-purple-800 transition-all duration-200">
+                        <i class="fas fa-table w-5 h-5 mr-3 text-purple-600"></i>
+                        <span>빠른 재고 수정</span>
+                    </a>
 
                 </div>
             </nav>
@@ -279,12 +306,14 @@
                         <p class="text-gray-800/80">PDA 실사 데이터 확인 및 재고 수정</p>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <button id="exportBtn" class="bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
+                        <button id="exportBtn"
+                            class="bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
                             <i class="fas fa-download mr-2"></i>
                             내보내기
                         </button>
                         <div class="relative">
-                            <select id="exportFormat" class="bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select id="exportFormat"
+                                class="bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="csv">CSV</option>
                                 <option value="excel">Excel</option>
                             </select>
@@ -297,10 +326,11 @@
             <div class="flex-1 overflow-auto p-6">
                 <!-- 알림 컨테이너 -->
                 <div id="alertContainer" class="mb-4"></div>
-                
+
                 <!-- Statistics Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                    <div class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
+                    <div
+                        class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
                         <div class="flex items-center">
                             <div class="p-2 bg-blue-500/20 rounded-lg">
                                 <i class="fas fa-clipboard-list text-blue-300 text-xl"></i>
@@ -312,7 +342,8 @@
                         </div>
                     </div>
 
-                    <div class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
+                    <div
+                        class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
                         <div class="flex items-center">
                             <div class="p-2 bg-green-500/20 rounded-lg">
                                 <i class="fas fa-check-circle text-green-300 text-xl"></i>
@@ -324,7 +355,8 @@
                         </div>
                     </div>
 
-                    <div class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
+                    <div
+                        class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
                         <div class="flex items-center">
                             <div class="p-2 bg-red-500/20 rounded-lg">
                                 <i class="fas fa-exclamation-triangle text-red-300 text-xl"></i>
@@ -336,7 +368,8 @@
                         </div>
                     </div>
 
-                    <div class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
+                    <div
+                        class="glass-effect rounded-xl border-2 border-gray-200 p-6 card-shadow stat-card animate-slide-up">
                         <div class="flex items-center">
                             <div class="p-2 bg-yellow-500/20 rounded-lg">
                                 <i class="fas fa-edit text-yellow-300 text-xl"></i>
@@ -356,25 +389,30 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">세션 선택</label>
-                                <select id="sessionSelect" class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
+                                <select id="sessionSelect"
+                                    class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
                                     <option value="">세션을 선택하세요</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">시작 날짜</label>
-                                <input type="date" id="startDate" class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
+                                <input type="date" id="startDate"
+                                    class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">종료 날짜</label>
-                                <input type="date" id="endDate" class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
+                                <input type="date" id="endDate"
+                                    class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
                             </div>
                         </div>
                         <div class="mt-4 flex space-x-2">
-                            <button id="filterBtn" class="bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
+                            <button id="filterBtn"
+                                class="bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
                                 <i class="fas fa-search mr-2"></i>
                                 검색
                             </button>
-                            <button id="clearFilterBtn" class="bg-gray-500 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-600 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
+                            <button id="clearFilterBtn"
+                                class="bg-gray-500 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-600 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
                                 <i class="fas fa-times mr-2"></i>
                                 초기화
                             </button>
@@ -387,7 +425,8 @@
                     <div class="p-6 border-b border-gray-200">
                         <div class="flex items-center justify-between mb-4">
                             <h2 class="text-lg font-semibold text-gray-800">실사 세션 목록</h2>
-                            <button class="refresh-btn bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
+                            <button
+                                class="refresh-btn bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
                                 <i class="fas fa-sync-alt mr-2"></i>
                                 새로고침
                             </button>
@@ -397,11 +436,21 @@
                         <table class="min-w-full divide-y divide-white/20 border-2 border-gray-200">
                             <thead class="bg-white/10 sticky top-0 z-10">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">세션명</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">실사 날짜</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">상태</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">생성일시</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">작업</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        세션명</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        실사 날짜</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        상태</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        생성일시</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        작업</th>
                                 </tr>
                             </thead>
                             <tbody id="sessionsTableBody" class="bg-white/5 divide-y divide-white/20">
@@ -412,7 +461,8 @@
                 </div>
 
                 <!-- 실사 세션 상세 -->
-                <div id="sessionDetailsSection" class="glass-effect rounded-xl border-2 border-gray-200 mb-6 card-shadow" style="display: none;">
+                <div id="sessionDetailsSection"
+                    class="glass-effect rounded-xl border-2 border-gray-200 mb-6 card-shadow" style="display: none;">
                     <div class="p-6 border-b border-gray-200">
                         <div class="flex items-center justify-between">
                             <div>
@@ -426,11 +476,13 @@
                                 </div>
                             </div>
                             <div class="flex items-center space-x-3">
-                                <button class="complete-session-btn bg-green-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-green-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
+                                <button
+                                    class="complete-session-btn bg-green-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-green-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
                                     <i class="fas fa-check mr-2"></i>
                                     세션 완료
                                 </button>
-                                <button onclick="window.physicalInventoryAdmin.showSessionsList()" class="bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
+                                <button onclick="window.physicalInventoryAdmin.showSessionsList()"
+                                    class="bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center">
                                     <i class="fas fa-arrow-left mr-2"></i>
                                     목록으로
                                 </button>
@@ -443,13 +495,27 @@
                         <table class="min-w-full divide-y divide-white/20 border-2 border-gray-200">
                             <thead class="bg-white/10 sticky top-0 z-10">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">파트 번호</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">DB 재고</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">실사 재고</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">차이</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">상태</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider w-48">비고</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">작업</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        파트 번호</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        DB 재고</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        실사 재고</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        차이</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        상태</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider w-48">
+                                        비고</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">
+                                        작업</th>
                                 </tr>
                             </thead>
                             <tbody id="inventoryItemsTableBody" class="bg-white/5 divide-y divide-white/20">
@@ -457,27 +523,33 @@
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <!-- 실사 재고 직접 입력 섹션 -->
                     <div class="p-6 border-t border-gray-200">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4">실사 재고 직접 입력</h3>
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">파트 번호</label>
-                                <select id="manualPartSelect" class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
+                                <select id="manualPartSelect"
+                                    class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900">
                                     <option value="">파트를 선택하세요</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">실사 재고 수량</label>
-                                <input type="number" id="manualPhysicalStock" min="0" class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" placeholder="실사 수량 입력">
+                                <input type="number" id="manualPhysicalStock" min="0"
+                                    class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                    placeholder="실사 수량 입력">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">비고</label>
-                                <input type="text" id="manualNotes" class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" placeholder="비고 입력">
+                                <input type="text" id="manualNotes"
+                                    class="w-full px-3 py-2 bg-white/90 backdrop-blur-md border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                    placeholder="비고 입력">
                             </div>
                             <div class="flex items-end">
-                                <button id="addManualItemBtn" class="w-full bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center">
+                                <button id="addManualItemBtn"
+                                    class="w-full bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center">
                                     <i class="fas fa-plus mr-2"></i>
                                     추가
                                 </button>
@@ -499,24 +571,24 @@
     <script>
         // PhysicalInventoryAdmin 인스턴스 생성
         let physicalInventoryAdmin;
-        
+
         // DOM이 로드된 후 초기화
         document.addEventListener('DOMContentLoaded', async () => {
             physicalInventoryAdmin = new PhysicalInventoryAdmin();
             window.physicalInventoryAdmin = physicalInventoryAdmin; // 전역 접근을 위해
         });
-        
+
         // 로그아웃 함수
         function logout() {
             // 로컬 스토리지에서 인증 정보 제거
             localStorage.removeItem('authToken');
             localStorage.removeItem('userInfo');
             localStorage.removeItem('userMode');
-            
+
             // 로그인 페이지로 리다이렉트
             window.location.href = '../login.html';
         }
-        
+
         // 현재 시간 표시
         function updateTime() {
             const now = new Date();
@@ -531,9 +603,10 @@
             });
             document.getElementById('currentTime').textContent = timeString;
         }
-        
+
         updateTime();
         setInterval(updateTime, 1000);
     </script>
 </body>
-</html> 
+
+</html>

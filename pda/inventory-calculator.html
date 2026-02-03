@@ -1045,7 +1045,7 @@
             try {
                 const { data, error } = await supabaseClient
                     .from('inventory')
-                    .select('current_stock')
+                    .select('part_number, current_stock')
                     .eq('part_number', partNumber)
                     .single();
                 
@@ -1354,7 +1354,7 @@
             try {
                 const { data, error } = await supabaseClient
                     .from('inventory')
-                    .select('current_stock')
+                    .select('part_number, current_stock')
                     .eq('part_number', partNumber)
                     .single();
                 
