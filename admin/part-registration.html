@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>파트 등록 - 이화-서한 프로젝트</title>
-    
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -54,10 +55,10 @@
                 setTimeout(configureTailwind, 100);
             }
         }
-        
+
         // 페이지 로드 시 Tailwind 설정
         document.addEventListener('DOMContentLoaded', configureTailwind);
-        
+
         // 개발 환경 플래그 설정
         window.NODE_ENV = 'development';
     </script>
@@ -68,30 +69,37 @@
             border: 1px solid rgba(0, 0, 0, 0.1);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
+
         .glass-sidebar {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(15px);
             border-right: 1px solid rgba(0, 0, 0, 0.1);
             box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
         }
+
         .gradient-bg {
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         }
+
         .card-shadow {
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
+
         .nav-item {
             transition: all 0.3s ease;
         }
+
         .nav-item:hover {
             transform: translateX(5px);
         }
+
         .nav-item.active {
             background: rgba(59, 130, 246, 0.1);
             border-right: 3px solid #3b82f6;
         }
     </style>
 </head>
+
 <body class="gradient-bg min-h-screen">
     <div class="flex h-screen">
         <!-- Sidebar -->
@@ -110,46 +118,53 @@
                 <div class="px-4">
                     <h3 class="text-xs font-semibold text-gray-800/60 uppercase tracking-wider mb-3">메뉴</h3>
                 </div>
-                
+
                 <div class="space-y-1">
                     <!-- Dashboard -->
-                    <a href="index.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="index.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
                         <span>대시보드</span>
                     </a>
 
                     <!-- Part Registration -->
-                    <a href="part-registration.html" class="nav-item active flex items-center px-4 py-3 text-gray-800 hover:bg-gray-100 transition-all duration-200">
+                    <a href="part-registration.html"
+                        class="nav-item active flex items-center px-4 py-3 text-gray-800 hover:bg-gray-100 transition-all duration-200">
                         <i class="fas fa-plus w-5 h-5 mr-3"></i>
                         <span class="font-medium">파트 등록</span>
                     </a>
 
                     <!-- Inbound Status -->
-                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="inbound-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
                         <span>입고 현황</span>
                     </a>
 
                     <!-- Outbound Status -->
-                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="outbound-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
                         <span>출고 현황</span>
                     </a>
 
                     <!-- Inventory Status -->
-                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="inventory-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-boxes w-5 h-5 mr-3"></i>
                         <span>재고 현황</span>
                     </a>
 
                     <!-- Outbound Summary -->
-                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="outbound-summary.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
                         <span>출하 현황</span>
                     </a>
 
                     <!-- Physical Inventory -->
-                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 bg-orange-50 border-l-4 border-orange-500 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition-all duration-200 font-semibold">
+                    <a href="physical-inventory.html"
+                        class="nav-item flex items-center px-4 py-3 bg-orange-50 border-l-4 border-orange-500 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition-all duration-200 font-semibold">
                         <i class="fas fa-clipboard-check w-5 h-5 mr-3 text-orange-600"></i>
                         <span>실사 관리</span>
                     </a>
@@ -165,7 +180,8 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-800">관리자</p>
-                        <button onclick="logout()" class="text-xs text-gray-800/80 hover:text-gray-800 transition-colors">
+                        <button onclick="logout()"
+                            class="text-xs text-gray-800/80 hover:text-gray-800 transition-colors">
                             <i class="fas fa-sign-out-alt mr-1"></i>로그아웃
                         </button>
                     </div>
@@ -184,7 +200,8 @@
                             <p class="text-sm text-gray-800/80">새로운 파트 등록 및 관리</p>
                         </div>
                         <div class="flex items-center space-x-4">
-                            <button id="refreshBtn" class="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-white/30 transition-colors">
+                            <button id="refreshBtn"
+                                class="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-white/30 transition-colors">
                                 <i class="fas fa-sync-alt mr-2"></i>
                                 새로고침
                             </button>
@@ -255,47 +272,48 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-800/80 mb-2">파트 번호 *</label>
-                                    <input type="text" id="partNumber" name="partNumber" required 
-                                           class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                           placeholder="예: 49560-12345">
+                                    <input type="text" id="partNumber" name="partNumber" required
+                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="예: 49560-12345">
                                     <p class="mt-1 text-xs text-gray-800/60">파트 번호를 입력하면 카테고리가 자동으로 설정됩니다.</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-800/80 mb-2">카테고리 *</label>
-                                    <div class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-800">
+                                    <div
+                                        class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-800">
                                         <span id="categoryDisplay" class="text-sm">파트 번호를 입력하면 자동으로 설정됩니다</span>
                                     </div>
                                     <input type="hidden" id="category" name="category" value="UNKNOWN">
                                 </div>
                             </div>
-                            
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-800/80 mb-2">제품 유형 *</label>
-                                    <select id="productType" name="productType" required 
-                                            class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select id="productType" name="productType" required
+                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="PRODUCTION">양산</option>
                                         <option value="AS">AS</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-800/80 mb-2">상태 *</label>
-                                    <select id="status" name="status" required 
-                                            class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select id="status" name="status" required
+                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="active">활성</option>
                                         <option value="inactive">비활성</option>
                                         <option value="discontinued">단종</option>
                                     </select>
                                 </div>
                             </div>
-                            
+
                             <div class="flex space-x-3">
-                                <button type="submit" 
-                                        class="flex-1 bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                <button type="submit"
+                                    class="flex-1 bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                                     <i class="fas fa-save mr-2"></i>등록
                                 </button>
                                 <button type="button" id="resetBtn"
-                                        class="flex-1 bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                                    class="flex-1 bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                                     <i class="fas fa-undo mr-2"></i>초기화
                                 </button>
                             </div>
@@ -308,16 +326,16 @@
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">검색</label>
-                                <input type="text" id="searchInput" 
-                                       class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                       placeholder="파트 번호, 설명으로 검색...">
+                                <input type="text" id="searchInput"
+                                    class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="파트 번호, 설명으로 검색...">
                             </div>
-                            
+
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-800/80 mb-2">카테고리 필터</label>
-                                    <select id="categoryFilter" 
-                                            class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select id="categoryFilter"
+                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="">모든 카테고리</option>
                                         <option value="INNER">INNER</option>
                                         <option value="REAR">REAR</option>
@@ -326,8 +344,8 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-800/80 mb-2">제품 유형 필터</label>
-                                    <select id="productTypeFilter" 
-                                            class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select id="productTypeFilter"
+                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="">모든 유형</option>
                                         <option value="PRODUCTION">양산</option>
                                         <option value="AS">AS</option>
@@ -335,8 +353,8 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-800/80 mb-2">상태 필터</label>
-                                    <select id="statusFilter" 
-                                            class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select id="statusFilter"
+                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="">모든 상태</option>
                                         <option value="active">활성</option>
                                         <option value="inactive">비활성</option>
@@ -366,7 +384,7 @@
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <!-- Pagination -->
                     <div id="pagination" class="mt-4 flex justify-center">
                         <!-- Pagination will be rendered here -->
@@ -388,15 +406,15 @@
                     <form id="editPartForm" class="mt-4 space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-800/80 mb-2">파트 번호 *</label>
-                            <input type="text" id="editPartNumber" required 
-                                   class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="예: 49560-12345">
+                            <input type="text" id="editPartNumber" required
+                                class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="예: 49560-12345">
                             <p class="mt-1 text-xs text-gray-800/60">파트 번호를 입력하면 카테고리가 자동으로 설정됩니다.</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-800/80 mb-2">카테고리 *</label>
-                            <select id="editCategory" required 
-                                    class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select id="editCategory" required
+                                class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="UNKNOWN">UNKNOWN</option>
                                 <option value="INNER">INNER</option>
                                 <option value="REAR">REAR</option>
@@ -406,16 +424,16 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">제품 유형 *</label>
-                                <select id="editProductType" required 
-                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <select id="editProductType" required
+                                    class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <option value="PRODUCTION">양산</option>
                                     <option value="AS">AS</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-800/80 mb-2">상태 *</label>
-                                <select id="editStatus" required 
-                                        class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <select id="editStatus" required
+                                    class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <option value="active">활성</option>
                                     <option value="inactive">비활성</option>
                                     <option value="discontinued">단종</option>
@@ -423,10 +441,12 @@
                             </div>
                         </div>
                         <div class="flex justify-center space-x-4">
-                            <button type="button" id="cancelEdit" class="bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                            <button type="button" id="cancelEdit"
+                                class="bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                                 취소
                             </button>
-                            <button type="submit" class="bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            <button type="submit"
+                                class="bg-blue-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                                 저장
                             </button>
                         </div>
@@ -451,10 +471,12 @@
                         </p>
                     </div>
                     <div class="flex justify-center space-x-4">
-                        <button id="cancelDelete" class="bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                        <button id="cancelDelete"
+                            class="bg-gray-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                             취소
                         </button>
-                        <button id="confirmDelete" class="bg-red-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                        <button id="confirmDelete"
+                            class="bg-red-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
                             삭제
                         </button>
                     </div>
@@ -464,7 +486,8 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+    <div id="loadingOverlay"
+        class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
         <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <div class="glass-effect p-6 rounded-xl shadow-lg">
                 <div class="flex items-center">
@@ -476,10 +499,10 @@
     </div>
 
     <!-- Scripts -->
-    <script src="../js/config.js"></script>
-    <script src="../js/supabase-client.js"></script>
-    <script src="../js/admin.js"></script>
-    <script src="../js/part-registration.js"></script>
+    <script src="../js/config.js?v=20260205"></script>
+    <script src="../js/supabase-client.js?v=20260205"></script>
+    <script src="../js/admin.js?v=20260205"></script>
+    <script src="../js/part-registration.js?v=20260205"></script>
     <script>
         // 로그아웃 함수
         function logout() {
@@ -495,4 +518,5 @@
         });
     </script>
 </body>
-</html> 
+
+</html>

@@ -1,68 +1,69 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title data-i18n="inventory_calculator_title">재고 계산기 - PDA</title>
-    
+
     <!-- Supabase 설정 (먼저 로드) -->
-    <script src="../js/config.js"></script>
-    
+    <script src="../js/config.js?v=20260205"></script>
+
     <!-- Supabase 클라이언트 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+
     <!-- i18n 스크립트 -->
-    <script src="../js/i18n.js"></script>
-    
+    <script src="../js/i18n.js?v=20260205"></script>
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    
+
     <style>
         * {
             -webkit-tap-highlight-color: transparent;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding-bottom: 100px;
         }
-        
+
         /* 타블렛 세로 모드 최적화 */
         @media (max-width: 1024px) and (orientation: portrait) {
             body {
                 padding-bottom: 90px;
             }
-            
+
             .glass-card {
                 padding: 0.75rem !important;
                 margin-bottom: 0.75rem !important;
             }
-            
+
             header {
                 padding: 0.75rem !important;
                 margin-bottom: 0.75rem !important;
             }
-            
+
             main {
                 padding: 0.75rem !important;
             }
         }
-        
+
         .glass-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3);
             box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
         }
-        
+
         .input-group {
             margin-bottom: 1rem;
         }
-        
+
         .input-label {
             display: block;
             font-size: 0.875rem;
@@ -70,8 +71,9 @@
             color: #374151;
             margin-bottom: 0.5rem;
         }
-        
-        .input-field, .select-field {
+
+        .input-field,
+        .select-field {
             width: 100%;
             padding: 0.75rem;
             border: 2px solid #e5e7eb;
@@ -79,13 +81,14 @@
             font-size: 1rem;
             transition: all 0.2s;
         }
-        
-        .input-field:focus, .select-field:focus {
+
+        .input-field:focus,
+        .select-field:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
-        
+
         .result-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -93,14 +96,14 @@
             border-radius: 1rem;
             margin-top: 1rem;
         }
-        
+
         .result-value {
             font-size: 2rem;
             font-weight: bold;
             text-align: center;
             margin: 0.5rem 0;
         }
-        
+
         .difference-card {
             background: rgba(255, 255, 255, 0.95);
             padding: 1rem;
@@ -108,11 +111,11 @@
             margin-top: 1rem;
             border-left: 4px solid #10b981;
         }
-        
+
         .difference-negative {
             border-left-color: #ef4444;
         }
-        
+
         .btn {
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
@@ -122,55 +125,55 @@
             cursor: pointer;
             font-size: 1rem;
         }
-        
+
         .btn-primary {
             background: #667eea;
             color: white;
         }
-        
+
         .btn-primary:hover {
             background: #5568d3;
         }
-        
+
         .btn-success {
             background: #10b981;
             color: white;
         }
-        
+
         .btn-success:hover {
             background: #059669;
         }
-        
+
         .btn-secondary {
             background: #6b7280;
             color: white;
         }
-        
+
         .btn-secondary:hover {
             background: #4b5563;
         }
-        
+
         .btn-danger {
             background: #ef4444;
             color: white;
         }
-        
+
         .btn-sm {
             padding: 0.5rem 1rem;
             font-size: 0.875rem;
         }
-        
+
         .item-row {
             display: flex;
             gap: 0.5rem;
             align-items: center;
             margin-bottom: 0.5rem;
         }
-        
+
         .item-row input {
             flex: 1;
         }
-        
+
         .fixed-bottom {
             position: fixed;
             bottom: 0;
@@ -181,7 +184,7 @@
             box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
             z-index: 100;
         }
-        
+
         /* 태블릿 최적화 스타일 */
         .table-input {
             font-size: 20px !important;
@@ -196,14 +199,14 @@
             -moz-appearance: textfield;
             flex: 1;
         }
-        
+
         /* 스피너 화살표 숨기기 (Chrome, Safari, Edge) */
         .table-input::-webkit-outer-spin-button,
         .table-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
-        
+
         /* 수량 조절 버튼 컨테이너 */
         .quantity-control {
             display: flex;
@@ -211,13 +214,13 @@
             gap: 2px;
             width: 100%;
         }
-        
+
         .quantity-control .table-input {
             flex: 1 1 auto;
             min-width: 30px;
             max-width: none;
         }
-        
+
         /* 수량 조절 버튼 */
         .quantity-btn {
             min-width: 28px;
@@ -236,29 +239,29 @@
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
-        
+
         .quantity-btn:active {
             background-color: #2563eb;
             transform: scale(0.95);
         }
-        
+
         .quantity-btn:hover {
             background-color: #2563eb;
         }
-        
+
         .quantity-btn.decrease {
             background-color: #ef4444;
             border-color: #dc2626;
         }
-        
+
         .quantity-btn.decrease:active {
             background-color: #dc2626;
         }
-        
+
         .quantity-btn.decrease:hover {
             background-color: #dc2626;
         }
-        
+
         .table-input:focus {
             background-color: #eff6ff !important;
             border-color: #3b82f6 !important;
@@ -268,17 +271,17 @@
             z-index: 10;
             position: relative;
         }
-        
+
         .table-input:not(:placeholder-shown) {
             background-color: #f0f9ff !important;
             border-color: #0ea5e9 !important;
         }
-        
+
         .table-row:has(.table-input:focus) {
             background-color: #eff6ff;
             box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
         }
-        
+
         .table-select {
             font-size: 18px !important;
             padding: 12px 8px !important;
@@ -286,14 +289,14 @@
             border: 2px solid #e5e7eb !important;
             background-color: #f9fafb;
         }
-        
+
         .table-select:focus {
             background-color: #ffffff;
             border-color: #3b82f6 !important;
             outline: none;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
-        
+
         .subtotal-cell {
             font-size: 18px;
             font-weight: 700;
@@ -305,7 +308,7 @@
             background-color: #f3f4f6;
             border-radius: 4px;
         }
-        
+
         .total-cell {
             font-size: 22px;
             font-weight: 700;
@@ -315,171 +318,174 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         /* 반응형 스타일 - 타블렛 세로 모드 최적화 */
         @media (max-width: 1200px) {
             #calculationTable {
                 min-width: 900px !important;
             }
-            
+
             .table-input {
                 font-size: 16px !important;
                 padding: 10px 6px !important;
                 min-height: 48px;
             }
-            
+
             .quantity-btn {
                 min-width: 40px;
                 min-height: 48px;
                 font-size: 20px;
             }
-            
+
             .quantity-control .table-input {
                 min-width: 28px !important;
             }
-            
+
             .subtotal-cell {
                 font-size: 12px !important;
                 padding: 6px 3px !important;
                 min-height: 48px;
             }
-            
+
             .total-cell {
                 font-size: 18px !important;
             }
-            
+
             table {
                 font-size: 12px;
             }
-            
-            th, td {
+
+            th,
+            td {
                 padding: 4px 2px !important;
             }
         }
-        
+
         /* 타블렛 세로 모드 (768px ~ 1024px) */
         @media (max-width: 1024px) and (orientation: portrait) {
             #calculationTable {
                 min-width: 800px !important;
             }
-            
+
             .table-input {
                 font-size: 14px !important;
                 padding: 8px 4px !important;
                 min-height: 44px;
             }
-            
+
             .quantity-btn {
                 min-width: 32px !important;
                 min-height: 44px !important;
                 font-size: 16px;
             }
-            
+
             .quantity-control .table-input {
                 min-width: 24px !important;
             }
-            
+
             .subtotal-cell {
                 font-size: 11px !important;
                 padding: 5px 2px !important;
                 min-height: 44px;
             }
-            
+
             .total-cell {
                 font-size: 15px !important;
             }
-            
+
             table {
                 font-size: 11px;
             }
-            
-            th, td {
+
+            th,
+            td {
                 padding: 3px 1px !important;
             }
-            
+
             th {
                 font-size: 10px !important;
             }
-            
+
             /* 헤더 텍스트 줄바꿈 최적화 */
             th br {
                 display: block;
             }
         }
-        
+
         @media (max-width: 768px) {
             #calculationTable {
                 min-width: 700px !important;
             }
-            
+
             .table-input {
                 font-size: 14px !important;
                 padding: 8px 4px !important;
                 min-height: 40px;
             }
-            
+
             .quantity-btn {
                 min-width: 36px;
                 min-height: 40px;
                 font-size: 18px;
             }
-            
+
             .quantity-control .table-input {
                 min-width: 25px !important;
             }
-            
+
             .quantity-btn {
                 min-width: 20px !important;
                 min-height: 36px !important;
             }
-            
+
             .subtotal-cell {
                 font-size: 10px !important;
                 padding: 4px 2px !important;
                 min-height: 40px;
             }
-            
+
             .total-cell {
                 font-size: 16px !important;
             }
-            
+
             table {
                 font-size: 11px;
             }
-            
-            th, td {
+
+            th,
+            td {
                 padding: 3px 1px !important;
             }
-            
+
             th {
                 font-size: 10px !important;
             }
         }
-        
+
         /* 테이블 스크롤 최적화 */
         .overflow-x-auto {
             -webkit-overflow-scrolling: touch;
             scrollbar-width: thin;
         }
-        
+
         .overflow-x-auto::-webkit-scrollbar {
             height: 8px;
         }
-        
+
         .overflow-x-auto::-webkit-scrollbar-track {
             background: #f1f1f1;
             border-radius: 4px;
         }
-        
+
         .overflow-x-auto::-webkit-scrollbar-thumb {
             background: #888;
             border-radius: 4px;
         }
-        
+
         .overflow-x-auto::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
-        
+
         /* 터치 최적화 버튼 */
         .btn-table {
             min-width: 48px;
@@ -489,6 +495,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Header -->
     <header class="glass-card p-4 mb-4">
@@ -535,38 +542,74 @@
                 </div>
             </div>
             <div class="overflow-x-auto w-full">
-                <table class="w-full border-collapse table-auto" id="calculationTable" style="min-width: 1160px; width: 100%;">
+                <table class="w-full border-collapse table-auto" id="calculationTable"
+                    style="min-width: 1160px; width: 100%;">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center" style="width: 35px; min-width: 35px;" data-i18n="no">번호</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center" style="width: 100px; min-width: 100px;" data-i18n="part_number">파트</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="5" style="min-width: 180px;">박스</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 45px; min-width: 45px;" data-i18n="box1_subtotal">박스<br>소계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="3" style="min-width: 110px;">렉</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100" style="width: 45px; min-width: 45px;" data-i18n="rack_subtotal">렉<br>소계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50" colspan="2" style="min-width: 90px;" data-i18n="remaining_quantity">잔량</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-red-50" style="width: 70px; min-width: 70px; border-left: 3px solid #ef4444;" data-i18n="total">총합계</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-blue-800 text-center bg-blue-50" style="width: 70px; min-width: 70px;" data-i18n="system_stock">시스템<br>재고</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-gray-50" style="width: 60px; min-width: 60px;">차이</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center"
+                                style="width: 35px; min-width: 35px;" data-i18n="no">번호</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center"
+                                style="width: 100px; min-width: 100px;" data-i18n="part_number">파트</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                colspan="5" style="min-width: 180px;">박스</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100"
+                                style="width: 45px; min-width: 45px;" data-i18n="box1_subtotal">박스<br>소계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                colspan="3" style="min-width: 110px;">렉</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100"
+                                style="width: 45px; min-width: 45px;" data-i18n="rack_subtotal">렉<br>소계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                colspan="2" style="min-width: 90px;" data-i18n="remaining_quantity">잔량</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-red-50"
+                                style="width: 70px; min-width: 70px; border-left: 3px solid #ef4444;" data-i18n="total">
+                                총합계</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-blue-800 text-center bg-blue-50"
+                                style="width: 70px; min-width: 70px;" data-i18n="system_stock">시스템<br>재고</th>
+                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-bold text-gray-800 text-center bg-gray-50"
+                                style="width: 60px; min-width: 60px;">차이</th>
                         </tr>
                         <tr class="bg-gray-50">
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center"></th>
-                            <th class="border-2 border-gray-400 px-2 py-2 text-sm font-semibold text-gray-800 text-center"></th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">1</th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">2</th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">3</th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">4</th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">5</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100"></th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">1</th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">2</th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">3</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100"></th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">1</th>
-                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50" style="width: 40px; min-width: 40px;">2</th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-red-50"></th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-blue-50"></th>
-                            <th class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50"></th>
+                            <th
+                                class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center">
+                            </th>
+                            <th
+                                class="border-2 border-gray-400 px-2 py-2 text-sm font-semibold text-gray-800 text-center">
+                            </th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">1</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">2</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">3</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">4</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">5</th>
+                            <th
+                                class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100">
+                            </th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">1</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">2</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">3</th>
+                            <th
+                                class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-100">
+                            </th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">1</th>
+                            <th class="border-2 border-gray-400 px-1 py-1 text-xs font-semibold text-gray-800 text-center bg-gray-50"
+                                style="width: 40px; min-width: 40px;">2</th>
+                            <th
+                                class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-red-50">
+                            </th>
+                            <th
+                                class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-blue-50">
+                            </th>
+                            <th
+                                class="border-2 border-gray-400 px-1 py-2 text-xs font-semibold text-gray-800 text-center bg-gray-50">
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="calculationTableBody">
@@ -601,7 +644,7 @@
         // Supabase 설정 (physical-inventory.html과 동일)
         const supabaseUrl = 'https://vzemucykhxlxgjuldibf.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ';
-        
+
         // Supabase 초기화 (physical-inventory.html과 동일한 방식)
         function initSupabase() {
             try {
@@ -624,24 +667,24 @@
                 console.error('Supabase 클라이언트가 초기화되지 않았습니다.');
                 return;
             }
-            
+
             try {
                 console.log('파트 목록 로드 시작... (AS 파트 제외)');
-                
+
                 // AS 파트 제외하고 로드
                 let query = supabaseClient
                     .from('parts')
                     .select('part_number, description, category, product_type')
                     .eq('status', 'ACTIVE')
                     .neq('product_type', 'AS'); // AS 파트 제외
-                
+
                 const { data, error } = await query.order('part_number');
-                
+
                 if (error) {
                     console.error('Supabase 쿼리 오류:', error);
                     throw error;
                 }
-                
+
                 allParts = data || [];
                 console.log('파트 목록 로드 완료:', allParts.length + '개');
             } catch (error) {
@@ -660,14 +703,14 @@
             const sessionSelect = document.getElementById('sessionSelect');
             const sessionNameGroup = document.getElementById('sessionNameGroup');
             const sessionNameInput = document.getElementById('sessionName');
-            
+
             if (!sessionDate || !supabaseClient) {
                 sessionSelect.innerHTML = '<option value="">-- 새 세션 생성 --</option>';
                 sessionNameGroup.style.display = 'none';
                 selectedSessionId = null;
                 return;
             }
-            
+
             try {
                 // 해당 날짜의 PENDING 또는 COMPLETED 세션 조회
                 const { data, error } = await supabaseClient
@@ -676,16 +719,16 @@
                     .eq('session_date', sessionDate)
                     .in('status', ['PENDING', 'COMPLETED'])
                     .order('created_at', { ascending: false });
-                
+
                 if (error) {
                     console.error('세션 목록 로드 오류:', error);
                     sessionSelect.innerHTML = '<option value="">-- 새 세션 생성 --</option>';
                     return;
                 }
-                
+
                 availableSessions = data || [];
                 sessionSelect.innerHTML = '<option value="">-- 새 세션 생성 --</option>';
-                
+
                 // 세션 목록 추가
                 availableSessions.forEach(session => {
                     const option = document.createElement('option');
@@ -696,7 +739,7 @@
                     }
                     sessionSelect.appendChild(option);
                 });
-                
+
                 // 세션이 없으면 세션명 자동 생성
                 if (availableSessions.length === 0) {
                     sessionNameGroup.style.display = 'none'; // 숨김 (자동 생성)
@@ -713,9 +756,9 @@
             const sessionSelect = document.getElementById('sessionSelect');
             const sessionNameGroup = document.getElementById('sessionNameGroup');
             const sessionNameInput = document.getElementById('sessionName');
-            
+
             selectedSessionId = sessionSelect.value;
-            
+
             if (!selectedSessionId) {
                 // 새 세션 생성 모드 - 세션명 자동 생성
                 sessionNameGroup.style.display = 'none'; // 숨김 (자동 생성)
@@ -734,7 +777,7 @@
         function generateAutoSessionName() {
             const sessionDate = document.getElementById('sessionDate').value;
             const sessionNameInput = document.getElementById('sessionName');
-            
+
             if (sessionDate && sessionNameInput) {
                 // 로컬 시간으로 날짜 파싱 (시간대 문제 방지)
                 const [year, month, day] = sessionDate.split('-').map(Number);
@@ -748,21 +791,21 @@
         async function loadAllPartsToTable() {
             const tbody = document.getElementById('calculationTableBody');
             const statusEl = document.getElementById('partsStatus');
-            
+
             if (!allParts || allParts.length === 0) {
                 if (statusEl) statusEl.textContent = '파트가 없습니다';
                 return;
             }
-            
+
             // INNER와 REAR로 분류
             const innerParts = allParts.filter(p => p.part_number.startsWith('49560'));
             const rearParts49600 = allParts.filter(p => p.part_number.startsWith('49600'));
             const rearParts49601 = allParts.filter(p => p.part_number.startsWith('49601'));
             const otherParts = allParts.filter(p => !p.part_number.startsWith('49560') && !p.part_number.startsWith('49600') && !p.part_number.startsWith('49601'));
-            
+
             tbody.innerHTML = '';
             tableRowCount = 0;
-            
+
             // INNER 파트들 추가
             if (innerParts.length > 0) {
                 const headerRow = document.createElement('tr');
@@ -773,12 +816,12 @@
                     </td>
                 `;
                 tbody.appendChild(headerRow);
-                
+
                 innerParts.forEach(part => {
                     addPartRow(part, 'INNER', 'text-blue-600');
                 });
             }
-            
+
             // REAR 파트들 추가 (49600과 49601을 뒤의 파트 번호로 그룹화)
             const allRearParts = [...rearParts49600, ...rearParts49601];
             if (allRearParts.length > 0) {
@@ -790,7 +833,7 @@
                     </td>
                 `;
                 tbody.appendChild(headerRow);
-                
+
                 // 뒤의 파트 번호로 그룹화 (예: l3000)
                 const groupedRearParts = {};
                 allRearParts.forEach(part => {
@@ -810,14 +853,14 @@
                         groupedRearParts[''].push(part);
                     }
                 });
-                
+
                 // 그룹화된 파트들을 정렬하여 추가 (49600 먼저, 49601 나중에)
                 Object.keys(groupedRearParts).sort().forEach(suffix => {
                     const parts = groupedRearParts[suffix];
                     // 49600으로 시작하는 파트 먼저, 49601으로 시작하는 파트 나중에
                     const parts49600 = parts.filter(p => p.part_number.startsWith('49600'));
                     const parts49601 = parts.filter(p => p.part_number.startsWith('49601'));
-                    
+
                     parts49600.forEach(part => {
                         addPartRow(part, 'REAR', 'text-green-600');
                     });
@@ -826,7 +869,7 @@
                     });
                 });
             }
-            
+
             // 기타 파트들 추가
             if (otherParts.length > 0) {
                 const headerRow = document.createElement('tr');
@@ -837,16 +880,16 @@
                     </td>
                 `;
                 tbody.appendChild(headerRow);
-                
+
                 otherParts.forEach(part => {
                     addPartRow(part, '', 'text-gray-600');
                 });
             }
-            
+
             if (statusEl) {
                 statusEl.textContent = `총 ${allParts.length}개 파트`;
             }
-            
+
         }
 
         // 개별 파트 행 추가
@@ -854,16 +897,16 @@
             const tbody = document.getElementById('calculationTableBody');
             const rowId = `row_${tableRowCount++}`;
             const rowNumber = tableRowCount;
-            
+
             const row = document.createElement('tr');
             row.id = rowId;
             row.className = 'table-row';
             row.dataset.partNumber = part.part_number;
-            
-            const displayText = part.description 
+
+            const displayText = part.description
                 ? `${part.part_number} - ${part.description}`
                 : `${part.part_number}${part.category ? ' - ' + part.category : ''}`;
-            
+
             // 박스 5개 인풋 생성
             let boxInputs = '';
             for (let i = 1; i <= 5; i++) {
@@ -879,7 +922,7 @@
                     </td>
                 `;
             }
-            
+
             // 렉 3개 인풋 생성
             let rackInputs = '';
             for (let i = 1; i <= 3; i++) {
@@ -895,7 +938,7 @@
                     </td>
                 `;
             }
-            
+
             // 잔량 2개 인풋 생성
             let remainingInputs = '';
             for (let i = 1; i <= 2; i++) {
@@ -911,7 +954,7 @@
                     </td>
                 `;
             }
-            
+
             row.innerHTML = `
                 <td class="border-2 border-gray-400 px-1 py-1 text-center text-xs font-semibold" style="width: 40px; min-width: 40px;">${rowNumber}</td>
                 <td class="border-2 border-gray-400 px-2 py-1" id="part-cell-${rowId}" style="width: 130px; min-width: 130px;">
@@ -937,9 +980,9 @@
                     <span class="font-bold text-lg" data-row="${rowId}" data-type="difference">-</span>
                 </td>
             `;
-            
+
             tbody.appendChild(row);
-            
+
             // 파트 번호로 기본값 설정
             const partNumber = part.part_number;
             setTimeout(() => {
@@ -959,18 +1002,18 @@
             const differenceEl = document.querySelector(`[data-row="${rowId}"][data-type="difference"]`);
             const totalCell = document.getElementById(`total-cell-${rowId}`);
             const differenceCell = document.getElementById(`difference-cell-${rowId}`);
-            
+
             if (!totalEl || !systemStockEl || !differenceEl || !totalCell || !differenceCell) return;
-            
+
             const total = parseFloat(totalEl.textContent.replace(/,/g, '')) || 0;
             const difference = total - systemStock;
-            
+
             systemStockEl.textContent = systemStock.toLocaleString();
             differenceEl.textContent = difference > 0 ? `+${difference.toLocaleString()}` : difference.toLocaleString();
-            
+
             // 시스템 재고 스타일 (항상 파란색, 큰 글씨)
             systemStockEl.className = 'text-blue-800 font-bold text-lg';
-            
+
             // 총합계와 차이 셀 색상 설정
             if (difference === 0) {
                 differenceEl.className = 'font-bold text-lg text-green-700';
@@ -997,62 +1040,62 @@
         // 파트 번호에 따른 기본 박스1 UNIT 반환
         function getDefaultBox1Unit(partNumber) {
             if (!partNumber) return null;
-            
+
             // 49560으로 시작하는 파트: 박스1 UNIT = 84
             if (partNumber.startsWith('49560')) {
                 return 84;
             }
-            
+
             // 49600 또는 49601로 시작하는 파트: 박스1 UNIT = 80
             if (partNumber.startsWith('49600') || partNumber.startsWith('49601')) {
                 return 80;
             }
-            
+
             return null;
         }
 
         // 파트 번호에 따른 기본 RACK UNIT 반환
         function getDefaultRackUnit(partNumber) {
             if (!partNumber) return null;
-            
+
             // 예외: 49560-DO000 파트만 RACK UNIT = 64
             if (partNumber === '49560-DO000') {
                 return 64;
             }
-            
+
             // 49560으로 시작하는 파트: RACK UNIT = 40
             if (partNumber.startsWith('49560')) {
                 return 40;
             }
-            
+
             // 49600 또는 49601로 시작하는 파트: RACK UNIT = 50
             if (partNumber.startsWith('49600') || partNumber.startsWith('49601')) {
                 return 50;
             }
-            
+
             return null;
         }
 
         // 파트별 시스템 재고 조회
         async function loadSystemStockForPart(partNumber) {
             if (!supabaseClient || !partNumber) return Promise.resolve();
-            
+
             // 이미 조회한 경우 캐시된 값 반환
             if (systemStocks[partNumber] !== undefined) {
                 return Promise.resolve();
             }
-            
+
             try {
                 const { data, error } = await supabaseClient
                     .from('inventory')
                     .select('part_number, current_stock')
                     .eq('part_number', partNumber)
                     .single();
-                
+
                 if (error && error.code !== 'PGRST116') {
                     throw error;
                 }
-                
+
                 systemStocks[partNumber] = data ? data.current_stock : 0;
                 return Promise.resolve();
             } catch (error) {
@@ -1066,12 +1109,12 @@
         function calculateRowTotal(rowId) {
             const row = document.getElementById(rowId);
             if (!row) return;
-            
+
             // 파트 번호에 따라 자동으로 INNER/REAR 구분하여 UNIT 결정
             const partNumber = row.dataset.partNumber;
             let boxUnit = 0;
             let rackUnit = 0;
-            
+
             if (partNumber && partNumber.startsWith('49560')) {
                 boxUnit = 84; // INNER 박스 UNIT
                 rackUnit = partNumber === '49560-DO000' ? 64 : 40; // INNER 렉 UNIT
@@ -1079,48 +1122,48 @@
                 boxUnit = 80; // REAR 박스 UNIT
                 rackUnit = 50; // REAR 렉 UNIT
             }
-            
+
             // 박스 5개 합계 계산
             let boxTotal = 0;
             for (let i = 1; i <= 5; i++) {
                 const boxQty = parseFloat(row.querySelector(`[data-type="box${i}"]`)?.value) || 0;
                 boxTotal += boxUnit * boxQty;
             }
-            
+
             // 렉 3개 합계 계산
             let rackTotal = 0;
             for (let i = 1; i <= 3; i++) {
                 const rackQty = parseFloat(row.querySelector(`[data-type="rack${i}"]`)?.value) || 0;
                 rackTotal += rackUnit * rackQty;
             }
-            
+
             // 잔량 2개 합계 계산
             let remainingTotal = 0;
             for (let i = 1; i <= 2; i++) {
                 const remainingQty = parseFloat(row.querySelector(`[data-type="remaining${i}"]`)?.value) || 0;
                 remainingTotal += remainingQty;
             }
-            
+
             // 각 항목별 합계 표시
             const boxTotalEl = row.querySelector('[data-type="box-total"]');
             if (boxTotalEl) {
                 boxTotalEl.textContent = boxTotal.toLocaleString();
             }
-            
+
             const rackTotalEl = row.querySelector('[data-type="rack-total"]');
             if (rackTotalEl) {
                 rackTotalEl.textContent = rackTotal.toLocaleString();
             }
-            
+
             // 총 합계
             const total = boxTotal + rackTotal + remainingTotal;
-            
+
             // 총합계 표시
             const totalEl = row.querySelector('[data-type="total"]');
             if (totalEl) {
                 totalEl.textContent = total.toLocaleString();
             }
-            
+
             // 파트 번호 셀 배경색 업데이트 (수량을 샜으면 색상 표시)
             const partCell = document.getElementById(`part-cell-${rowId}`);
             if (partCell) {
@@ -1132,12 +1175,12 @@
                     partCell.style.borderLeft = '';
                 }
             }
-            
+
             // 시스템 재고와 차이 표시 업데이트
             if (partNumber) {
                 updateRowStockDisplay(row.id, partNumber);
             }
-            
+
             // 요약 업데이트
         }
 
@@ -1149,16 +1192,16 @@
             let totalQuantity = 0;
             let completedParts = 0;
             let totalPartRows = 0;
-            
+
             rows.forEach(row => {
                 // 헤더 행은 건너뛰기
                 if (row.classList.contains('bg-blue-100') || row.classList.contains('bg-green-100') || row.classList.contains('bg-gray-100')) {
                     return;
                 }
-                
+
                 totalPartRows++;
                 const totalEl = row.querySelector('[data-type="total"]');
-                
+
                 if (totalEl) {
                     const total = parseFloat(totalEl.textContent.replace(/,/g, '')) || 0;
                     if (total > 0) {
@@ -1168,20 +1211,20 @@
                     }
                 }
             });
-            
+
             const summaryPartCountEl = document.getElementById('summaryPartCount');
             const summaryTotalQuantityEl = document.getElementById('summaryTotalQuantity');
             const progressPercentageEl = document.getElementById('progressPercentage');
             const progressBarEl = document.getElementById('progressBar');
             const progressTextEl = document.getElementById('progressText');
-            
+
             if (summaryPartCountEl) {
                 summaryPartCountEl.textContent = totalParts;
             }
             if (summaryTotalQuantityEl) {
                 summaryTotalQuantityEl.textContent = totalQuantity.toLocaleString();
             }
-            
+
             // 진행률 업데이트
             if (totalPartRows > 0) {
                 const progressPercentage = Math.round((completedParts / totalPartRows) * 100);
@@ -1222,33 +1265,33 @@
         function adjustQuantity(rowId, inputType, change) {
             const input = document.getElementById(`${inputType}-${rowId}`);
             if (!input) return;
-            
+
             const currentValue = parseFloat(input.value) || 0;
             const newValue = Math.max(0, currentValue + change);
             input.value = newValue;
-            
+
             // 입력 이벤트 트리거하여 계산 실행
             input.dispatchEvent(new Event('input', { bubbles: true }));
-            
+
             // 포커스 유지
             input.focus();
         }
-        
+
         // 입력 필드 간 이동 처리
         function handleInputKeydown(event, rowId, nextType) {
             if (event.key === 'Enter' || event.key === 'Tab') {
                 event.preventDefault();
-                
+
                 if (!nextType) {
                     // 다음 행의 첫 번째 입력 필드로 이동
                     const currentRow = document.getElementById(rowId);
                     let nextRow = currentRow.nextElementSibling;
-                    
+
                     // 헤더 행 건너뛰기
                     while (nextRow && (nextRow.classList.contains('bg-blue-100') || nextRow.classList.contains('bg-green-100') || nextRow.classList.contains('bg-gray-100'))) {
                         nextRow = nextRow.nextElementSibling;
                     }
-                    
+
                     if (nextRow) {
                         const firstInput = nextRow.querySelector('input[type="number"]');
                         if (firstInput) {
@@ -1260,7 +1303,7 @@
                     }
                     return;
                 }
-                
+
                 // nextType이 'box-total'이나 'rack-total'이면 다음 입력 필드로 이동
                 let nextInput = null;
                 if (nextType === 'box-total') {
@@ -1270,7 +1313,7 @@
                 } else {
                     nextInput = document.querySelector(`[data-row="${rowId}"][data-type="${nextType}"]`);
                 }
-                
+
                 if (nextInput) {
                     setTimeout(() => {
                         nextInput.focus();
@@ -1286,7 +1329,7 @@
                 resetCalculatorForm();
             }
         }
-        
+
         // 계산기 폼 초기화 (확인 없이)
         function resetCalculatorForm() {
             const rows = document.querySelectorAll('.table-row');
@@ -1295,22 +1338,22 @@
                 if (row.classList.contains('bg-blue-100') || row.classList.contains('bg-green-100') || row.classList.contains('bg-gray-100')) {
                     return;
                 }
-                
+
                 // 모든 입력 필드 초기화
                 const inputs = row.querySelectorAll('input[type="number"]');
                 inputs.forEach(input => {
                     // 모든 수량 필드는 빈 값으로 초기화
                     input.value = '';
                 });
-                
+
                 // 합계 재계산
                 if (row.id) {
                     calculateRowTotal(row.id);
                 }
             });
-            
+
             // 요약 정보 업데이트
-            
+
             // 세션 선택 초기화 (선택 사항)
             // selectedSessionId는 유지하여 같은 세션에 계속 추가할 수 있도록 함
         }
@@ -1319,16 +1362,16 @@
         async function onPartSelected() {
             const select = document.getElementById('partNumberSelect');
             const partNumber = select.value;
-            
+
             if (!partNumber) {
                 currentPartNumber = '';
                 document.getElementById('partInfo').classList.add('hidden');
                 document.getElementById('differenceCard').classList.add('hidden');
                 return;
             }
-            
+
             currentPartNumber = partNumber;
-            
+
             // 파트 정보 표시
             const part = allParts.find(p => p.part_number === partNumber);
             if (part) {
@@ -1339,10 +1382,10 @@
                     ${part.description || part.category || ''}
                 `;
             }
-            
+
             // 시스템 재고 조회
             await loadSystemStock(partNumber);
-            
+
             // 계산 업데이트
             calculateTotal();
         }
@@ -1350,18 +1393,18 @@
         // 시스템 재고 조회
         async function loadSystemStock(partNumber) {
             if (!supabaseClient || !partNumber) return;
-            
+
             try {
                 const { data, error } = await supabaseClient
                     .from('inventory')
                     .select('part_number, current_stock')
                     .eq('part_number', partNumber)
                     .single();
-                
+
                 if (error && error.code !== 'PGRST116') {
                     throw error;
                 }
-                
+
                 systemStock = data ? data.current_stock : 0;
                 updateDifferenceDisplay();
             } catch (error) {
@@ -1439,30 +1482,30 @@
             boxInputs.forEach(input => {
                 boxTotal += parseInt(input.value) || 0;
             });
-            
+
             // 잔량 합계 (테이블 내 잔량만 계산)
             const remainingInputs = document.querySelectorAll('input[data-type^="remaining"][data-row]');
             let remainingTotal = 0;
             remainingInputs.forEach(input => {
                 remainingTotal += parseInt(input.value) || 0;
             });
-            
+
             // 렉 수량 합계
             const rackInputs = document.querySelectorAll('input[data-type="rack"]');
             let rackTotal = 0;
             rackInputs.forEach(input => {
                 rackTotal += parseInt(input.value) || 0;
             });
-            
+
             const total = boxTotal + remainingTotal + rackTotal;
-            
+
             // 결과 표시
             const resultCard = document.getElementById('resultCard');
             const totalQuantity = document.getElementById('totalQuantity');
             const calculationDetail = document.getElementById('calculationDetail');
-            
+
             totalQuantity.textContent = total.toLocaleString();
-            
+
             // 계산 상세
             const details = [];
             if (boxTotal > 0) {
@@ -1475,13 +1518,13 @@
                 details.push(`렉: ${rackTotal.toLocaleString()}`);
             }
             calculationDetail.textContent = details.length > 0 ? details.join(' + ') : '';
-            
+
             if (total > 0 || boxInputs.length > 0 || remainingInputs.length > 0 || rackInputs.length > 0) {
                 resultCard.classList.remove('hidden');
             } else {
                 resultCard.classList.add('hidden');
             }
-            
+
             // 차이 표시 업데이트
             updateDifferenceDisplay(total);
         }
@@ -1492,19 +1535,19 @@
                 const totalText = document.getElementById('totalQuantity').textContent.replace(/,/g, '');
                 physicalStock = parseInt(totalText) || 0;
             }
-            
+
             const differenceCard = document.getElementById('differenceCard');
             const systemStockEl = document.getElementById('systemStock');
             const physicalStockEl = document.getElementById('physicalStock');
             const differenceValueEl = document.getElementById('differenceValue');
-            
+
             if (currentPartNumber && systemStock !== undefined) {
                 systemStockEl.textContent = systemStock.toLocaleString();
                 physicalStockEl.textContent = physicalStock.toLocaleString();
-                
+
                 const difference = physicalStock - systemStock;
                 differenceValueEl.textContent = difference > 0 ? `+${difference.toLocaleString()}` : difference.toLocaleString();
-                
+
                 // 차이에 따라 색상 변경
                 if (difference > 0) {
                     differenceCard.classList.remove('difference-negative');
@@ -1516,7 +1559,7 @@
                     differenceCard.classList.remove('difference-negative');
                     differenceValueEl.className = 'text-xl font-bold text-gray-600';
                 }
-                
+
                 differenceCard.classList.remove('hidden');
             } else {
                 differenceCard.classList.add('hidden');
@@ -1537,7 +1580,7 @@
             boxRowCount = 0;
             remainingRowCount = 0;
             rackRowCount = 0;
-            
+
             // 초기 행 하나씩 추가
             addBoxRow();
             addRemainingRow();
@@ -1550,41 +1593,41 @@
                 alert('파트를 선택해주세요.');
                 return;
             }
-            
+
             const totalText = document.getElementById('totalQuantity').textContent.replace(/,/g, '');
             const total = parseInt(totalText) || 0;
-            
+
             if (total === 0) {
                 alert('총 수량이 0입니다.');
                 return;
             }
-            
+
             // 박스, 잔량, 렉 데이터 수집
             const boxes = [];
             document.querySelectorAll('input[data-type="box"]').forEach(input => {
                 const qty = parseInt(input.value) || 0;
                 if (qty > 0) boxes.push(qty);
             });
-            
+
             const remainings = [];
             // 테이블 내 잔량만 수집 (data-row 속성이 있는 것만)
             document.querySelectorAll('input[data-type^="remaining"][data-row]').forEach(input => {
                 const qty = parseInt(input.value) || 0;
                 if (qty > 0) remainings.push(qty);
             });
-            
+
             const racks = [];
             document.querySelectorAll('input[data-type="rack"]').forEach(input => {
                 const qty = parseInt(input.value) || 0;
                 if (qty > 0) racks.push(qty);
             });
-            
+
             // 파트 정보 가져오기
             const part = allParts.find(p => p.part_number === currentPartNumber);
-            
+
             // 세션 날짜 가져오기
             const sessionDate = document.getElementById('sessionDate').value || new Date().toISOString().split('T')[0];
-            
+
             // 목록에 추가
             const partItem = {
                 id: Date.now(),
@@ -1601,10 +1644,10 @@
                 },
                 timestamp: new Date().toLocaleString('ko-KR')
             };
-            
+
             partsList.push(partItem);
             renderPartsList();
-            
+
             // 현재 입력 초기화
             clearCurrent();
         }
@@ -1613,14 +1656,14 @@
         function renderPartsList() {
             const container = document.getElementById('partsList');
             const countEl = document.getElementById('partsCount');
-            
+
             countEl.textContent = `${partsList.length}개`;
-            
+
             if (partsList.length === 0) {
                 container.innerHTML = '<p class="text-gray-500 text-center py-4" data-i18n="no_parts_added">추가된 파트가 없습니다</p>';
                 return;
             }
-            
+
             container.innerHTML = partsList.map((item, index) => `
                 <div class="bg-white p-3 rounded mb-2 border-l-4 ${item.difference > 0 ? 'border-green-500' : item.difference < 0 ? 'border-red-500' : 'border-gray-300'}">
                     <div class="flex items-center justify-between mb-2">
@@ -1683,30 +1726,30 @@
         // 모든 파트를 실사 재고에 저장
         async function saveAllToPhysicalInventory() {
             const sessionDate = document.getElementById('sessionDate').value;
-            
+
             if (!sessionDate) {
                 alert('날짜를 선택해주세요.');
                 return;
             }
-            
+
             // 테이블에서 모든 행 데이터 수집 (입력이 있는 파트만)
             const rows = document.querySelectorAll('.table-row');
             const parts = [];
-            
+
             for (const row of rows) {
                 // 헤더 행은 건너뛰기
                 if (row.classList.contains('bg-blue-100') || row.classList.contains('bg-green-100') || row.classList.contains('bg-gray-100')) {
                     continue;
                 }
-                
+
                 const partNumber = row.dataset.partNumber;
                 if (!partNumber) continue;
-                
+
                 // 시스템 재고 조회
                 if (!systemStocks[partNumber]) {
                     await loadSystemStockForPart(partNumber);
                 }
-                
+
                 // 입력값 수집
                 // 파트 번호에 따라 자동으로 INNER/REAR 구분하여 UNIT 결정
                 let boxUnit = 0;
@@ -1718,7 +1761,7 @@
                     boxUnit = 80; // REAR 박스 UNIT
                     rackUnit = 50; // REAR 렉 UNIT
                 }
-                
+
                 // 박스 5개 합계 계산
                 let boxTotal = 0;
                 const boxes = [];
@@ -1728,7 +1771,7 @@
                     boxTotal += boxValue;
                     if (boxValue > 0) boxes.push(boxValue);
                 }
-                
+
                 // 렉 3개 합계 계산
                 let rackTotal = 0;
                 const racks = [];
@@ -1738,7 +1781,7 @@
                     rackTotal += rackValue;
                     if (rackValue > 0) racks.push(rackValue);
                 }
-                
+
                 // 잔량 2개 합계 계산
                 let remainingTotal = 0;
                 const remainings = [];
@@ -1747,17 +1790,17 @@
                     remainingTotal += remainingQty;
                     if (remainingQty > 0) remainings.push(remainingQty);
                 }
-                
+
                 // 합계 계산
                 const total = boxTotal + rackTotal + remainingTotal;
-                
+
                 // 숫자를 하나도 세지 않은 파트는 제외 (실사재고를 하지 않은 것으로 처리)
                 // 0으로 저장하지 않고, 해당 파트는 실사재고 목록에 포함되지 않음
                 if (total === 0) continue;
-                
+
                 // 파트 정보 가져오기
                 const part = allParts.find(p => p.part_number === partNumber);
-                
+
                 parts.push({
                     partNumber: partNumber,
                     partDescription: part ? (part.description || part.category || '') : '',
@@ -1772,16 +1815,16 @@
                     }
                 });
             }
-            
+
             if (parts.length === 0) {
                 alert('저장할 파트가 없습니다. 최소 하나 이상의 파트에 수량을 입력해주세요.');
                 return;
             }
-            
+
             // 세션명 가져오기
             const sessionNameInput = document.getElementById('sessionName');
             let sessionName = sessionNameInput ? sessionNameInput.value.trim() : '';
-            
+
             // 세션명이 없으면 자동 생성
             if (!sessionName) {
                 // 로컬 시간으로 날짜 파싱 (시간대 문제 방지)
@@ -1789,18 +1832,18 @@
                 const dateObj = new Date(year, month - 1, day);
                 sessionName = `계산기 실사 ${dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}`;
             }
-            
+
             // Supabase 클라이언트 확인
             if (!supabaseClient) {
                 alert('Supabase 연결에 실패했습니다. 페이지를 새로고침해주세요.');
                 return;
             }
-            
+
             // 저장 확인
             if (!confirm(`총 ${parts.length}개 파트를 저장하시겠습니까?\n날짜: ${sessionDate}\n세션: ${sessionName}`)) {
                 return;
             }
-            
+
             // 로딩 표시
             const saveBtn = document.querySelector('button[onclick="saveAllToPhysicalInventory()"]');
             const originalText = saveBtn?.innerHTML;
@@ -1808,11 +1851,11 @@
                 saveBtn.disabled = true;
                 saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>저장 중...';
             }
-            
+
             try {
                 // 1. 세션 처리 (기존 세션이 있으면 업데이트, 없으면 생성)
                 let sessionId = selectedSessionId ? parseInt(selectedSessionId) : null;
-                
+
                 if (sessionId) {
                     // 기존 세션 업데이트
                     const { data: updatedSession, error: updateError } = await supabaseClient
@@ -1824,7 +1867,7 @@
                         .eq('id', sessionId)
                         .select()
                         .single();
-                    
+
                     if (updateError) {
                         throw new Error(`세션 업데이트 실패: ${updateError.message}`);
                     }
@@ -1839,7 +1882,7 @@
                         })
                         .select()
                         .single();
-                    
+
                     if (sessionError) {
                         throw new Error(`세션 생성 실패: ${sessionError.message}`);
                     }
@@ -1848,25 +1891,25 @@
                     }
                     sessionId = newSession.id;
                 }
-                
+
                 // 2. 기존 세션의 경우 기존 항목 삭제
                 if (sessionId) {
                     const { error: deleteError } = await supabaseClient
                         .from('physical_inventory_items')
                         .delete()
                         .eq('session_id', sessionId);
-                    
+
                     if (deleteError) {
                         console.warn('기존 항목 삭제 오류:', deleteError);
                     }
                 }
-                
+
                 // 3. 실사 항목 생성 (재고 반영은 관리자 확정 시에만 수행)
                 const inventoryItems = [];
-                
+
                 for (const part of parts) {
                     const difference = part.difference;
-                    
+
                     // 실사 항목 생성
                     inventoryItems.push({
                         session_id: sessionId,
@@ -1875,11 +1918,11 @@
                         physical_stock: part.quantity,
                         notes: `계산기 - ${part.calculation ? JSON.stringify(part.calculation) : ''} (차이: ${difference > 0 ? '+' : ''}${difference})`
                     });
-                    
+
                     // 주의: 재고 계산기에서는 inventory_transactions에 저장하지 않습니다.
                     // 재고 반영은 관리자가 실사 관리 화면에서 확정할 때만 수행됩니다.
                 }
-                
+
                 // 4. 실사 항목 저장 (배치 처리)
                 if (inventoryItems.length > 0) {
                     const BATCH_SIZE = 1000;
@@ -1888,23 +1931,23 @@
                         const { error: itemsError } = await supabaseClient
                             .from('physical_inventory_items')
                             .insert(batch);
-                        
+
                         if (itemsError) {
                             throw new Error(`실사 항목 저장 실패: ${itemsError.message}`);
                         }
                     }
                 }
-                
+
                 // 5. inventory_transactions 저장 제거
                 // 재고 계산기에서는 실사 데이터만 저장하고, 재고 반영은 하지 않습니다.
                 // 재고 반영은 관리자가 실사 관리 화면에서 확정할 때만 수행됩니다.
-                
+
                 // 저장 성공
                 alert(`✅ 저장 완료!\n총 ${parts.length}개 파트가 저장되었습니다.\n날짜: ${sessionDate}\n세션: ${sessionName}`);
-                
+
                 // 화면 초기화 (확인 없이)
                 resetCalculatorForm();
-                
+
             } catch (error) {
                 console.error('저장 오류:', error);
                 alert(`❌ 저장 실패: ${error.message}`);
@@ -1921,73 +1964,74 @@
 
         // 페이지 로드 후 Supabase 초기화 시도 (physical-inventory.html과 동일한 방식)
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', async function() {
+            document.addEventListener('DOMContentLoaded', async function () {
                 if (!initSupabase()) {
                     alert('Supabase 연결에 실패했습니다. 페이지를 새로고침해주세요.');
                     return;
                 }
-                
+
                 // i18n 초기화
                 if (window.i18n) {
                     window.i18n.init();
                 }
-                
+
                 // 날짜 기본값 설정
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('sessionDate').value = today;
-                
+
                 // 날짜 변경 시 세션 목록 로드 및 세션명 자동 생성
                 await loadSessionsForDate();
                 generateAutoSessionName();
-                
+
                 // 날짜 변경 시 세션명 자동 재생성
-                document.getElementById('sessionDate').addEventListener('change', function() {
+                document.getElementById('sessionDate').addEventListener('change', function () {
                     if (!selectedSessionId) {
                         generateAutoSessionName();
                     }
                 });
-                
+
                 // 파트 목록 로드
                 await loadPartsList();
-                
+
                 // 모든 파트를 테이블에 미리 로드
                 await loadAllPartsToTable();
             });
         } else {
             // 이미 로드된 경우
-            (async function() {
+            (async function () {
                 if (!initSupabase()) {
                     alert('Supabase 연결에 실패했습니다. 페이지를 새로고침해주세요.');
                     return;
                 }
-                
+
                 // i18n 초기화
                 if (window.i18n) {
                     window.i18n.init();
                 }
-                
+
                 // 날짜 기본값 설정
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('sessionDate').value = today;
-                
+
                 // 날짜 변경 시 세션 목록 로드 및 세션명 자동 생성
                 await loadSessionsForDate();
                 generateAutoSessionName();
-                
+
                 // 날짜 변경 시 세션명 자동 재생성
-                document.getElementById('sessionDate').addEventListener('change', function() {
+                document.getElementById('sessionDate').addEventListener('change', function () {
                     if (!selectedSessionId) {
                         generateAutoSessionName();
                     }
                 });
-                
+
                 // 파트 목록 로드
                 await loadPartsList();
-                
+
                 // 모든 파트를 테이블에 미리 로드
                 await loadAllPartsToTable();
             })();
         }
     </script>
 </body>
+
 </html>

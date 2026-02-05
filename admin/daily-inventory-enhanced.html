@@ -1,40 +1,47 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>일별 재고 관리 (개선된 버전)</title>
-    
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
+
         .glass-sidebar {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-right: 1px solid rgba(255, 255, 255, 0.2);
         }
+
         .glass-effect {
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+
         .nav-item {
             transition: all 0.3s ease;
         }
+
         .nav-item:hover {
             transform: translateX(5px);
         }
+
         .nav-item.active {
             background: rgba(59, 130, 246, 0.1);
             border-right: 3px solid #3b82f6;
         }
     </style>
 </head>
+
 <body class="gradient-bg min-h-screen">
     <!-- 사이드바 -->
     <div class="flex h-screen">
@@ -52,52 +59,60 @@
                 <div class="px-4">
                     <h3 class="text-xs font-semibold text-gray-800/60 uppercase tracking-wider mb-3">메뉴</h3>
                 </div>
-                
+
                 <div class="space-y-1">
                     <!-- Dashboard -->
-                    <a href="index.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="index.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-tachometer-alt w-5 h-5 mr-3"></i>
                         <span>대시보드</span>
                     </a>
 
                     <!-- Part Registration -->
-                    <a href="part-registration.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="part-registration.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-plus w-5 h-5 mr-3"></i>
                         <span>파트 등록</span>
                     </a>
 
                     <!-- Inbound Status -->
-                    <a href="inbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="inbound-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-down w-5 h-5 mr-3"></i>
                         <span>입고 현황</span>
                     </a>
 
                     <!-- Inventory Status -->
-                    <a href="inventory-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="inventory-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-boxes w-5 h-5 mr-3"></i>
                         <span>재고 현황</span>
                     </a>
 
                     <!-- Outbound Status -->
-                    <a href="outbound-status.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="outbound-status.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-arrow-up w-5 h-5 mr-3"></i>
                         <span>출고 현황</span>
                     </a>
 
                     <!-- Outbound Summary -->
-                    <a href="outbound-summary.html" class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
+                    <a href="outbound-summary.html"
+                        class="nav-item flex items-center px-4 py-3 text-gray-800/80 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200">
                         <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
                         <span>출하 현황</span>
                     </a>
 
                     <!-- Physical Inventory -->
-                    <a href="physical-inventory.html" class="nav-item flex items-center px-4 py-3 bg-orange-50 border-l-4 border-orange-500 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition-all duration-200 font-semibold">
+                    <a href="physical-inventory.html"
+                        class="nav-item flex items-center px-4 py-3 bg-orange-50 border-l-4 border-orange-500 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition-all duration-200 font-semibold">
                         <i class="fas fa-clipboard-check w-5 h-5 mr-3 text-orange-600"></i>
                         <span>실사재고</span>
                     </a>
 
                     <!-- Daily Inventory -->
-                    <a href="daily-inventory-enhanced.html" class="nav-item active flex items-center px-4 py-3 text-gray-800 hover:bg-gray-100 transition-all duration-200">
+                    <a href="daily-inventory-enhanced.html"
+                        class="nav-item active flex items-center px-4 py-3 text-gray-800 hover:bg-gray-100 transition-all duration-200">
                         <i class="fas fa-calendar-day w-5 h-5 mr-3"></i>
                         <span class="font-medium">일일 재고</span>
                     </a>
@@ -115,10 +130,12 @@
                     <div class="flex items-center justify-between">
                         <h1 class="text-2xl font-bold text-gray-900">일별 재고 관리</h1>
                         <div class="flex items-center space-x-4">
-                            <button id="refreshInventory" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                            <button id="refreshInventory"
+                                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200">
                                 <i class="fas fa-sync-alt mr-2"></i>새로고침
                             </button>
-                            <button id="generateSummary" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200">
+                            <button id="generateSummary"
+                                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200">
                                 <i class="fas fa-calculator mr-2"></i>요약 생성
                             </button>
                         </div>
@@ -131,15 +148,18 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="inventoryDate" class="block text-sm font-medium text-gray-700 mb-2">조회 날짜</label>
-                        <input type="date" id="inventoryDate" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="date" id="inventoryDate"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label for="partFilter" class="block text-sm font-medium text-gray-700 mb-2">파트 필터</label>
-                        <input type="text" id="partFilter" placeholder="파트번호로 검색..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="partFilter" placeholder="파트번호로 검색..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">재고 상태</label>
-                        <select id="statusFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="statusFilter"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">전체</option>
                             <option value="NORMAL">정상</option>
                             <option value="LOW_STOCK">재고부족</option>
@@ -196,9 +216,9 @@
 
     <!-- 스크립트 -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="../js/config.js"></script>
-    <script src="../js/supabase-client.js"></script>
-    <script src="../js/daily-inventory-enhanced.js"></script>
+    <script src="../js/config.js?v=20260205"></script>
+    <script src="../js/supabase-client.js?v=20260205"></script>
+    <script src="../js/daily-inventory-enhanced.js?v=20260205"></script>
     <script>
         // 페이지 초기화
         document.addEventListener('DOMContentLoaded', async () => {
@@ -222,10 +242,10 @@
         function setupEventListeners() {
             // 파트 필터
             document.getElementById('partFilter').addEventListener('input', filterTable);
-            
+
             // 상태 필터
             document.getElementById('statusFilter').addEventListener('change', filterTable);
-            
+
             // 요약 생성 버튼
             document.getElementById('generateSummary').addEventListener('click', async () => {
                 const date = document.getElementById('inventoryDate').value;
@@ -233,7 +253,7 @@
                     alert('날짜를 선택해주세요.');
                     return;
                 }
-                
+
                 if (window.dailyInventory && typeof window.dailyInventory.generateDailySummary === 'function') {
                     const success = await window.dailyInventory.generateDailySummary(date);
                     if (success) {
@@ -256,16 +276,16 @@
         function filterTable() {
             const partFilter = document.getElementById('partFilter').value.toLowerCase();
             const statusFilter = document.getElementById('statusFilter').value;
-            
+
             const rows = document.querySelectorAll('#inventoryTableContainer tbody tr');
-            
+
             rows.forEach(row => {
                 const partNumber = row.cells[0].textContent.toLowerCase();
                 const status = row.cells[5].textContent.trim();
-                
+
                 const partMatch = !partFilter || partNumber.includes(partFilter);
                 const statusMatch = !statusFilter || status.includes(statusFilter);
-                
+
                 if (partMatch && statusMatch) {
                     row.style.display = '';
                 } else {
@@ -286,7 +306,7 @@
 
         function renderPartHistory(partNumber, history) {
             const container = document.getElementById('partHistoryContainer');
-            
+
             if (history.length === 0) {
                 container.innerHTML = '<p class="text-gray-500">이력 데이터가 없습니다.</p>';
                 return;
@@ -337,4 +357,5 @@
         }
     </script>
 </body>
+
 </html>

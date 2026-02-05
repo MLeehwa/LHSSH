@@ -550,23 +550,40 @@ class QuickInventoryEdit {
                     continue;
                 }
 
-                // 1. 재고 업데이트 (UPSERT 사용 - 없으면 INSERT, 있으면 UPDATE)
+                // 1. 재고 업데이트 (가상 파트면 INSERT, 아니면 UPDATE)
                 console.log(`[DEBUG] 재고 업데이트 시도: ${partNumber} = ${change.newStock} (이전: ${currentStock})`);
-                console.log(`[DEBUG] 가상 파트 여부: ${item?._isVirtual ? '예 (INSERT 필요)' : '아니오'}`);
+                console.log(`[DEBUG] 가상 파트 여부: ${item?._isVirtual ? '예 (INSERT 필요)' : '아니오 (UPDATE 사용)'}`);
 
-                const { data: updateData, error: updateError } = await this.supabase
-                    .from('inventory')
-                    .upsert({
-                        part_number: partNumber,
-                        current_stock: change.newStock,
-                        last_updated: new Date().toISOString(),
-                        min_stock: item?.min_stock || 0,
-                        max_stock: item?.max_stock || 0,
-                        status: 'in_stock'
-                    }, {
-                        onConflict: 'part_number'  // part_number가 PK인 경우
-                    })
-                    .select();
+                let updateData, updateError;
+
+                if (item?._isVirtual) {
+                    // 새 파트: INSERT 사용
+                    const result = await this.supabase
+                        .from('inventory')
+                        .insert({
+                            part_number: partNumber,
+                            current_stock: change.newStock,
+                            last_updated: new Date().toISOString(),
+                            min_stock: 0,
+                            max_stock: 0,
+                            status: 'in_stock'
+                        })
+                        .select();
+                    updateData = result.data;
+                    updateError = result.error;
+                } else {
+                    // 기존 파트: UPDATE 사용 (UPSERT 대신)
+                    const result = await this.supabase
+                        .from('inventory')
+                        .update({
+                            current_stock: change.newStock,
+                            last_updated: new Date().toISOString()
+                        })
+                        .eq('part_number', partNumber)
+                        .select();
+                    updateData = result.data;
+                    updateError = result.error;
+                }
 
                 if (updateError) {
                     console.error(`[ERROR] 재고 업데이트 오류 (${partNumber}):`, updateError);
@@ -574,39 +591,59 @@ class QuickInventoryEdit {
                     continue;
                 }
 
-                // 🔍 UPSERT 결과 상세 확인
+                // 🔍 UPDATE 결과 상세 확인
                 if (!updateData || updateData.length === 0) {
-                    console.error(`[ERROR] UPSERT는 성공했지만 데이터가 반환되지 않음 (${partNumber})`);
+                    console.error(`[ERROR] UPDATE는 성공했지만 데이터가 반환되지 않음 (${partNumber})`);
                     console.error('[ERROR] 이것은 RLS 정책이나 권한 문제일 수 있습니다!');
                     errorCount++;
                     continue;
                 }
 
                 console.log(`[SUCCESS] 재고 업데이트 성공 (${partNumber}):`, updateData);
-                console.log(`[SUCCESS] Supabase에 저장된 값: ${updateData[0].current_stock}`);
+                console.log(`[SUCCESS] 반환된 값: ${updateData[0].current_stock}`);
+
+                // 🔍 검증: 실제로 DB에 저장되었는지 SELECT로 확인
+                const { data: verifyData, error: verifyError } = await this.supabase
+                    .from('inventory')
+                    .select('current_stock')
+                    .eq('part_number', partNumber)
+                    .single();
+
+                if (verifyError) {
+                    console.error(`[ERROR] 검증 SELECT 실패 (${partNumber}):`, verifyError);
+                } else {
+                    console.log(`[VERIFY] DB 실제 값: ${verifyData.current_stock}, 기대값: ${change.newStock}`);
+                    if (verifyData.current_stock !== change.newStock) {
+                        console.error(`[ERROR] 저장 검증 실패! DB: ${verifyData.current_stock}, 기대: ${change.newStock}`);
+                        errorCount++;
+                        continue;
+                    } else {
+                        console.log(`[VERIFY] ✅ 저장 검증 성공!`);
+                    }
+                }
 
                 // 🚀 로컬 inventory 배열도 즉시 업데이트 (성능 최적화)
                 const inventoryItem = this.inventory.find(i => i.part_number === partNumber);
                 if (inventoryItem) {
-                    inventoryItem.current_stock = updateData[0].current_stock;
-                    inventoryItem.last_updated = updateData[0].last_updated;
+                    inventoryItem.current_stock = change.newStock;
+                    inventoryItem.last_updated = new Date().toISOString();
                     inventoryItem._isVirtual = false; // 이제 실제 DB에 존재함
-                    console.log(`[DEBUG] 로컬 데이터 업데이트 완료: ${partNumber} = ${updateData[0].current_stock}`);
+                    console.log(`[DEBUG] 로컬 데이터 업데이트 완료: ${partNumber} = ${change.newStock}`);
                 } else {
                     console.warn(`[WARN] 로컬 배열에서 ${partNumber}를 찾을 수 없음`);
                 }
 
-                // 2. 거래 내역 기록 (백그라운드로 처리 - 사용자는 기다리지 않음)
+                // 2. 거래 내역 기록 (트리거가 ADJUSTMENT 타입은 건너뛰도록 수정됨)
                 const transactionData = {
                     transaction_date: today,
                     part_number: partNumber,
                     transaction_type: 'ADJUSTMENT',
-                    quantity: Math.abs(diff),
+                    quantity: diff, // 양수면 증가, 음수면 감소 (기록용)
                     reference_id: `ADJ-${Date.now()}`,
                     notes: globalMemo || `실사 조정: ${currentStock} → ${change.newStock}`
                 };
 
-                // 🚀 성능 최적화: await 없이 백그라운드로 실행
+                // 백그라운드로 실행 (트리거가 ADJUSTMENT는 건너뛰므로 재고에 영향 없음)
                 this.supabase
                     .from('inventory_transactions')
                     .insert(transactionData)
