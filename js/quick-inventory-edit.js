@@ -569,6 +569,14 @@ class QuickInventoryEdit {
                 }
                 
                 console.log(`[SUCCESS] 재고 업데이트 성공 (${partNumber}):`, updateData);
+                
+                // 🚀 로컬 inventory 배열도 즉시 업데이트 (성능 최적화)
+                const inventoryItem = this.inventory.find(i => i.part_number === partNumber);
+                if (inventoryItem && updateData && updateData.length > 0) {
+                    inventoryItem.current_stock = updateData[0].current_stock;
+                    inventoryItem.last_updated = updateData[0].last_updated;
+                    console.log(`[DEBUG] 로컬 데이터 업데이트 완료: ${partNumber} = ${updateData[0].current_stock}`);
+                }
 
                 // 2. 거래 내역 기록 (일괄 조정 사유 사용)
                 const transactionData = {
@@ -600,10 +608,13 @@ class QuickInventoryEdit {
                 this.showNotification(`${successCount}건 성공, ${errorCount}건 실패`, 'warning');
             }
 
-            // 변경사항 초기화 및 데이터 새로고침
+            // 변경사항 초기화
             this.changes.clear();
-            console.log('[DEBUG] 데이터 새로고침 시작...');
-            await this.loadInventoryData();
+            
+            // 🚀 성능 최적화: 전체 데이터를 다시 불러오지 않고 화면만 업데이트
+            console.log('[DEBUG] 화면 렌더링만 업데이트...');
+            this.renderTable();
+            this.updateStats();
             console.log('[DEBUG] saveChanges() 함수 완료!');
 
         } catch (error) {
