@@ -1,3 +1,21 @@
 [build]
   publish = "."
   command = "echo 'No build needed - static site'"
+
+# JavaScript 파일 캐시 방지 (항상 최신 버전 사용)
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# HTML 파일 캐시 방지
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# CSS 파일 캐시 방지
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
