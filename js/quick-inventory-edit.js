@@ -189,7 +189,7 @@ class QuickInventoryEdit {
 
     renderTable() {
         console.log('[DEBUG] renderTable() 호출됨, 아이템 수:', this.filteredInventory.length);
-        
+
         const tbody = document.getElementById('inventoryTableBody');
 
         if (this.filteredInventory.length === 0) {
@@ -207,12 +207,12 @@ class QuickInventoryEdit {
         const rows = this.filteredInventory.map((item, index) => {
             const partNumber = item.part_number;
             const currentStock = item.current_stock || 0;
-            
+
             // 디버깅: 특정 파트 확인
             if (partNumber === '49560-DO000') {
                 console.log('[DEBUG] 49560-DO000 렌더링:', currentStock);
             }
-            
+
             const change = this.changes.get(partNumber);
             const newStock = change?.newStock ?? '';
             const diff = newStock !== '' ? newStock - currentStock : null;
@@ -516,7 +516,7 @@ class QuickInventoryEdit {
 
     async saveChanges() {
         console.log('[DEBUG] saveChanges() 함수 시작!');
-        
+
         const validChanges = Array.from(this.changes.entries()).filter(([_, change]) =>
             change.newStock !== undefined && change.newStock !== ''
         );
@@ -536,7 +536,7 @@ class QuickInventoryEdit {
             const globalMemo = document.getElementById('globalMemo')?.value?.trim() || '';
             let successCount = 0;
             let errorCount = 0;
-            
+
             console.log('[DEBUG] 오늘 날짜:', today);
 
             for (const [partNumber, change] of validChanges) {
@@ -550,16 +550,22 @@ class QuickInventoryEdit {
                     continue;
                 }
 
-                // 1. 재고 업데이트
+                // 1. 재고 업데이트 (UPSERT 사용 - 없으면 INSERT, 있으면 UPDATE)
                 console.log(`[DEBUG] 재고 업데이트 시도: ${partNumber} = ${change.newStock} (이전: ${currentStock})`);
-                
+                console.log(`[DEBUG] 가상 파트 여부: ${item?._isVirtual ? '예 (INSERT 필요)' : '아니오'}`);
+
                 const { data: updateData, error: updateError } = await this.supabase
                     .from('inventory')
-                    .update({
+                    .upsert({
+                        part_number: partNumber,
                         current_stock: change.newStock,
-                        last_updated: new Date().toISOString()
+                        last_updated: new Date().toISOString(),
+                        min_stock: item?.min_stock || 0,
+                        max_stock: item?.max_stock || 0,
+                        status: 'in_stock'
+                    }, {
+                        onConflict: 'part_number'  // part_number가 PK인 경우
                     })
-                    .eq('part_number', partNumber)
                     .select();
 
                 if (updateError) {
@@ -567,23 +573,24 @@ class QuickInventoryEdit {
                     errorCount++;
                     continue;
                 }
-                
-                // 🔍 UPDATE 결과 상세 확인
+
+                // 🔍 UPSERT 결과 상세 확인
                 if (!updateData || updateData.length === 0) {
-                    console.error(`[ERROR] UPDATE는 성공했지만 데이터가 반환되지 않음 (${partNumber})`);
+                    console.error(`[ERROR] UPSERT는 성공했지만 데이터가 반환되지 않음 (${partNumber})`);
                     console.error('[ERROR] 이것은 RLS 정책이나 권한 문제일 수 있습니다!');
                     errorCount++;
                     continue;
                 }
-                
+
                 console.log(`[SUCCESS] 재고 업데이트 성공 (${partNumber}):`, updateData);
                 console.log(`[SUCCESS] Supabase에 저장된 값: ${updateData[0].current_stock}`);
-                
+
                 // 🚀 로컬 inventory 배열도 즉시 업데이트 (성능 최적화)
                 const inventoryItem = this.inventory.find(i => i.part_number === partNumber);
                 if (inventoryItem) {
                     inventoryItem.current_stock = updateData[0].current_stock;
                     inventoryItem.last_updated = updateData[0].last_updated;
+                    inventoryItem._isVirtual = false; // 이제 실제 DB에 존재함
                     console.log(`[DEBUG] 로컬 데이터 업데이트 완료: ${partNumber} = ${updateData[0].current_stock}`);
                 } else {
                     console.warn(`[WARN] 로컬 배열에서 ${partNumber}를 찾을 수 없음`);
@@ -624,7 +631,7 @@ class QuickInventoryEdit {
 
             // 변경사항 초기화
             this.changes.clear();
-            
+
             // 🚀 성능 최적화: 전체 데이터를 다시 불러오지 않고 화면만 업데이트
             console.log('[DEBUG] 화면 렌더링만 업데이트...');
             this.renderTable();
@@ -663,6 +670,206 @@ class QuickInventoryEdit {
             notification.style.transition = 'opacity 0.3s';
             setTimeout(() => notification.remove(), 300);
         }, 3000);
+    }
+
+    // ============ 디버깅/테스트 함수들 ============
+
+    /**
+     * Supabase 연결 테스트
+     * 콘솔에서: quickInventoryEdit.testConnection()
+     */
+    async testConnection() {
+        console.log('========== Supabase 연결 테스트 ==========');
+
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 없습니다!');
+            return false;
+        }
+
+        console.log('✅ Supabase 클라이언트 존재함');
+
+        try {
+            // 1. 읽기 테스트
+            console.log('\n📖 [1/3] 읽기 테스트 (SELECT)...');
+            const { data: readData, error: readError } = await this.supabase
+                .from('inventory')
+                .select('part_number, current_stock')
+                .limit(3);
+
+            if (readError) {
+                console.error('❌ 읽기 실패:', readError);
+            } else {
+                console.log('✅ 읽기 성공:', readData);
+            }
+
+            // 2. 테이블 구조 확인
+            console.log('\n📋 [2/3] 테이블 구조 확인...');
+            const { data: schemaData, error: schemaError } = await this.supabase
+                .from('inventory')
+                .select('*')
+                .limit(1);
+
+            if (schemaError) {
+                console.error('❌ 스키마 확인 실패:', schemaError);
+            } else if (schemaData && schemaData[0]) {
+                console.log('✅ inventory 테이블 컬럼들:', Object.keys(schemaData[0]));
+            }
+
+            // 3. 특정 파트 확인
+            console.log('\n🔍 [3/3] 특정 파트 확인 (49560-DO000)...');
+            const { data: partData, error: partError } = await this.supabase
+                .from('inventory')
+                .select('*')
+                .eq('part_number', '49560-DO000')
+                .single();
+
+            if (partError) {
+                console.error('❌ 파트 조회 실패:', partError);
+                console.log('   → 이 파트가 inventory 테이블에 없을 수 있습니다!');
+            } else {
+                console.log('✅ 파트 데이터:', partData);
+            }
+
+            console.log('\n========== 연결 테스트 완료 ==========');
+            return true;
+
+        } catch (error) {
+            console.error('❌ 테스트 중 예외 발생:', error);
+            return false;
+        }
+    }
+
+    /**
+     * RLS 정책 테스트 (실제 UPDATE 시도)
+     * 콘솔에서: quickInventoryEdit.testRLS('49560-DO000', 100)
+     */
+    async testRLS(partNumber = '49560-DO000', testValue = 9999) {
+        console.log('========== RLS 정책 테스트 ==========');
+        console.log(`파트: ${partNumber}, 테스트 값: ${testValue}`);
+
+        if (!this.supabase) {
+            console.error('❌ Supabase 클라이언트가 없습니다!');
+            return;
+        }
+
+        try {
+            // 1. 현재 값 확인
+            console.log('\n📖 [1/4] 현재 값 확인...');
+            const { data: beforeData, error: beforeError } = await this.supabase
+                .from('inventory')
+                .select('*')
+                .eq('part_number', partNumber)
+                .single();
+
+            if (beforeError) {
+                console.error('❌ 현재 값 조회 실패:', beforeError);
+                console.log('   → 이 파트가 inventory 테이블에 존재하지 않습니다!');
+                console.log('   → 먼저 INSERT가 필요할 수 있습니다.');
+                return;
+            }
+
+            console.log('현재 데이터:', beforeData);
+            const originalStock = beforeData.current_stock;
+
+            // 2. UPDATE 시도
+            console.log('\n✏️ [2/4] UPDATE 시도...');
+            const { data: updateData, error: updateError, status, statusText } = await this.supabase
+                .from('inventory')
+                .update({
+                    current_stock: testValue,
+                    last_updated: new Date().toISOString()
+                })
+                .eq('part_number', partNumber)
+                .select();
+
+            console.log('   HTTP Status:', status, statusText);
+
+            if (updateError) {
+                console.error('❌ UPDATE 실패:', updateError);
+                console.log('\n⚠️ RLS 정책이 UPDATE를 차단하고 있을 수 있습니다!');
+                console.log('   해결 방법: Supabase 대시보드 > Authentication > Policies 에서');
+                console.log('   inventory 테이블에 "Allow public update" 정책을 추가하세요.');
+                return;
+            }
+
+            if (!updateData || updateData.length === 0) {
+                console.error('❌ UPDATE는 성공했지만 데이터가 반환되지 않음!');
+                console.log('\n⚠️ 이것은 RLS 정책 문제입니다!');
+                console.log('   UPDATE 쿼리는 실행되었지만 WHERE 조건에 맞는 행이 없거나');
+                console.log('   RLS 정책에 의해 접근이 차단되었습니다.');
+                return;
+            }
+
+            console.log('✅ UPDATE 성공:', updateData);
+
+            // 3. 변경 확인
+            console.log('\n🔍 [3/4] 변경 확인...');
+            const { data: afterData, error: afterError } = await this.supabase
+                .from('inventory')
+                .select('*')
+                .eq('part_number', partNumber)
+                .single();
+
+            if (afterError) {
+                console.error('❌ 변경 확인 실패:', afterError);
+            } else {
+                console.log('변경 후 데이터:', afterData);
+
+                if (afterData.current_stock === testValue) {
+                    console.log('✅ 데이터베이스에 정상적으로 저장됨!');
+                } else {
+                    console.error('❌ 값이 변경되지 않음! DB: ', afterData.current_stock, '기대값:', testValue);
+                }
+            }
+
+            // 4. 원래 값으로 복원
+            console.log('\n🔄 [4/4] 원래 값으로 복원...');
+            const { error: restoreError } = await this.supabase
+                .from('inventory')
+                .update({
+                    current_stock: originalStock,
+                    last_updated: new Date().toISOString()
+                })
+                .eq('part_number', partNumber);
+
+            if (restoreError) {
+                console.error('❌ 복원 실패:', restoreError);
+            } else {
+                console.log('✅ 원래 값으로 복원 완료:', originalStock);
+            }
+
+            console.log('\n========== RLS 테스트 완료 ==========');
+
+        } catch (error) {
+            console.error('❌ 테스트 중 예외 발생:', error);
+        }
+    }
+
+    /**
+     * RLS 정책 상태 확인 (Service Role Key 없이는 제한적)
+     */
+    async checkRLSStatus() {
+        console.log('========== RLS 상태 확인 ==========');
+        console.log('⚠️ 클라이언트에서는 RLS 정책을 직접 확인할 수 없습니다.');
+        console.log('\n📋 Supabase 대시보드에서 확인하세요:');
+        console.log('   1. https://supabase.com/dashboard 로그인');
+        console.log('   2. 프로젝트 선택');
+        console.log('   3. Table Editor > inventory 테이블 선택');
+        console.log('   4. 우측 상단 "RLS" 버튼 클릭');
+        console.log('\n🔧 익명 사용자도 UPDATE 가능하게 하려면:');
+        console.log('   SQL Editor에서 다음 실행:');
+        console.log('   ----------------------------------------');
+        console.log('   -- 기존 RLS 정책 삭제 (있다면)');
+        console.log('   DROP POLICY IF EXISTS "Allow update for authenticated users" ON inventory;');
+        console.log('');
+        console.log('   -- 모든 사용자 UPDATE 허용');
+        console.log('   CREATE POLICY "Allow public update" ON inventory');
+        console.log('       FOR UPDATE USING (true) WITH CHECK (true);');
+        console.log('');
+        console.log('   -- 모든 사용자 INSERT 허용 (필요시)');
+        console.log('   CREATE POLICY "Allow public insert" ON inventory');
+        console.log('       FOR INSERT WITH CHECK (true);');
+        console.log('   ----------------------------------------');
     }
 }
 
