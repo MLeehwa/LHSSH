@@ -568,14 +568,25 @@ class QuickInventoryEdit {
                     continue;
                 }
                 
+                // 🔍 UPDATE 결과 상세 확인
+                if (!updateData || updateData.length === 0) {
+                    console.error(`[ERROR] UPDATE는 성공했지만 데이터가 반환되지 않음 (${partNumber})`);
+                    console.error('[ERROR] 이것은 RLS 정책이나 권한 문제일 수 있습니다!');
+                    errorCount++;
+                    continue;
+                }
+                
                 console.log(`[SUCCESS] 재고 업데이트 성공 (${partNumber}):`, updateData);
+                console.log(`[SUCCESS] Supabase에 저장된 값: ${updateData[0].current_stock}`);
                 
                 // 🚀 로컬 inventory 배열도 즉시 업데이트 (성능 최적화)
                 const inventoryItem = this.inventory.find(i => i.part_number === partNumber);
-                if (inventoryItem && updateData && updateData.length > 0) {
+                if (inventoryItem) {
                     inventoryItem.current_stock = updateData[0].current_stock;
                     inventoryItem.last_updated = updateData[0].last_updated;
                     console.log(`[DEBUG] 로컬 데이터 업데이트 완료: ${partNumber} = ${updateData[0].current_stock}`);
+                } else {
+                    console.warn(`[WARN] 로컬 배열에서 ${partNumber}를 찾을 수 없음`);
                 }
 
                 // 2. 거래 내역 기록 (백그라운드로 처리 - 사용자는 기다리지 않음)
