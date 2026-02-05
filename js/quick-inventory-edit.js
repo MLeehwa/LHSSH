@@ -507,16 +507,16 @@ class QuickInventoryEdit {
     }
 
     async saveChanges() {
-        console.log('🚀 saveChanges() 함수 시작!');
+        console.log('[DEBUG] saveChanges() 함수 시작!');
         
         const validChanges = Array.from(this.changes.entries()).filter(([_, change]) =>
             change.newStock !== undefined && change.newStock !== ''
         );
 
-        console.log('📋 변경할 항목:', validChanges.length, '건');
+        console.log('[DEBUG] 변경할 항목:', validChanges.length, '건');
 
         if (validChanges.length === 0) {
-            console.warn('⚠️ 변경할 항목이 없습니다');
+            console.warn('[DEBUG] 변경할 항목이 없습니다');
             return;
         }
 
@@ -529,7 +529,7 @@ class QuickInventoryEdit {
             let successCount = 0;
             let errorCount = 0;
             
-            console.log('📅 오늘 날짜:', today);
+            console.log('[DEBUG] 오늘 날짜:', today);
 
             for (const [partNumber, change] of validChanges) {
                 const item = this.inventory.find(i => i.part_number === partNumber);
@@ -543,7 +543,7 @@ class QuickInventoryEdit {
                 }
 
                 // 1. 재고 업데이트
-                console.log(`📝 재고 업데이트 시도: ${partNumber} = ${change.newStock} (이전: ${currentStock})`);
+                console.log(`[DEBUG] 재고 업데이트 시도: ${partNumber} = ${change.newStock} (이전: ${currentStock})`);
                 
                 const { data: updateData, error: updateError } = await this.supabase
                     .from('inventory')
@@ -555,12 +555,12 @@ class QuickInventoryEdit {
                     .select();
 
                 if (updateError) {
-                    console.error(`❌ 재고 업데이트 오류 (${partNumber}):`, updateError);
+                    console.error(`[ERROR] 재고 업데이트 오류 (${partNumber}):`, updateError);
                     errorCount++;
                     continue;
                 }
                 
-                console.log(`✅ 재고 업데이트 성공 (${partNumber}):`, updateData);
+                console.log(`[SUCCESS] 재고 업데이트 성공 (${partNumber}):`, updateData);
 
                 // 2. 거래 내역 기록 (일괄 조정 사유 사용)
                 const transactionData = {
@@ -594,13 +594,13 @@ class QuickInventoryEdit {
 
             // 변경사항 초기화 및 데이터 새로고침
             this.changes.clear();
-            console.log('🔄 데이터 새로고침 시작...');
+            console.log('[DEBUG] 데이터 새로고침 시작...');
             await this.loadInventoryData();
-            console.log('✅ saveChanges() 함수 완료!');
+            console.log('[DEBUG] saveChanges() 함수 완료!');
 
         } catch (error) {
             document.getElementById('loadingIndicator').classList.add('hidden');
-            console.error('❌ 저장 중 오류:', error);
+            console.error('[ERROR] 저장 중 오류:', error);
             this.showNotification('저장 중 오류가 발생했습니다: ' + error.message, 'error');
         }
     }
