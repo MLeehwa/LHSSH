@@ -188,6 +188,8 @@ class QuickInventoryEdit {
     }
 
     renderTable() {
+        console.log('[DEBUG] renderTable() 호출됨, 아이템 수:', this.filteredInventory.length);
+        
         const tbody = document.getElementById('inventoryTableBody');
 
         if (this.filteredInventory.length === 0) {
@@ -205,6 +207,12 @@ class QuickInventoryEdit {
         const rows = this.filteredInventory.map((item, index) => {
             const partNumber = item.part_number;
             const currentStock = item.current_stock || 0;
+            
+            // 디버깅: 특정 파트 확인
+            if (partNumber === '49560-DO000') {
+                console.log('[DEBUG] 49560-DO000 렌더링:', currentStock);
+            }
+            
             const change = this.changes.get(partNumber);
             const newStock = change?.newStock ?? '';
             const diff = newStock !== '' ? newStock - currentStock : null;
