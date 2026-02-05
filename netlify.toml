@@ -2,19 +2,46 @@
   publish = "."
   command = "echo 'No build needed - static site'"
 
+# 루트 경로 (/) 처리 - 가장 먼저 매칭
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    CDN-Cache-Control = "no-store"
+    Netlify-CDN-Cache-Control = "no-store"
+    Pragma = "no-cache"
+    Expires = "0"
+    Vary = "Accept-Encoding"
+
+# 루트 index.html 특별 처리
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    CDN-Cache-Control = "no-store"
+    Netlify-CDN-Cache-Control = "no-store"
+    Pragma = "no-cache"
+    Expires = "0"
+    Vary = "Accept-Encoding"
+
 # 모든 HTML 파일 - 캐시 완전 비활성화
 [[headers]]
   for = "/*.html"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    CDN-Cache-Control = "no-store"
+    Netlify-CDN-Cache-Control = "no-store"
     Pragma = "no-cache"
     Expires = "0"
+    Vary = "Accept-Encoding"
 
 # admin 폴더 HTML 파일
 [[headers]]
   for = "/admin/*.html"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    CDN-Cache-Control = "no-store"
+    Netlify-CDN-Cache-Control = "no-store"
     Pragma = "no-cache"
     Expires = "0"
 
@@ -22,7 +49,9 @@
 [[headers]]
   for = "/pda/*.html"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    CDN-Cache-Control = "no-store"
+    Netlify-CDN-Cache-Control = "no-store"
     Pragma = "no-cache"
     Expires = "0"
 
@@ -30,7 +59,9 @@
 [[headers]]
   for = "/js/*.js"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    CDN-Cache-Control = "no-store"
+    Netlify-CDN-Cache-Control = "no-store"
     Pragma = "no-cache"
     Expires = "0"
 
@@ -38,22 +69,8 @@
 [[headers]]
   for = "/css/*.css"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-    Pragma = "no-cache"
-    Expires = "0"
-
-# 루트 index.html 특별 처리
-[[headers]]
-  for = "/index.html"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-    Pragma = "no-cache"
-    Expires = "0"
-
-# 루트 경로 (/) 처리
-[[headers]]
-  for = "/"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    CDN-Cache-Control = "no-store"
+    Netlify-CDN-Cache-Control = "no-store"
     Pragma = "no-cache"
     Expires = "0"
