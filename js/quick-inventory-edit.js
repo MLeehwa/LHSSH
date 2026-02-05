@@ -534,19 +534,24 @@ class QuickInventoryEdit {
                 }
 
                 // 1. 재고 업데이트
-                const { error: updateError } = await this.supabase
+                console.log(`📝 재고 업데이트 시도: ${partNumber} = ${change.newStock} (이전: ${currentStock})`);
+                
+                const { data: updateData, error: updateError } = await this.supabase
                     .from('inventory')
                     .update({
                         current_stock: change.newStock,
                         last_updated: new Date().toISOString()
                     })
-                    .eq('part_number', partNumber);
+                    .eq('part_number', partNumber)
+                    .select();
 
                 if (updateError) {
-                    console.error(`재고 업데이트 오류 (${partNumber}):`, updateError);
+                    console.error(`❌ 재고 업데이트 오류 (${partNumber}):`, updateError);
                     errorCount++;
                     continue;
                 }
+                
+                console.log(`✅ 재고 업데이트 성공 (${partNumber}):`, updateData);
 
                 // 2. 거래 내역 기록 (일괄 조정 사유 사용)
                 const transactionData = {
