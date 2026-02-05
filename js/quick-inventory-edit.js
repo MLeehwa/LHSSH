@@ -578,7 +578,7 @@ class QuickInventoryEdit {
                     console.log(`[DEBUG] 로컬 데이터 업데이트 완료: ${partNumber} = ${updateData[0].current_stock}`);
                 }
 
-                // 2. 거래 내역 기록 (일괄 조정 사유 사용)
+                // 2. 거래 내역 기록 (백그라운드로 처리 - 사용자는 기다리지 않음)
                 const transactionData = {
                     transaction_date: today,
                     part_number: partNumber,
@@ -588,14 +588,17 @@ class QuickInventoryEdit {
                     notes: globalMemo || `실사 조정: ${currentStock} → ${change.newStock}`
                 };
 
-                const { error: transactionError } = await this.supabase
+                // 🚀 성능 최적화: await 없이 백그라운드로 실행
+                this.supabase
                     .from('inventory_transactions')
-                    .insert(transactionData);
-
-                if (transactionError) {
-                    console.warn(`거래 내역 기록 오류 (${partNumber}):`, transactionError);
-                    // 거래 내역 오류는 무시 (재고는 이미 업데이트됨)
-                }
+                    .insert(transactionData)
+                    .then(({ error: transactionError }) => {
+                        if (transactionError) {
+                            console.warn(`거래 내역 기록 오류 (${partNumber}):`, transactionError);
+                        } else {
+                            console.log(`[SUCCESS] 거래 내역 기록 완료 (${partNumber})`);
+                        }
+                    });
 
                 successCount++;
             }
