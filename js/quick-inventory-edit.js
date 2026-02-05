@@ -507,11 +507,18 @@ class QuickInventoryEdit {
     }
 
     async saveChanges() {
+        console.log('🚀 saveChanges() 함수 시작!');
+        
         const validChanges = Array.from(this.changes.entries()).filter(([_, change]) =>
             change.newStock !== undefined && change.newStock !== ''
         );
 
-        if (validChanges.length === 0) return;
+        console.log('📋 변경할 항목:', validChanges.length, '건');
+
+        if (validChanges.length === 0) {
+            console.warn('⚠️ 변경할 항목이 없습니다');
+            return;
+        }
 
         this.hideConfirmModal();
         document.getElementById('loadingIndicator').classList.remove('hidden');
@@ -521,6 +528,8 @@ class QuickInventoryEdit {
             const globalMemo = document.getElementById('globalMemo')?.value?.trim() || '';
             let successCount = 0;
             let errorCount = 0;
+            
+            console.log('📅 오늘 날짜:', today);
 
             for (const [partNumber, change] of validChanges) {
                 const item = this.inventory.find(i => i.part_number === partNumber);
@@ -585,11 +594,13 @@ class QuickInventoryEdit {
 
             // 변경사항 초기화 및 데이터 새로고침
             this.changes.clear();
+            console.log('🔄 데이터 새로고침 시작...');
             await this.loadInventoryData();
+            console.log('✅ saveChanges() 함수 완료!');
 
         } catch (error) {
             document.getElementById('loadingIndicator').classList.add('hidden');
-            console.error('저장 중 오류:', error);
+            console.error('❌ 저장 중 오류:', error);
             this.showNotification('저장 중 오류가 발생했습니다: ' + error.message, 'error');
         }
     }
