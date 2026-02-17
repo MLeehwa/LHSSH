@@ -1,6 +1,2 @@
 # Netlify redirects
-# 루트 접속 시 login.html로 리다이렉트 (302 임시 리다이렉트)
 / /login.html 302
-
-# 나머지 경로는 그대로 유지
-/* /:splat 200
