@@ -1129,8 +1129,8 @@ class OutboundSummary {
             groupedByDate[item.date].push(item);
         });
 
-        // 날짜 정렬
-        structure.dates = Object.keys(groupedByDate).sort();
+        // 날짜 정렬 (최신순 - 최신 날짜가 왼쪽에 표시)
+        structure.dates = Object.keys(groupedByDate).sort().reverse();
 
         // 각 날짜별로 시퀀스와 파트 정보 수집
         structure.dates.forEach(date => {
@@ -1826,8 +1826,8 @@ class OutboundSummary {
         try {
             const notification = document.createElement('div');
             notification.className = `fixed bottom-4 right-4 z-50 p-4 rounded-lg shadow-lg ${type === 'success' ? 'bg-green-500 text-white' :
-                    type === 'error' ? 'bg-red-500 text-white' :
-                        'bg-blue-500 text-white'
+                type === 'error' ? 'bg-red-500 text-white' :
+                    'bg-blue-500 text-white'
                 }`;
             notification.innerHTML = `
                 <div class="flex items-center">
