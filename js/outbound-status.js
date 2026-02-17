@@ -11,24 +11,24 @@ class OutboundStatus {
         this.partsTable = null; // Handsontable 인스턴스
         this.allParts = []; // 모든 파트 번호 목록 (드롭다운용)
         this.supabase = null;
-        
+
         // Performance optimizations
         this.cache = new Map();
         this.lastDataUpdate = 0;
         this.dataUpdateInterval = 30000; // 30 seconds
         this.isLoading = false;
         this.domCache = new Map();
-        
+
         this.initializeSupabase();
         this.init();
-        
+
         // 출고 취소 관련 이벤트 리스너 설정
         this.setupCancelEventListeners();
-        
+
         // 수정 관련 변수
         this.editingSequence = null;
         this.originalQuantities = new Map();
-        
+
         // 수정 모달 이벤트 리스너는 제거됨 (출고 등록 모달 재사용)
     }
 
@@ -57,7 +57,7 @@ class OutboundStatus {
                 );
                 console.log('새 Supabase 클라이언트 생성 완료');
             }
-            
+
             const isConnected = await this.testConnection();
             if (!isConnected) {
                 console.warn('Supabase 연결 실패 - Mock 데이터 모드로 전환');
@@ -72,13 +72,13 @@ class OutboundStatus {
     async testConnection() {
         try {
             console.log('Supabase 연결 테스트 시작...');
-            
+
             // 더 간단한 연결 테스트
             const { data, error } = await this.supabase
                 .from('outbound_sequences')
                 .select('count')
                 .limit(1);
-            
+
             if (error) {
                 console.error('Supabase 연결 테스트 실패:', error);
                 return false;
@@ -123,35 +123,37 @@ class OutboundStatus {
     async init() {
         try {
             console.log('OutboundStatus 초기화 시작...');
-            
+
             if (!this.supabase) {
                 console.warn('Supabase 클라이언트가 초기화되지 않았습니다. Mock 데이터를 사용합니다.');
                 this.loadMockData();
             } else {
                 try {
-                await this.loadData();
+                    await this.loadData();
                 } catch (loadError) {
                     console.error('데이터 로딩 실패, Mock 데이터로 전환:', loadError);
                     this.loadMockData();
                 }
             }
-            
+
             this.bindEvents();
             this.updateStats();
             this.updateCurrentTime();
-            
-            // 날짜 필터를 오늘 날짜로 초기화
+
+            // 날짜 필터를 비워두어 전체 데이터 표시 (기본)
+            // 사용자가 필요시 직접 날짜를 선택하여 필터링
             const dateFilter = document.getElementById('dateFilter');
-            if (dateFilter) {
-                const today = new Date().toISOString().split('T')[0];
-                dateFilter.value = today;
-                // 필터 적용
-                this.applyFilters();
+            if (dateFilter && !dateFilter.value) {
+                // 날짜 필터를 비워두면 모든 데이터가 표시됨
+                // 필요한 경우 로컬 시간 기준 오늘 날짜로 설정:
+                // const now = new Date();
+                // const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                // dateFilter.value = today;
             }
-            
+
             // Performance: Use requestAnimationFrame for time updates
             this.scheduleTimeUpdate();
-            
+
             console.log('OutboundStatus 초기화 완료');
         } catch (error) {
             console.error('OutboundStatus 초기화 오류:', error);
@@ -170,7 +172,7 @@ class OutboundStatus {
             second: '2-digit',
             timeZone: 'America/Chicago'
         });
-        
+
         const currentTimeElement = document.getElementById('currentTime');
         if (currentTimeElement) {
             currentTimeElement.textContent = timeString;
@@ -188,7 +190,7 @@ class OutboundStatus {
     bindEvents() {
         // Performance: Use event delegation for better performance
         const container = document.getElementById('outboundStatusContainer') || document.body;
-        
+
         // Single event listener for all interactions
         container.addEventListener('click', (e) => {
             // Filter buttons
@@ -253,25 +255,25 @@ class OutboundStatus {
             }
         });
 
-    // Modal events
-    this.bindModalEvents();
-}
-
-// 차수 변경 처리
-handleSequenceChange(e) {
-    const selectedSequence = e.target.value;
-    console.log('선택된 차수:', selectedSequence);
-    
-    // AS 차수인지 확인
-    if (selectedSequence === 'AS') {
-        // AS 차수일 때는 기존 출고 데이터를 로드하지 않음
-        this.registrationParts = [];
-        console.log('AS 차수 선택됨 - 기존 출고 데이터 로드 안함');
-    } else {
-        // 다른 차수일 때는 기존 출고 데이터 로드
-        this.loadExistingOutboundData();
+        // Modal events
+        this.bindModalEvents();
     }
-}
+
+    // 차수 변경 처리
+    handleSequenceChange(e) {
+        const selectedSequence = e.target.value;
+        console.log('선택된 차수:', selectedSequence);
+
+        // AS 차수인지 확인
+        if (selectedSequence === 'AS') {
+            // AS 차수일 때는 기존 출고 데이터를 로드하지 않음
+            this.registrationParts = [];
+            console.log('AS 차수 선택됨 - 기존 출고 데이터 로드 안함');
+        } else {
+            // 다른 차수일 때는 기존 출고 데이터 로드
+            this.loadExistingOutboundData();
+        }
+    }
 
     bindModalEvents() {
         // 이벤트 중복 등록 방지
@@ -279,9 +281,9 @@ handleSequenceChange(e) {
             console.log('모달 이벤트가 이미 등록되었습니다. 중복 등록을 방지합니다.');
             return;
         }
-        
+
         console.log('모달 이벤트 등록 중...');
-        
+
         const modalEvents = [
             { selector: '#cancelConfirmation', action: () => this.closeConfirmationModal() },
             { selector: '#confirmOutboundAction', action: () => this.processOutboundConfirmation() }
@@ -295,7 +297,7 @@ handleSequenceChange(e) {
                 }
             });
         });
-        
+
         this.modalEventsBound = true;
         console.log('모달 이벤트 등록 완료');
     }
@@ -304,9 +306,9 @@ handleSequenceChange(e) {
         const input = e.target;
         const partId = parseInt(input.dataset.partId);
         const newQty = parseInt(input.value) || 0;
-        
+
         console.log('실제 출고 수량 변경:', partId, newQty);
-        
+
         // Performance: Debounce actual quantity updates
         clearTimeout(this.actualQtyTimeout);
         this.actualQtyTimeout = setTimeout(() => {
@@ -323,7 +325,7 @@ handleSequenceChange(e) {
 
     async loadData() {
         if (this.isLoading) return;
-        
+
         const now = Date.now();
         if (now - this.lastDataUpdate < this.dataUpdateInterval) {
             console.log('Using cached data');
@@ -331,30 +333,30 @@ handleSequenceChange(e) {
         }
 
         this.isLoading = true;
-        
+
         try {
             console.log('데이터 로딩 시작...');
-            
+
             // Performance: Load data in parallel
             const [sequencesResult, partsResult, allPartsResult] = await Promise.all([
                 this.loadOutboundSequences(),
                 this.loadOutboundParts(),
                 this.loadAllParts()
             ]);
-            
+
             this.outboundSequences = sequencesResult;
             this.outboundParts = partsResult;
             this.allParts = allPartsResult;
             this.filteredSequences = [...this.outboundSequences];
-            
+
             this.lastDataUpdate = now;
             this.cache.clear();
-            
+
             console.log('데이터 로드 완료. 총 시퀀스:', this.outboundSequences.length, '총 파트:', this.outboundParts.length);
-            
+
             this.renderSequences();
             this.updateStats();
-            
+
         } catch (error) {
             console.error('데이터 로드 중 오류:', error);
             this.loadMockData();
@@ -380,12 +382,12 @@ handleSequenceChange(e) {
             `)
             .order('outbound_date', { ascending: false })
             .order('created_at', { ascending: false });
-        
+
         if (error) {
             console.error('출고 시퀀스 데이터 로드 오류:', error);
             return [];
         }
-        
+
         const result = data || [];
         console.log('로드된 출고 시퀀스 데이터:', result);
         this.cache.set(cacheKey, result);
@@ -412,12 +414,12 @@ handleSequenceChange(e) {
             `)
             .order('sequence_id', { ascending: false })
             .order('part_number');
-        
+
         if (error) {
             console.error('출고 파트 데이터 로드 오류:', error);
             return [];
         }
-        
+
         const result = data || [];
         this.cache.set(cacheKey, result);
         return result;
@@ -434,19 +436,19 @@ handleSequenceChange(e) {
             .from('parts')
             .select('part_number')
             .eq('status', 'ACTIVE');
-        
+
         // AS를 포함하지 않으면 양산 제품만
         if (!includeAS) {
             query = query.eq('product_type', 'PRODUCTION');
         }
-        
+
         const { data, error } = await query.order('part_number');
-        
+
         if (error) {
             console.error('파트 목록 로드 오류:', error);
             return [];
         }
-        
+
         const result = data ? data.map(part => part.part_number) : [];
         this.cache.set(cacheKey, result);
         return result;
@@ -457,7 +459,7 @@ handleSequenceChange(e) {
         if (this.filterTimeout) {
             clearTimeout(this.filterTimeout);
         }
-        
+
         // 300ms 후에 필터 적용
         this.filterTimeout = setTimeout(() => {
             this.applyFilters();
@@ -479,7 +481,7 @@ handleSequenceChange(e) {
 
             // Check if any parts in this sequence match the part number filter
             const sequenceParts = this.outboundParts.filter(part => part.sequence_id === sequence.id);
-            const matchesPartNumber = !partNumberFilter || sequenceParts.some(part => 
+            const matchesPartNumber = !partNumberFilter || sequenceParts.some(part =>
                 part.part_number.toLowerCase().includes(partNumberFilter)
             );
 
@@ -505,7 +507,7 @@ handleSequenceChange(e) {
     renderSequences() {
         console.log('renderSequences 호출됨');
         console.log('현재 filteredSequences:', this.filteredSequences);
-        
+
         const tbody = document.getElementById('outboundSequenceTableBody');
         if (!tbody) {
             console.error('outboundSequenceTableBody 요소를 찾을 수 없습니다.');
@@ -526,16 +528,16 @@ handleSequenceChange(e) {
         tbody.innerHTML = this.filteredSequences.map(sequence => {
             const statusClass = sequence.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
             const statusText = sequence.status === 'COMPLETED' ? '완료' : '대기';
-            
+
             // 해당 시퀀스의 파트 수 계산
             const partsCount = this.outboundParts.filter(part => part.sequence_id === sequence.id).length;
-            
+
             // 선택된 차수인지 확인
             const isSelected = this.selectedSequence === sequence.id;
-            const rowClass = isSelected ? 
-                'bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100 cursor-pointer' : 
+            const rowClass = isSelected ?
+                'bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100 cursor-pointer' :
                 'hover:bg-gray-50 cursor-pointer';
-            
+
             return `
                 <tr class="${rowClass}" data-sequence-id="${sequence.id}">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${sequence.sequence_number}</td>
@@ -563,7 +565,7 @@ handleSequenceChange(e) {
                 </tr>
             `;
         }).join('');
-        
+
         console.log('renderSequences 완료');
     }
 
@@ -571,12 +573,12 @@ handleSequenceChange(e) {
     formatDateOnly(dateValue) {
         try {
             if (!dateValue) return '-';
-            
+
             // 이미 YYYY-MM-DD 형식인 경우
             if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
                 return dateValue;
             }
-            
+
             // ISO 형식인 경우 날짜 부분만 추출 (시간대 무시)
             if (typeof dateValue === 'string' && dateValue.includes('T')) {
                 // 타임스탬프가 있으면 날짜 부분만 추출 (T 이전 부분)
@@ -586,7 +588,7 @@ handleSequenceChange(e) {
                     return datePart;
                 }
             }
-            
+
             // 날짜만 있는 문자열 형식 (예: "2024-11-03")
             if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
                 const datePart = dateValue.substring(0, 10);
@@ -594,14 +596,14 @@ handleSequenceChange(e) {
                     return datePart;
                 }
             }
-            
+
             // Date 객체로 변환 시도
             const date = new Date(dateValue);
             if (isNaN(date.getTime())) {
                 console.warn('유효하지 않은 날짜:', dateValue);
                 return '-';
             }
-            
+
             // 로컬 시간 기준으로 날짜 추출 (UTC가 아닌 로컬 시간대 사용)
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -620,12 +622,12 @@ handleSequenceChange(e) {
 
         // 파트 상세 정보 로드
         this.renderParts(sequenceId);
-        
+
         // 상세 섹션 표시
         const detailsSection = document.getElementById('partsDetailsSection');
         if (detailsSection) {
             detailsSection.classList.remove('hidden');
-            
+
             // 선택된 시퀀스 정보 표시
             const sequenceInfo = document.getElementById('selectedSequenceInfo');
             if (sequenceInfo) {
@@ -638,18 +640,18 @@ handleSequenceChange(e) {
         this.selectedSequence = sequenceId;
         this.renderSequences();
         this.renderParts(sequenceId);
-        
+
         const sequence = this.outboundSequences.find(s => s.id === sequenceId);
         if (sequence) {
             const selectedSequenceElement = document.getElementById('selectedSequence');
             if (selectedSequenceElement) {
                 selectedSequenceElement.textContent = `(${sequence.outbound_date} ${sequence.sequence_number === 'AS' ? 'AS' : sequence.sequence_number + '차'})`;
             }
-            
+
             // 파트 상세 섹션 표시
             this.showSequenceDetails(sequenceId);
         }
-        
+
         // 버튼 상태 업데이트
         this.updateConfirmButtons();
     }
@@ -669,11 +671,11 @@ handleSequenceChange(e) {
             '49600-S9000',
             '49601-S9000'
         ];
-        
+
         return partNumbers.sort((a, b) => {
             const indexA = sortOrder.indexOf(a);
             const indexB = sortOrder.indexOf(b);
-            
+
             // 정의된 순서에 있으면 그 순서대로
             if (indexA !== -1 && indexB !== -1) {
                 return indexA - indexB;
@@ -690,9 +692,9 @@ handleSequenceChange(e) {
     renderParts(sequenceId) {
         const tbody = document.getElementById('partsTableBody');
         if (!tbody) return;
-        
+
         const sequenceParts = this.outboundParts.filter(part => part.sequence_id === sequenceId);
-        
+
         tbody.innerHTML = '';
 
         if (sequenceParts.length === 0) {
@@ -714,7 +716,7 @@ handleSequenceChange(e) {
         tbody.innerHTML = sortedParts.map(part => {
             const statusClass = part.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
             const statusText = part.status === 'COMPLETED' ? '완료' : '대기';
-            
+
             return `
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${part.part_number}</td>
@@ -746,9 +748,9 @@ handleSequenceChange(e) {
             const sequence = this.outboundSequences.find(s => s.id === sequenceId);
             if (!sequence) {
                 this.showNotification('출고 차수를 찾을 수 없습니다.', 'error');
-                    return;
-                }
-                
+                return;
+            }
+
             // 출고 시퀀스 상태를 COMPLETED로 업데이트
             const { error: sequenceError } = await this.supabase
                 .from('outbound_sequences')
@@ -770,26 +772,26 @@ handleSequenceChange(e) {
             if (partsError) {
                 console.error('출고 파트 상태 업데이트 오류:', partsError);
                 this.showNotification('출고 파트 상태 업데이트 중 오류가 발생했습니다.', 'error');
-            return;
-        }
-        
+                return;
+            }
+
             // daily_inventory_summary 업데이트 (출고 날짜 기준)
-            const outboundDate = sequence.outbound_date ? 
-                (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) : 
+            const outboundDate = sequence.outbound_date ?
+                (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
                 new Date().toISOString().split('T')[0];
-            
+
             console.log('출고 확정 후 daily_inventory_summary 업데이트 시작...');
             console.log('출고 날짜:', outboundDate);
             await this.updateDailyInventorySummary(outboundDate);
             console.log('daily_inventory_summary 업데이트 완료');
-            
+
             this.showNotification('출고가 성공적으로 확정되었습니다. 페이지를 새로고침합니다.', 'success');
-            
+
             // 페이지 전체 리프레시
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
-            
+
         } catch (error) {
             console.error('출고 확정 처리 오류:', error);
             this.showNotification('출고 확정 처리 중 오류가 발생했습니다.', 'error');
@@ -820,7 +822,7 @@ handleSequenceChange(e) {
 
     updateStats() {
         try {
-        // 필터링된 시퀀스를 기준으로 통계 계산
+            // 필터링된 시퀀스를 기준으로 통계 계산
             const sequences = this.filteredSequences || [];
             const totalOutbound = sequences.length;
             const confirmedOutbound = sequences.filter(s => s.status === 'COMPLETED').length;
@@ -833,7 +835,7 @@ handleSequenceChange(e) {
             if (totalElement) totalElement.textContent = totalOutbound;
             if (confirmedElement) confirmedElement.textContent = confirmedOutbound;
             if (pendingElement) pendingElement.textContent = pendingOutbound;
-            
+
             console.log('통계 업데이트 완료:', { totalOutbound, confirmedOutbound, pendingOutbound });
         } catch (error) {
             console.error('통계 업데이트 오류:', error);
@@ -853,30 +855,30 @@ handleSequenceChange(e) {
     async forceRefreshData() {
         try {
             console.log('강제 데이터 새로고침 시작...');
-            
+
             // 캐시 무시하고 데이터 로드
             this.isLoading = false;
             this.lastDataUpdate = 0;
             this.cache.clear();
-            
+
             // 데이터 직접 로드 (캐시 무시)
             const [sequencesResult, partsResult, allPartsResult] = await Promise.all([
                 this.loadOutboundSequencesDirect(),
                 this.loadOutboundPartsDirect(),
                 this.loadAllPartsDirect()
             ]);
-            
+
             this.outboundSequences = sequencesResult;
             this.outboundParts = partsResult;
             this.allParts = allPartsResult;
-            
+
             // 필터링된 시퀀스 업데이트
             this.filteredSequences = [...this.outboundSequences];
-            
+
             // UI 업데이트
             this.renderSequences();
             this.updateStats();
-            
+
             console.log('강제 데이터 새로고침 완료');
         } catch (error) {
             console.error('강제 데이터 새로고침 오류:', error);
@@ -890,35 +892,35 @@ handleSequenceChange(e) {
             const date = targetDate || new Date().toISOString().split('T')[0];
             console.log('=== daily_inventory_summary 업데이트 시작 ===');
             console.log('대상 날짜:', date);
-            
+
             // 먼저 해당 날짜의 inventory_transactions 확인
             const { data: transactions, error: transError } = await this.supabase
                 .from('inventory_transactions')
                 .select('*')
                 .eq('transaction_date', date);
-            
+
             if (transError) {
                 console.error('inventory_transactions 조회 오류:', transError);
             } else {
                 console.log(`날짜(${date})의 거래 내역:`, transactions);
             }
-            
+
             // 해당 날짜의 daily_inventory_summary 생성
             const { error } = await this.supabase.rpc('generate_daily_inventory_summary', {
                 target_date: date
             });
-            
+
             if (error) {
                 console.error('daily_inventory_summary 업데이트 실패:', error);
             } else {
                 console.log('daily_inventory_summary 업데이트 완료');
-                
+
                 // 업데이트 후 결과 확인
                 const { data: summary, error: summaryError } = await this.supabase
                     .from('daily_inventory_summary')
                     .select('*')
                     .eq('summary_date', date);
-                
+
                 if (summaryError) {
                     console.error('daily_inventory_summary 조회 오류:', summaryError);
                 } else {
@@ -943,7 +945,7 @@ handleSequenceChange(e) {
             `)
             .order('outbound_date', { ascending: false })
             .order('created_at', { ascending: false });
-        
+
         if (error) {
             console.error('출고 시퀀스 직접 로드 오류:', error);
             return [];
@@ -962,7 +964,7 @@ handleSequenceChange(e) {
                 actual_qty,
                 status
             `);
-        
+
         if (error) {
             console.error('출고 파트 직접 로드 오류:', error);
             return [];
@@ -975,7 +977,7 @@ handleSequenceChange(e) {
             .from('parts')
             .select('part_number')
             .order('part_number');
-        
+
         if (error) {
             console.error('파트 목록 직접 로드 오류:', error);
             return [];
@@ -987,14 +989,14 @@ handleSequenceChange(e) {
     async updateInventoryDirectly(partNumber, quantity, transactionType) {
         try {
             console.log(`inventory 직접 업데이트: ${partNumber}, ${quantity}, ${transactionType}`);
-            
+
             // 현재 재고 조회
             const { data: currentInventory, error: fetchError } = await this.supabase
                 .from('inventory')
                 .select('current_stock')
                 .eq('part_number', partNumber)
                 .single();
-            
+
             if (fetchError && fetchError.code !== 'PGRST116') {
                 console.error('재고 조회 오류:', fetchError);
                 return;
@@ -1008,7 +1010,7 @@ handleSequenceChange(e) {
                 } else {
                     newStock = currentInventory.current_stock + quantity;
                 }
-                
+
                 const { error: updateError } = await this.supabase
                     .from('inventory')
                     .update({
@@ -1016,7 +1018,7 @@ handleSequenceChange(e) {
                         last_updated: new Date().toISOString()
                     })
                     .eq('part_number', partNumber);
-                
+
                 if (updateError) {
                     console.error('재고 업데이트 오류:', updateError);
                 } else {
@@ -1033,7 +1035,7 @@ handleSequenceChange(e) {
                             status: 'in_stock',
                             last_updated: new Date().toISOString()
                         });
-                    
+
                     if (insertError) {
                         console.error('재고 생성 오류:', insertError);
                     } else {
@@ -1050,46 +1052,46 @@ handleSequenceChange(e) {
         try {
             console.log(`=== inventory 업데이트 시작 ===`);
             console.log(`파트: ${partNumber}, 수량: ${quantity}, 타입: ${transactionType}`);
-            
+
             // 트리거 상태 확인을 위해 잠시 대기
             await new Promise(resolve => setTimeout(resolve, 50));
-            
+
             // 현재 재고 조회
             const { data: beforeInventory, error: fetchError } = await this.supabase
                 .from('inventory')
                 .select('current_stock, last_updated')
                 .eq('part_number', partNumber)
                 .single();
-            
+
             if (fetchError && fetchError.code !== 'PGRST116') {
                 console.error(`파트 ${partNumber} 재고 조회 실패:`, fetchError);
                 throw fetchError;
             }
-            
+
             const beforeStock = beforeInventory ? beforeInventory.current_stock : 0;
             console.log(`업데이트 전 재고: ${beforeStock}`);
-            
+
             // 직접 업데이트 실행
             await this.updateInventoryDirectly(partNumber, quantity, transactionType);
-            
+
             // 업데이트 후 재고 확인
             const { data: afterInventory, error: afterFetchError } = await this.supabase
                 .from('inventory')
                 .select('current_stock, last_updated')
                 .eq('part_number', partNumber)
                 .single();
-            
+
             if (afterFetchError) {
                 console.warn(`업데이트 후 재고 조회 실패:`, afterFetchError);
             } else {
                 const afterStock = afterInventory ? afterInventory.current_stock : 0;
                 console.log(`업데이트 후 재고: ${afterStock}`);
                 console.log(`재고 변화: ${beforeStock} → ${afterStock} (${afterStock - beforeStock})`);
-                
+
                 // 예상 변화량과 실제 변화량 비교
                 const expectedChange = transactionType === 'OUTBOUND' ? -quantity : quantity;
                 const actualChange = afterStock - beforeStock;
-                
+
                 if (Math.abs(actualChange - expectedChange) > 0) {
                     console.warn(`⚠️ 재고 변화량 불일치! 예상: ${expectedChange}, 실제: ${actualChange}`);
                     console.warn(`트리거가 여전히 작동하고 있을 수 있습니다.`);
@@ -1097,7 +1099,7 @@ handleSequenceChange(e) {
                     console.log(`✅ 재고 변화량 정상: ${actualChange}`);
                 }
             }
-            
+
         } catch (error) {
             console.error(`inventory 업데이트 실패: ${partNumber}`, error);
             throw error;
@@ -1107,7 +1109,7 @@ handleSequenceChange(e) {
     showConfirmationModal() {
         console.log('확정 모달 표시 시작...');
         console.log('선택된 차수:', this.selectedSequence);
-        
+
         if (!this.selectedSequence) {
             this.showNotification('확정할 차수를 선택해주세요.', 'error');
             return;
@@ -1115,10 +1117,10 @@ handleSequenceChange(e) {
 
         const sequence = this.outboundSequences.find(s => s.id === this.selectedSequence);
         const sequenceParts = this.outboundParts.filter(part => part.sequence_id === this.selectedSequence);
-        
+
         console.log('확정할 차수 정보:', sequence);
         console.log('확정할 파트들:', sequenceParts);
-        
+
         const detailsHtml = `
             <div class="space-y-2">
                 <div class="flex justify-between">
@@ -1142,12 +1144,12 @@ handleSequenceChange(e) {
 
         const confirmationDetails = document.getElementById('confirmationDetails');
         const confirmationModal = document.getElementById('confirmationModal');
-        
+
         console.log('모달 요소들:', {
             confirmationDetails: confirmationDetails,
             confirmationModal: confirmationModal
         });
-        
+
         if (confirmationDetails && confirmationModal) {
             confirmationDetails.innerHTML = detailsHtml;
             confirmationModal.classList.remove('hidden');
@@ -1259,18 +1261,18 @@ handleSequenceChange(e) {
         try {
             // 1. 관련된 재고 복구 및 거래 내역 삭제 (배치 처리)
             const sequenceParts = this.outboundParts.filter(p => p.sequence_id === this.selectedSequence);
-            
+
             if (sequenceParts.length > 0) {
                 // 재고 복구를 배치로 처리
                 await this.processInventoryRestoreBatch(sequenceParts);
-                
+
                 // 해당 시퀀스의 파트들과 매칭되는 모든 거래 내역 삭제
                 // (OUTBOUND 레코드만 삭제하여 today_outbound 감소)
                 const partNumbers = sequenceParts.map(p => p.part_number);
-                const outboundDate = sequence.outbound_date ? 
-                    (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) : 
+                const outboundDate = sequence.outbound_date ?
+                    (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
                     new Date().toISOString().split('T')[0];
-                
+
                 // reference_id에 sequence_number가 포함된 거래 내역 삭제
                 const { error: deleteError } = await this.supabase
                     .from('inventory_transactions')
@@ -1309,40 +1311,40 @@ handleSequenceChange(e) {
             this.outboundSequences = this.outboundSequences.filter(s => s.id !== this.selectedSequence);
             this.outboundParts = this.outboundParts.filter(p => p.sequence_id !== this.selectedSequence);
             this.filteredSequences = this.filteredSequences.filter(s => s.id !== this.selectedSequence);
-            
+
             console.log('로컬 데이터에서 삭제 완료');
 
             this.showSuccess('출고가 취소되었습니다. 재고가 복구되었습니다.');
             this.closeCancelModal();
-            
+
             // 선택된 차수 초기화 (데이터 로드 전에)
             this.selectedSequence = null;
-            
+
             // 데이터 다시 로드하여 상태 변경 반영 (캐시 무시)
             await this.forceRefreshData();
-            
+
             // daily_inventory_summary 업데이트 (출고 날짜 기준)
-            const summaryDate = sequence.outbound_date ? 
-                (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) : 
+            const summaryDate = sequence.outbound_date ?
+                (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
                 new Date().toISOString().split('T')[0];
-            
+
             console.log('출고 취소 후 daily_inventory_summary 업데이트 시작...');
             console.log('출고 날짜:', summaryDate);
             await this.updateDailyInventorySummary(summaryDate);
-            
+
             // UI 업데이트
             this.updateConfirmButtons();
             this.updateStats();
-            
+
             // 파트 상세 섹션 숨기기
             const partsDetailsSection = document.getElementById('partsDetailsSection');
             if (partsDetailsSection) {
                 partsDetailsSection.classList.add('hidden');
             }
-            
+
             // 테이블 다시 렌더링 (확실하게)
             this.renderSequences();
-            
+
         } catch (error) {
             console.error('출고 취소 오류:', error);
             this.showError('출고 취소 중 오류가 발생했습니다.');
@@ -1361,7 +1363,7 @@ handleSequenceChange(e) {
         }
 
         this.editingSequence = sequence;
-        
+
         // 기존 파트 데이터를 registrationParts 형태로 변환
         const existingParts = this.outboundParts.filter(p => p.sequence_id === sequenceId);
         this.registrationParts = existingParts.map(part => ({
@@ -1379,10 +1381,10 @@ handleSequenceChange(e) {
         const originalQty = parseInt(input.dataset.originalQty) || 0;
         const newQty = parseInt(input.value) || 0;
         const difference = newQty - originalQty;
-        
+
         const row = input.closest('tr');
         const differenceCell = row.querySelector('.difference-cell');
-        
+
         if (difference > 0) {
             differenceCell.textContent = `+${difference}`;
             differenceCell.className = 'px-4 py-2 text-sm text-green-600 difference-cell';
@@ -1401,7 +1403,7 @@ handleSequenceChange(e) {
         console.log(`파트 번호: ${partNumber}`);
         console.log(`차감 수량: ${outboundQuantity}개`);
         console.log(`출고 날짜: ${sequenceDate}`);
-        
+
         try {
             // 재고 부족 확인을 위해 현재 재고 조회
             const { data: existingInventory, error: inventoryError } = await this.supabase
@@ -1418,7 +1420,7 @@ handleSequenceChange(e) {
             if (!existingInventory || !existingInventory.part_number) {
                 throw new Error(`파트 번호 ${partNumber}에 대한 재고 정보를 찾을 수 없습니다.`);
             }
-            
+
             // 재고 부족 확인
             const currentStock = existingInventory.current_stock || 0;
             console.log(`=== 재고 차감 전 확인 ===`);
@@ -1426,7 +1428,7 @@ handleSequenceChange(e) {
             console.log(`차감 예정 수량: ${outboundQuantity}개`);
             console.log(`현재 재고: ${currentStock}개`);
             console.log(`차감 후 예상 재고: ${currentStock - outboundQuantity}개`);
-            
+
             if (currentStock < outboundQuantity) {
                 console.warn(`재고 부족: ${partNumber} - 현재 재고 ${currentStock}개, 출고 요청 ${outboundQuantity}개. 재고 차감을 건너뜁니다.`);
                 return;
@@ -1434,13 +1436,13 @@ handleSequenceChange(e) {
 
             // inventory_transactions에 기록하고 inventory 직접 업데이트
             // transaction_date는 실제 출고 날짜(outbound_date)로 설정
-            const transactionDate = sequenceDate ? 
-                (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) : 
+            const transactionDate = sequenceDate ?
+                (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) :
                 new Date().toISOString().split('T')[0];
 
             console.log(`=== 거래 내역 기록 및 재고 직접 업데이트 ===`);
             console.log(`거래 날짜: ${transactionDate} (출고 날짜: ${sequenceDate})`);
-            
+
             // inventory_transactions에 기록
             const transactionData = {
                 transaction_date: transactionDate,
@@ -1450,9 +1452,9 @@ handleSequenceChange(e) {
                 reference_id: (sequence && sequence.sequence_number) ? sequence.sequence_number : `OUTBOUND_${Date.now()}`,
                 notes: `출고 처리 - 수량: ${outboundQuantity}개 (${sequenceDate || '오늘'} 출고)`
             };
-            
+
             console.log('거래 내역 삽입 데이터:', transactionData);
-            
+
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
                 .insert(transactionData);
@@ -1466,7 +1468,7 @@ handleSequenceChange(e) {
 
             // inventory 테이블 직접 업데이트 (트리거가 비활성화되어 있으므로)
             await this.updateInventoryDirectly(partNumber, outboundQuantity, 'OUTBOUND');
-            
+
             console.log(`파트 ${partNumber} 거래 내역 기록 및 재고 업데이트 완료`);
 
             // 트리거가 실행된 후 재고 확인
@@ -1476,7 +1478,7 @@ handleSequenceChange(e) {
                     .select('current_stock')
                     .eq('part_number', partNumber)
                     .maybeSingle();
-                    
+
                 if (updatedInventory) {
                     console.log(`=== 트리거 실행 후 재고 확인 ===`);
                     console.log(`파트 번호: ${partNumber}`);
@@ -1492,7 +1494,7 @@ handleSequenceChange(e) {
             console.error(`파트 ${partNumber} 재고 차감 실패:`, error);
             throw error;
         }
-        
+
         /* 아래 코드는 비활성화됨
         // 파트별 중복 실행 방지 (더 강화)
         const lockKey = `outbound_${partNumber}_${outboundQuantity}_${sequenceDate}`;
@@ -1639,7 +1641,7 @@ handleSequenceChange(e) {
             // 재고 증가
             const currentStock = existingInventory.current_stock || 0;
             const newStock = currentStock + inboundQuantity;
-            
+
             const { error: updateError } = await this.supabase
                 .from('inventory')
                 .update({
@@ -1657,8 +1659,8 @@ handleSequenceChange(e) {
             }
 
             // 2. inventory_transactions에 거래 내역 기록
-            const transactionDate = inboundDate ? 
-                (inboundDate.includes('T') ? inboundDate.split('T')[0] : inboundDate) : 
+            const transactionDate = inboundDate ?
+                (inboundDate.includes('T') ? inboundDate.split('T')[0] : inboundDate) :
                 new Date().toISOString().split('T')[0];
 
             const { error: transactionError } = await this.supabase
@@ -1704,10 +1706,10 @@ handleSequenceChange(e) {
                 console.error('파트를 찾을 수 없습니다:', partId);
                 return;
             }
-            
+
             const oldActualQty = part.actual_qty || 0;
             const quantityDifference = newActualQty - oldActualQty;
-            
+
             console.log(`=== 실제 출고 수량 변경 감지 ===`);
             console.log(`파트 번호: ${part.part_number}`);
             console.log(`파트 ID: ${partId}`);
@@ -1719,7 +1721,7 @@ handleSequenceChange(e) {
             // 2. 데이터베이스에서 파트 업데이트
             const { error: updateError } = await this.supabase
                 .from('outbound_parts')
-                .update({ 
+                .update({
                     actual_qty: newActualQty
                 })
                 .eq('id', partId);
@@ -1729,17 +1731,17 @@ handleSequenceChange(e) {
             }
 
             // 3. 로컬 데이터 업데이트
-                part.actual_qty = newActualQty;
-                
+            part.actual_qty = newActualQty;
+
             // 4. 재고 조정은 확정 시에만 수행 (실시간 조정 제거)
             // 실제 출고 수량 변경 시에는 재고를 조정하지 않음
-            
+
             // 5. 시퀀스의 총 수량도 업데이트
-                await this.updateSequenceTotals(part.sequence_id);
-                
+            await this.updateSequenceTotals(part.sequence_id);
+
             // 6. UI 다시 렌더링
-                this.renderParts(part.sequence_id);
-                this.renderSequences();
+            this.renderParts(part.sequence_id);
+            this.renderSequences();
 
             console.log(`파트 ${partId} 실제 출고 수량 업데이트 완료: ${newActualQty}`);
         } catch (error) {
@@ -1792,47 +1794,47 @@ handleSequenceChange(e) {
     updateConfirmButtons() {
         const confirmBtn = document.getElementById('confirmOutboundBtn');
         const confirmAllBtn = document.getElementById('confirmAllBtn');
-        
+
         console.log('확정 버튼 상태 업데이트:');
         console.log('- 선택된 차수:', this.selectedSequence);
         console.log('- 확정 버튼 요소:', confirmBtn);
         console.log('- 전체 확정 버튼 요소:', confirmAllBtn);
-        
+
         // 차수가 선택되었고, 해당 차수에 파트가 있으면 확정 버튼 활성화
         const hasSelectedSequence = this.selectedSequence !== null;
-        const hasParts = hasSelectedSequence ? 
+        const hasParts = hasSelectedSequence ?
             this.outboundParts.filter(part => part.sequence_id === this.selectedSequence).length > 0 : false;
-        
+
         console.log('- 차수 선택됨:', hasSelectedSequence);
         console.log('- 파트 있음:', hasParts);
-        
+
         // 선택 확정 버튼 활성화/비활성화
         if (confirmBtn) {
             if (hasSelectedSequence && hasParts) {
-            confirmBtn.disabled = false;
-            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            console.log('선택 확정 버튼 활성화됨');
-        } else {
-            confirmBtn.disabled = true;
-            confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            console.log('선택 확정 버튼 비활성화됨');
+                confirmBtn.disabled = false;
+                confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                console.log('선택 확정 버튼 활성화됨');
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                console.log('선택 확정 버튼 비활성화됨');
             }
         }
-        
+
         // 전체 확정 버튼 활성화/비활성화 (출고 파트가 있으면 활성화)
         if (confirmAllBtn) {
             const hasOutboundParts = this.outboundParts.length > 0;
             if (hasOutboundParts) {
-            confirmAllBtn.disabled = false;
-            confirmAllBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            console.log('전체 확정 버튼 활성화됨');
-        } else {
-            confirmAllBtn.disabled = true;
-            confirmAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            console.log('전체 확정 버튼 비활성화됨');
+                confirmAllBtn.disabled = false;
+                confirmAllBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                console.log('전체 확정 버튼 활성화됨');
+            } else {
+                confirmAllBtn.disabled = true;
+                confirmAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                console.log('전체 확정 버튼 비활성화됨');
+            }
         }
-        }
-        
+
         // 출고 취소 버튼 활성화/비활성화 (차수가 선택되면 활성화)
         const cancelBtn = document.getElementById('cancelOutboundBtn');
         if (cancelBtn) {
@@ -1844,7 +1846,7 @@ handleSequenceChange(e) {
                 cancelBtn.disabled = true;
                 cancelBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 console.log('출고 취소 버튼 비활성화됨');
-        }
+            }
         }
     }
 
@@ -1854,7 +1856,7 @@ handleSequenceChange(e) {
         console.log('확정 모달 표시 시작...');
         console.log('모달 타입:', type);
         console.log('선택된 차수:', this.selectedSequence);
-        
+
         if (!this.selectedSequence) {
             console.error('선택된 차수가 없습니다.');
             this.showNotification('확정할 차수를 선택해주세요.', 'error');
@@ -1863,18 +1865,18 @@ handleSequenceChange(e) {
 
         const sequence = this.outboundSequences.find(s => s.id === this.selectedSequence);
         const sequenceParts = this.outboundParts.filter(part => part.sequence_id === this.selectedSequence);
-        
+
         console.log('찾은 차수 정보:', sequence);
         console.log('해당 차수의 파트들:', sequenceParts);
-        
+
         if (!sequence) {
             console.error('선택된 차수를 찾을 수 없습니다.');
             this.showNotification('선택된 차수 정보를 찾을 수 없습니다.', 'error');
             return;
         }
-        
+
         let detailsHtml = '';
-        
+
         if (type === 'all') {
             detailsHtml = `
                 <div class="space-y-2">
@@ -1899,9 +1901,9 @@ handleSequenceChange(e) {
         } else {
             // 'selected' 타입일 때는 해당 차수의 모든 파트를 선택된 것으로 처리
             const selectedPartData = sequenceParts;
-            
+
             console.log('선택된 파트 데이터 (차수 전체):', selectedPartData);
-            
+
             detailsHtml = `
                 <div class="space-y-2">
                     <div class="flex justify-between">
@@ -1921,7 +1923,7 @@ handleSequenceChange(e) {
         }
 
         console.log('생성된 상세 정보 HTML:', detailsHtml);
-        
+
         const detailsElement = document.getElementById('confirmationDetails');
         if (detailsElement) {
             detailsElement.innerHTML = detailsHtml;
@@ -1929,7 +1931,7 @@ handleSequenceChange(e) {
         } else {
             console.error('confirmationDetails 요소를 찾을 수 없습니다.');
         }
-        
+
         const modalElement = document.getElementById('confirmationModal');
         if (modalElement) {
             modalElement.classList.remove('hidden');
@@ -1971,14 +1973,14 @@ handleSequenceChange(e) {
             console.log('확정 처리가 이미 진행 중입니다. 중복 실행 방지됨.');
             return;
         }
-        
+
         // 처리 중 플래그 설정
         this.isProcessingConfirmation = true;
         console.log('=== 확정 프로세스 시작 (완전 격리 모드) ===');
-        
+
         // 모든 이벤트 리스너 일시 비활성화
         this.disableAllEventListeners();
-        
+
         // 확정 버튼 즉시 비활성화
         const confirmBtn = document.getElementById('confirmOutboundAction');
         if (confirmBtn) {
@@ -1986,14 +1988,14 @@ handleSequenceChange(e) {
             confirmBtn.textContent = '처리 중...';
             confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
-        
+
         // 모달의 다른 버튼들도 비활성화
         const cancelBtn = document.getElementById('cancelConfirmation');
         if (cancelBtn) {
             cancelBtn.disabled = true;
             cancelBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
-        
+
         console.log('=== 확정 프로세스 시작 ===');
         console.log('선택된 차수:', this.selectedSequence);
         console.log('Supabase 클라이언트 상태:', this.supabase);
@@ -2001,7 +2003,7 @@ handleSequenceChange(e) {
             sequences: this.outboundSequences,
             parts: this.outboundParts
         });
-        
+
         if (!this.selectedSequence) {
             console.error('선택된 차수가 없습니다!');
             this.showNotification('확정할 차수를 선택해주세요.', 'error');
@@ -2011,7 +2013,7 @@ handleSequenceChange(e) {
         // 선택된 차수 정보 확인
         const selectedSequenceData = this.outboundSequences.find(s => s.id === this.selectedSequence);
         console.log('선택된 차수 데이터:', selectedSequenceData);
-        
+
         if (!selectedSequenceData) {
             console.error('선택된 차수 데이터를 찾을 수 없습니다!');
             this.showNotification('선택된 차수 정보를 찾을 수 없습니다.', 'error');
@@ -2019,7 +2021,7 @@ handleSequenceChange(e) {
         }
 
         let databaseSuccess = false;
-        
+
         try {
             // Supabase 연결이 없는 경우 Mock 데이터로 처리
             if (!this.supabase) {
@@ -2028,11 +2030,11 @@ handleSequenceChange(e) {
             } else {
                 console.log('1단계: 출고 차수 상태 업데이트 시작...');
                 console.log('업데이트할 차수 ID:', this.selectedSequence);
-                
+
                 // 1. 출고 차수 상태 업데이트
                 const { data: sequenceData, error: sequenceError } = await this.supabase
                     .from('outbound_sequences')
-                    .update({ 
+                    .update({
                         status: 'COMPLETED'
                     })
                     .eq('id', this.selectedSequence)
@@ -2057,7 +2059,7 @@ handleSequenceChange(e) {
                     // 2. 출고 파트 상태 업데이트
                     const { data: partsData, error: partsError } = await this.supabase
                         .from('outbound_parts')
-                        .update({ 
+                        .update({
                             status: 'COMPLETED'
                         })
                         .eq('sequence_id', this.selectedSequence)
@@ -2083,19 +2085,19 @@ handleSequenceChange(e) {
                     try {
                         // 확정 전에 DB에서 직접 최신 데이터 조회
                         console.log('확정 전 DB에서 직접 최신 데이터 조회 중...');
-                        
+
                         const { data: dbParts, error: dbPartsError } = await this.supabase
                             .from('outbound_parts')
                             .select('*')
                             .eq('sequence_id', this.selectedSequence);
-                            
+
                         if (dbPartsError) {
                             console.error('DB에서 파트 데이터 조회 실패:', dbPartsError);
                             throw dbPartsError;
                         }
-                        
+
                         console.log('DB에서 조회한 파트들:', dbParts);
-                        
+
                         // 각 파트의 상세 정보 로그
                         dbParts.forEach((part, index) => {
                             console.log(`DB 파트 ${index + 1}: ${part.part_number}`);
@@ -2105,23 +2107,23 @@ handleSequenceChange(e) {
                             console.log(`  - scanned_qty: ${part.scanned_qty}`);
                             console.log(`  - status: ${part.status}`);
                         });
-                        
+
                         // 선택된 시퀀스의 날짜 가져오기
                         const selectedSequenceData = this.outboundSequences.find(s => s.id === this.selectedSequence);
                         const sequenceDate = selectedSequenceData ? selectedSequenceData.outbound_date : null;
                         console.log(`시퀀스 날짜: ${sequenceDate}`);
-                        
+
                         // 처리된 파트 추적을 위한 Set
                         if (!this.processedParts) {
                             this.processedParts = new Set();
                         }
-                        
+
                         // 재고 차감을 배치로 처리 (성능 최적화)
                         console.log('=== 재고 차감 시작 (배치 처리 모드) ===');
-                        
+
                         // 모든 파트의 재고 차감을 배치로 처리
                         await this.processInventoryBatch(dbParts, sequenceDate, selectedSequenceData);
-                        
+
                         console.log('=== 재고 차감 완료 (완전 격리 모드) ===');
                     } catch (inventoryError) {
                         console.warn('재고 차감 처리 중 오류 (무시하고 계속):', inventoryError);
@@ -2166,21 +2168,21 @@ handleSequenceChange(e) {
             this.resetAfterConfirmation();
 
             // daily_inventory_summary 업데이트 (출고 날짜 기준)
-            const outboundDate = selectedSequenceData.outbound_date ? 
-                (selectedSequenceData.outbound_date.includes('T') ? selectedSequenceData.outbound_date.split('T')[0] : selectedSequenceData.outbound_date) : 
+            const outboundDate = selectedSequenceData.outbound_date ?
+                (selectedSequenceData.outbound_date.includes('T') ? selectedSequenceData.outbound_date.split('T')[0] : selectedSequenceData.outbound_date) :
                 new Date().toISOString().split('T')[0];
-            
+
             console.log('출고 확정 후 daily_inventory_summary 업데이트 시작...');
             console.log('출고 날짜:', outboundDate);
             await this.updateDailyInventorySummary(outboundDate);
             console.log('daily_inventory_summary 업데이트 완료');
 
             console.log('=== 확정 프로세스 완료! ===');
-            const successMessage = databaseSuccess ? 
-                '출하가 성공적으로 확정되었습니다. 페이지를 새로고침합니다.' : 
+            const successMessage = databaseSuccess ?
+                '출하가 성공적으로 확정되었습니다. 페이지를 새로고침합니다.' :
                 '출하가 성공적으로 확정되었습니다. (로컬 데이터) 페이지를 새로고침합니다.';
             this.showNotification(successMessage, 'success');
-            
+
             // 페이지 전체 리프레시
             setTimeout(() => {
                 window.location.reload();
@@ -2195,7 +2197,7 @@ handleSequenceChange(e) {
                 code: error.code,
                 stack: error.stack
             });
-            
+
             // 오류 발생 시에도 로컬 데이터 업데이트 시도
             try {
                 console.log('오류 발생으로 로컬 데이터만 업데이트 시도...');
@@ -2220,21 +2222,21 @@ handleSequenceChange(e) {
                 this.renderParts(this.selectedSequence);
                 this.updateStats();
                 this.closeConfirmationModal();
-                
+
                 // 상태 초기화
                 this.resetAfterConfirmation();
 
                 // daily_inventory_summary 업데이트 (출고 날짜 기준)
-                const outboundDate = sequence.outbound_date ? 
-                    (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) : 
+                const outboundDate = sequence.outbound_date ?
+                    (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
                     new Date().toISOString().split('T')[0];
-                
+
                 console.log('출고 확정 후 daily_inventory_summary 업데이트 시작...');
                 console.log('출고 날짜:', outboundDate);
                 await this.updateDailyInventorySummary(outboundDate);
 
                 this.showNotification('출하가 확정되었습니다. 페이지를 새로고침합니다.', 'success');
-                
+
                 // 페이지 전체 리프레시
                 setTimeout(() => {
                     window.location.reload();
@@ -2247,20 +2249,20 @@ handleSequenceChange(e) {
         } finally {
             // 플래그 해제
             this.isProcessingConfirmation = false;
-            
+
             // 처리된 파트 목록 초기화
             this.processedParts = new Set();
-            
+
             // 모든 이벤트 리스너 재활성화
             this.enableAllEventListeners();
-            
+
             // 확정 버튼 텍스트 복원
             const confirmBtn = document.getElementById('confirmOutboundAction');
             if (confirmBtn) {
                 confirmBtn.textContent = '확정';
                 confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
-            
+
             console.log('=== 확정 프로세스 완료 (완전 격리 모드 종료) ===');
         }
     }
@@ -2269,11 +2271,11 @@ handleSequenceChange(e) {
     async processInventoryBatch(parts, sequenceDate, sequence = null) {
         console.log('=== 재고 차감 배치 처리 시작 ===');
         console.log(`처리할 파트 수: ${parts.length}개`);
-        
-        const transactionDate = sequenceDate ? 
-            (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) : 
+
+        const transactionDate = sequenceDate ?
+            (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) :
             new Date().toISOString().split('T')[0];
-        
+
         try {
             // 1. 현재 재고 상태 조회 (한 번에)
             const partNumbers = parts.map(p => p.part_number);
@@ -2281,24 +2283,24 @@ handleSequenceChange(e) {
                 .from('inventory')
                 .select('part_number, current_stock')
                 .in('part_number', partNumbers);
-                
+
             if (inventoryError) {
                 throw inventoryError;
             }
-            
+
             console.log('현재 재고 조회 완료:', currentInventory.length, '개 파트');
-            
+
             // 2. 재고 부족 파트 확인
             const insufficientStock = [];
             const validParts = [];
-            
+
             for (const part of parts) {
                 const inventory = currentInventory.find(inv => inv.part_number === part.part_number);
                 if (!inventory) {
                     console.warn(`파트 ${part.part_number}의 재고 정보가 없습니다. 건너뜁니다.`);
                     continue;
                 }
-                
+
                 if (inventory.current_stock < part.actual_qty) {
                     insufficientStock.push({
                         part_number: part.part_number,
@@ -2309,16 +2311,16 @@ handleSequenceChange(e) {
                     validParts.push(part);
                 }
             }
-            
+
             if (insufficientStock.length > 0) {
                 console.warn('재고 부족 파트들:', insufficientStock);
             }
-            
+
             if (validParts.length === 0) {
                 console.warn('처리 가능한 파트가 없습니다.');
                 return;
             }
-            
+
             // 3. inventory_transactions 배치 삽입
             const transactionData = validParts.map(part => ({
                 transaction_date: transactionDate,
@@ -2328,34 +2330,34 @@ handleSequenceChange(e) {
                 reference_id: (sequence && sequence.sequence_number) ? sequence.sequence_number : `OUTBOUND_${Date.now()}_${part.id}`,
                 notes: `출고 처리 - 수량: ${part.actual_qty}개 (${sequenceDate || '오늘'} 출고)`
             }));
-            
+
             console.log('=== inventory_transactions 배치 삽입 시작 ===');
             console.log(`삽입할 거래 내역 수: ${transactionData.length}건`);
             console.log('거래 내역 샘플 (최대 5건):', transactionData.slice(0, 5));
             console.log('transaction_date 형식:', transactionDate);
             console.log('transaction_date 타입:', typeof transactionDate);
-            
+
             const { data: insertedData, error: transactionError } = await this.supabase
                 .from('inventory_transactions')
                 .insert(transactionData)
                 .select(); // 삽입된 데이터 반환
-            
+
             if (transactionError) {
                 console.error('❌ inventory_transactions 삽입 실패!');
                 console.error('에러 상세:', transactionError);
                 console.error('삽입 시도한 데이터:', transactionData);
                 throw transactionError;
             }
-            
+
             if (insertedData) {
                 console.log(`✅ inventory_transactions 삽입 성공: ${insertedData.length}건`);
                 console.log('삽입된 데이터 샘플 (최대 5건):', insertedData.slice(0, 5));
             } else {
                 console.warn('⚠️ insertedData가 null입니다. 삽입은 성공했지만 반환된 데이터가 없습니다.');
             }
-            
+
             console.log('=== inventory_transactions 배치 삽입 완료 ===');
-            
+
             // 4. inventory 테이블 배치 업데이트
             console.log('재고 배치 업데이트 시작...');
             const inventoryUpdates = validParts.map(part => {
@@ -2365,27 +2367,27 @@ handleSequenceChange(e) {
                     current_stock: inventory.current_stock - part.actual_qty
                 };
             });
-            
+
             // 각 파트별로 업데이트 (PostgreSQL의 UPSERT 제한으로 인해)
             for (const update of inventoryUpdates) {
                 const { error: updateError } = await this.supabase
                     .from('inventory')
                     .update({ current_stock: update.current_stock })
                     .eq('part_number', update.part_number);
-                    
+
                 if (updateError) {
                     console.error(`파트 ${update.part_number} 재고 업데이트 실패:`, updateError);
                 }
             }
-            
+
             console.log('재고 배치 업데이트 완료');
             console.log(`성공적으로 처리된 파트: ${validParts.length}개`);
-            
+
         } catch (error) {
             console.error('재고 배치 처리 중 오류:', error);
             throw error;
         }
-        
+
         console.log('=== 재고 차감 배치 처리 완료 ===');
     }
 
@@ -2393,7 +2395,7 @@ handleSequenceChange(e) {
     async processInventoryRestoreBatch(parts) {
         console.log('=== 재고 복구 배치 처리 시작 ===');
         console.log(`복구할 파트 수: ${parts.length}개`);
-        
+
         try {
             // 1. 현재 재고 상태 조회 (한 번에)
             const partNumbers = parts.map(p => p.part_number);
@@ -2401,44 +2403,44 @@ handleSequenceChange(e) {
                 .from('inventory')
                 .select('part_number, current_stock')
                 .in('part_number', partNumbers);
-                
+
             if (inventoryError) {
                 throw inventoryError;
             }
-            
+
             console.log('현재 재고 조회 완료:', currentInventory.length, '개 파트');
-            
+
             // 2. 재고 복구 업데이트
             console.log('재고 복구 배치 업데이트 시작...');
-            
+
             for (const part of parts) {
                 const inventory = currentInventory.find(inv => inv.part_number === part.part_number);
                 if (!inventory) {
                     console.warn(`파트 ${part.part_number}의 재고 정보가 없습니다. 건너뜁니다.`);
                     continue;
                 }
-                
+
                 const newStock = inventory.current_stock + (part.actual_qty || 0);
-                
+
                 const { error: updateError } = await this.supabase
                     .from('inventory')
                     .update({ current_stock: newStock })
                     .eq('part_number', part.part_number);
-                    
+
                 if (updateError) {
                     console.error(`파트 ${part.part_number} 재고 복구 실패:`, updateError);
                 } else {
                     console.log(`파트 ${part.part_number} 재고 복구 완료: ${inventory.current_stock} → ${newStock}`);
                 }
             }
-            
+
             console.log('재고 복구 배치 업데이트 완료');
-            
+
         } catch (error) {
             console.error('재고 복구 배치 처리 중 오류:', error);
             throw error;
         }
-        
+
         console.log('=== 재고 복구 배치 처리 완료 ===');
     }
 
@@ -2446,12 +2448,12 @@ handleSequenceChange(e) {
     async processInventoryUpdates(updates) {
         console.log('=== 재고 차감 일괄 처리 시작 ===');
         console.log(`처리할 파트 수: ${updates.length}개`);
-        
+
         for (let i = 0; i < updates.length; i++) {
             const update = updates[i];
-            console.log(`=== 파트 ${update.partNumber} 재고 차감 (${i+1}/${updates.length}) ===`);
+            console.log(`=== 파트 ${update.partNumber} 재고 차감 (${i + 1}/${updates.length}) ===`);
             console.log(`차감 수량: ${update.quantity}개`);
-            
+
             try {
                 await this.updateInventoryAfterOutbound(update.partNumber, update.quantity, update.sequenceDate);
                 console.log(`파트 ${update.partNumber} 재고 차감 완료`);
@@ -2459,76 +2461,75 @@ handleSequenceChange(e) {
                 console.error(`파트 ${update.partNumber} 재고 차감 실패:`, error);
                 // 개별 파트 실패해도 계속 진행
             }
-            
+
             // 각 파트 처리 후 잠시 대기
             if (i < updates.length - 1) {
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         }
-        
+
         console.log('=== 재고 차감 일괄 처리 완료 ===');
     }
 
     // 모든 이벤트 리스너 비활성화
     disableAllEventListeners() {
         console.log('모든 이벤트 리스너 비활성화 중...');
-        
+
         // 확정 버튼 비활성화
         const confirmBtn = document.getElementById('confirmOutboundAction');
         if (confirmBtn) {
             confirmBtn.disabled = true;
             confirmBtn.style.pointerEvents = 'none';
         }
-        
+
         // 취소 버튼 비활성화
         const cancelBtn = document.getElementById('cancelConfirmation');
         if (cancelBtn) {
             cancelBtn.disabled = true;
             cancelBtn.style.pointerEvents = 'none';
         }
-        
+
         // 모든 클릭 이벤트 일시 중지
         document.body.style.pointerEvents = 'none';
-        
+
         console.log('이벤트 리스너 비활성화 완료');
     }
-    
+
     // 모든 이벤트 리스너 재활성화
     enableAllEventListeners() {
         console.log('모든 이벤트 리스너 재활성화 중...');
-        
+
         // 확정 버튼 재활성화
         const confirmBtn = document.getElementById('confirmOutboundAction');
         if (confirmBtn) {
             confirmBtn.disabled = false;
             confirmBtn.style.pointerEvents = 'auto';
         }
-        
+
         // 취소 버튼 재활성화
         const cancelBtn = document.getElementById('cancelConfirmation');
         if (cancelBtn) {
             cancelBtn.disabled = false;
             cancelBtn.style.pointerEvents = 'auto';
         }
-        
+
         // 모든 클릭 이벤트 재활성화
         document.body.style.pointerEvents = 'auto';
-        
+
         console.log('이벤트 리스너 재활성화 완료');
     }
 
     showNotification(message, type = 'info') {
         // 간단한 알림 표시
         const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
-            type === 'success' ? 'bg-green-500 text-white' :
-            type === 'error' ? 'bg-red-500 text-white' :
-            'bg-blue-500 text-white'
-        }`;
+        notification.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${type === 'success' ? 'bg-green-500 text-white' :
+                type === 'error' ? 'bg-red-500 text-white' :
+                    'bg-blue-500 text-white'
+            }`;
         notification.textContent = message;
-        
+
         document.body.appendChild(notification);
-        
+
         // 3초 후 자동 제거
         setTimeout(() => {
             if (notification.parentNode) {
@@ -2539,18 +2540,18 @@ handleSequenceChange(e) {
 
     resetAfterConfirmation() {
         console.log('확정 후 상태 초기화 시작...');
-        
+
         // 1. 선택된 차수 초기화
         this.selectedSequence = null;
         console.log('선택된 차수 초기화 완료');
-        
+
         // 2. 파트 테이블 초기화
         const partsTableBody = document.getElementById('partsTableBody');
         if (partsTableBody) {
             const selectShiftText = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('select_shift_first') : '차수를 먼저 선택해주세요.';
             partsTableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-800/60">${selectShiftText}</td></tr>`;
         }
-        
+
         // 3. 모든 체크박스 초기화
         const allCheckboxes = document.querySelectorAll('input[type="checkbox"]');
         allCheckboxes.forEach(checkbox => {
@@ -2560,50 +2561,50 @@ handleSequenceChange(e) {
                 this.updateRowBackgroundColor(row, false);
             }
         });
-        
+
         // 4. 전체 선택 체크박스 초기화
         const selectAllCheckbox = document.getElementById('selectAllParts');
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = false;
             selectAllCheckbox.indeterminate = false;
         }
-        
+
         // 5. 버튼 상태 초기화
         const confirmBtn = document.getElementById('confirmOutboundBtn');
         if (confirmBtn) {
             confirmBtn.disabled = true;
             confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
-        
+
         const confirmAllBtn = document.getElementById('confirmAllBtn');
         if (confirmAllBtn) {
             confirmAllBtn.disabled = true;
             confirmAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
-        
+
         const cancelBtn = document.getElementById('cancelOutboundBtn');
         if (cancelBtn) {
             cancelBtn.disabled = true;
             cancelBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
-        
+
         // 6. 통계 초기화
         this.updateStats();
-        
+
         // 7. 차수 테이블에서 선택 상태 제거
         const sequenceRows = document.querySelectorAll('#sequencesTableBody tr');
         sequenceRows.forEach(row => {
             row.classList.remove('bg-blue-50', 'border-blue-200');
             row.classList.add('hover:bg-gray-50');
         });
-        
+
         console.log('확정 후 상태 초기화 완료');
     }
 
     // 재고 동기화 상태 검증 함수
     async validateInventorySync() {
         console.log('=== 재고 동기화 상태 검증 시작 ===');
-        
+
         try {
             if (!this.supabase) {
                 console.error('Supabase 클라이언트가 없습니다.');
@@ -2641,7 +2642,7 @@ handleSequenceChange(e) {
 
             // 2. 각 출고에 대해 재고 차감 확인
             let syncIssues = [];
-            
+
             for (const sequence of recentOutbound || []) {
                 for (const part of sequence.outbound_parts || []) {
                     if (part.status === 'COMPLETED' && part.actual_qty > 0) {
@@ -2661,7 +2662,7 @@ handleSequenceChange(e) {
 
                         // 해당 날짜의 총 출고 수량 계산
                         const totalOutboundQty = transactions?.reduce((sum, trans) => sum + (trans.quantity || 0), 0) || 0;
-                        
+
                         if (totalOutboundQty !== part.actual_qty) {
                             syncIssues.push({
                                 sequence: sequence.sequence_number,
@@ -2700,7 +2701,7 @@ handleSequenceChange(e) {
     // 재고 동기화 수정 함수
     async fixInventorySync() {
         console.log('=== 재고 동기화 수정 시작 ===');
-        
+
         try {
             if (!this.supabase) {
                 console.error('Supabase 클라이언트가 없습니다.');
@@ -2787,13 +2788,13 @@ handleSequenceChange(e) {
         console.log('테스트 수량:', quantity);
         console.log('테스트 날짜:', testDate || '오늘 날짜 사용');
         console.log('Supabase 클라이언트:', this.supabase);
-        
+
         if (!this.supabase) {
             console.error('Supabase 클라이언트가 없습니다.');
             this.showNotification('Supabase 클라이언트가 없습니다.', 'error');
             return;
         }
-        
+
         // 인증 상태 확인
         try {
             const { data: { user }, error: authError } = await this.supabase.auth.getUser();
@@ -2806,11 +2807,11 @@ handleSequenceChange(e) {
         } catch (authCheckError) {
             console.warn('인증 상태 확인 실패:', authCheckError);
         }
-        
+
         console.log('=== 테스트 함수 비활성화됨 ===');
         console.log('테스트 함수는 중복 실행을 방지하기 위해 비활성화되었습니다.');
         return;
-        
+
         // 아래 코드는 비활성화됨
         /*
         try {
@@ -2830,16 +2831,16 @@ handleSequenceChange(e) {
         try {
             if (isEditMode) {
                 // 수정 모드: 기존 데이터 사용
-                const today = this.editingSequence.outbound_date ? 
-                    (this.editingSequence.outbound_date.includes('T') ? this.editingSequence.outbound_date.split('T')[0] : this.editingSequence.outbound_date) : 
+                const today = this.editingSequence.outbound_date ?
+                    (this.editingSequence.outbound_date.includes('T') ? this.editingSequence.outbound_date.split('T')[0] : this.editingSequence.outbound_date) :
                     new Date().toISOString().split('T')[0];
                 document.getElementById('registrationDate').value = today;
                 document.getElementById('registrationSequence').value = this.editingSequence.sequence_number;
-                
+
                 // 모달 제목 변경
                 const modalTitle = document.querySelector('#outboundRegistrationModal h3');
                 const saveButton = document.getElementById('saveRegistration');
-                
+
                 if (modalTitle) {
                     modalTitle.textContent = '출고 수정';
                 }
@@ -2851,14 +2852,14 @@ handleSequenceChange(e) {
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('registrationDate').value = today;
                 document.getElementById('registrationSequence').value = '';
-                
+
                 // 등록된 파트 목록 초기화
                 this.registrationParts = [];
-                
+
                 // 모달 제목 변경
                 const modalTitle = document.querySelector('#outboundRegistrationModal h3');
                 const saveButton = document.getElementById('saveRegistration');
-                
+
                 if (modalTitle) {
                     modalTitle.textContent = '출고 등록';
                 }
@@ -2866,25 +2867,25 @@ handleSequenceChange(e) {
                     saveButton.textContent = '등록';
                 }
             }
-            
+
             // AS 체크박스 초기화 (기본값: 체크 안됨)
             const includeASCheckbox = document.getElementById('includeASCheckbox');
             if (includeASCheckbox) {
                 includeASCheckbox.checked = false;
             }
-            
+
             // 파트 목록 로딩 (기본값: 양산 제품만)
             const includeAS = includeASCheckbox?.checked || false;
             this.allParts = await this.loadAllParts(includeAS);
-            
+
             if (!isEditMode) {
                 // 등록 모드에서만 기존 출고 데이터 확인
                 await this.loadExistingOutboundData();
             }
-            
+
             // Handsontable 초기화
             this.initializePartsTable();
-            
+
             // 모달 표시
             document.getElementById('outboundRegistrationModal').classList.remove('hidden');
         } catch (error) {
@@ -2897,7 +2898,7 @@ handleSequenceChange(e) {
     async loadExistingOutboundData() {
         try {
             const today = new Date().toISOString().split('T')[0];
-            
+
             // 오늘 날짜의 기존 출고 차수 확인 (로깅용)
             const { data: existingData, error } = await this.supabase
                 .from('outbound_sequences')
@@ -2920,7 +2921,7 @@ handleSequenceChange(e) {
                 console.error('기존 출고 데이터 로딩 오류:', error);
                 return;
             }
-            
+
             if (existingData && existingData.length > 0) {
                 console.log('오늘 날짜의 기존 출고 차수들:', existingData);
                 console.log('새로운 차수로 등록 진행 (메시지 없이)');
@@ -2934,17 +2935,17 @@ handleSequenceChange(e) {
 
     initializePartsTable() {
         const container = document.getElementById('partsTable');
-        
+
         // 기존 테이블이 있다면 제거
         if (this.partsTable) {
             this.partsTable.destroy();
         }
-        
+
         // allParts가 없으면 빈 배열로 초기화
         if (!this.allParts) {
             this.allParts = [];
         }
-        
+
         // 기존 데이터가 있으면 Handsontable 데이터로 변환
         let initialData = [];
         if (this.registrationParts && this.registrationParts.length > 0) {
@@ -2988,8 +2989,8 @@ handleSequenceChange(e) {
                     validator: (value, callback) => {
                         if (!value || value === 0) {
                             callback(true); // 빈 값이나 0은 허용 (저장 시 제외됨)
-            return;
-        }
+                            return;
+                        }
                         const num = parseInt(value);
                         if (num > 0 && num <= 9999) {
                             callback(true);
@@ -3018,20 +3019,20 @@ handleSequenceChange(e) {
                 this.updateSelectedRows();
             }
         });
-        
+
     }
 
     async handleASCheckboxChange() {
         try {
             // AS 체크박스 상태 확인
             const includeAS = document.getElementById('includeASCheckbox')?.checked || false;
-            
+
             // 파트 목록 다시 로드
             this.allParts = await this.loadAllParts(includeAS);
-            
+
             // 테이블 다시 초기화
             this.initializePartsTable();
-            
+
             console.log(`AS 제품 ${includeAS ? '포함' : '제외'}하여 파트 목록을 다시 로드했습니다.`);
         } catch (error) {
             console.error('AS 체크박스 변경 처리 오류:', error);
@@ -3043,13 +3044,13 @@ handleSequenceChange(e) {
         if (this.partsTable) {
             // 현재 데이터 가져오기
             const currentData = this.partsTable.getData();
-            
+
             // 새 빈 행 추가
             currentData.push(['', 0]); // 빈 파트 번호와 수량 0
-            
+
             // 테이블에 새 데이터 로드
             this.partsTable.loadData(currentData);
-            
+
             console.log('새 행이 추가되었습니다.');
             this.showNotification('새 행이 추가되었습니다. 파트 번호와 수량을 입력하세요.', 'success');
         } else {
@@ -3064,20 +3065,20 @@ handleSequenceChange(e) {
             if (selected && selected.length > 0) {
                 const [startRow, startCol, endRow, endCol] = selected[0];
                 const currentData = this.partsTable.getData();
-                
+
                 // 선택된 행들을 역순으로 삭제 (인덱스 변경 방지)
                 const rowsToDelete = [];
                 for (let row = startRow; row <= endRow; row++) {
                     rowsToDelete.push(row);
                 }
-                
+
                 // 역순으로 정렬하여 뒤에서부터 삭제
                 rowsToDelete.sort((a, b) => b - a);
-                
+
                 rowsToDelete.forEach(rowIndex => {
                     currentData.splice(rowIndex, 1);
                 });
-                
+
                 this.partsTable.loadData(currentData);
                 this.updatePartsFromTable();
                 console.log(`선택된 ${rowsToDelete.length}개 행이 삭제되었습니다.`);
@@ -3095,7 +3096,7 @@ handleSequenceChange(e) {
         // 선택된 행이 있는지 확인
         const selected = this.partsTable.getSelected();
         const hasSelection = selected && selected.length > 0;
-        
+
         // 삭제 버튼 활성화/비활성화
         const removeBtn = document.getElementById('removeRowBtn');
         if (removeBtn) {
@@ -3108,21 +3109,21 @@ handleSequenceChange(e) {
     updatePartsFromTable() {
         const data = this.partsTable.getData();
         this.registrationParts = [];
-        
+
         data.forEach((row, index) => {
             const [partNumber, quantity] = row;
-            
+
             // 파트 번호가 있고 수량이 0보다 큰 경우만 저장
             if (partNumber && quantity > 0) {
-            this.registrationParts.push({
+                this.registrationParts.push({
                     id: Date.now() + index,
-                partNumber: partNumber,
+                    partNumber: partNumber,
                     quantity: parseInt(quantity) || 0,
                     status: 'PENDING'
                 });
             }
         });
-        
+
         console.log('업데이트된 파트 목록 (수량 0인 행 제외):', this.registrationParts);
     }
 
@@ -3149,28 +3150,28 @@ handleSequenceChange(e) {
 
     closeRegistrationModal() {
         document.getElementById('outboundRegistrationModal').classList.add('hidden');
-        
+
         // 입력 필드 초기화
         document.getElementById('registrationDate').value = '';
         document.getElementById('registrationSequence').value = '';
-        
+
         // 등록된 파트 목록 초기화
         this.registrationParts = [];
-        
+
         // 수정 모드 초기화
         this.editingSequence = null;
-        
+
         // 모달 제목과 버튼 텍스트 초기화
         const modalTitle = document.querySelector('#outboundRegistrationModal h3');
         const saveButton = document.getElementById('saveRegistration');
-        
+
         if (modalTitle) {
             modalTitle.textContent = '출고 등록';
         }
         if (saveButton) {
             saveButton.textContent = '등록';
         }
-        
+
         // Handsontable 제거
         if (this.partsTable) {
             this.partsTable.destroy();
@@ -3186,13 +3187,13 @@ handleSequenceChange(e) {
 
     renderRegistrationParts() {
         const container = document.getElementById('registeredPartsList');
-        
+
         if (this.registrationParts.length === 0) {
             const noPartsText = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('no_registered_parts') : '등록된 파트가 없습니다.';
             container.innerHTML = `<p class="text-gray-500 text-sm">${noPartsText}</p>`;
             return;
         }
-        
+
         const partsHtml = this.registrationParts.map(part => `
             <div class="flex items-center justify-between bg-white p-3 rounded border">
                 <div class="flex items-center space-x-4">
@@ -3205,7 +3206,7 @@ handleSequenceChange(e) {
                 </button>
             </div>
         `).join('');
-        
+
         container.innerHTML = partsHtml;
     }
 
@@ -3213,25 +3214,25 @@ handleSequenceChange(e) {
         const date = document.getElementById('registrationDate').value;
         const seq = document.getElementById('registrationSequence').value;
         const isEditMode = this.editingSequence !== null;
-        
+
         if (!date) {
             this.showNotification('날짜를 선택해주세요.', 'error');
             return;
         }
-        
+
         if (!seq) {
             this.showNotification('차수를 선택해주세요.', 'error');
             return;
         }
-        
+
         // Handsontable에서 최신 데이터 가져오기
         this.updatePartsFromTable();
-        
+
         if (this.registrationParts.length === 0) {
             this.showNotification('등록할 파트를 추가해주세요.', 'error');
             return;
         }
-        
+
         try {
             if (isEditMode) {
                 // 수정 모드: 기존 차수 업데이트
@@ -3283,14 +3284,14 @@ handleSequenceChange(e) {
 
         this.showNotification('출고 수량이 수정되었습니다. 페이지를 새로고침합니다.', 'success');
         this.closeRegistrationModal();
-        
+
         // 데이터 다시 로드하여 변경사항 반영
         await this.forceRefreshData();
-        
+
         // UI 업데이트
         this.updateConfirmButtons();
         this.updateStats();
-        
+
         // 페이지 전체 리프레시 (수정 후 확실한 반영을 위해)
         setTimeout(() => {
             window.location.reload();
@@ -3321,7 +3322,7 @@ handleSequenceChange(e) {
             const totalQuantity = this.registrationParts.reduce((sum, part) => sum + part.quantity, 0);
             // 차수 번호는 이미 위에서 생성됨
             console.log('생성된 차수 번호:', sequenceNumber, '날짜:', date, '차수:', seq);
-            
+
             const sequenceData = {
                 sequence_number: sequenceNumber,
                 outbound_date: date,
@@ -3339,7 +3340,7 @@ handleSequenceChange(e) {
                 console.error('차수 생성 오류:', sequenceError);
                 // 409 오류는 중복 데이터를 의미
                 if (sequenceError.code === '23505' || sequenceError.status === 409 || sequenceError.message?.includes('duplicate') || sequenceError.message?.includes('unique')) {
-                    const errorMessage = sequenceError.details 
+                    const errorMessage = sequenceError.details
                         ? `이미 등록된 차수입니다: ${sequenceNumber}\n(${sequenceError.details})`
                         : `이미 등록된 차수입니다: ${sequenceNumber}`;
                     this.showNotification(errorMessage, 'error');
@@ -3347,7 +3348,7 @@ handleSequenceChange(e) {
                 }
                 throw sequenceError;
             }
-            
+
             console.log('생성된 차수:', newSequence);
 
             // 2. 출고 파트들 생성
@@ -3379,16 +3380,16 @@ handleSequenceChange(e) {
             this.applyFilters();
             this.updateStats();
             this.closeRegistrationModal();
-            
+
             this.showNotification('출고가 성공적으로 등록되었습니다.', 'success');
-            
+
             console.log('새로운 출고 등록 완료:', newSequence, partsData);
-            
+
         } catch (error) {
             console.error('출고 등록 오류:', error);
             // 409 오류는 중복 데이터를 의미
             if (error.code === '23505' || error.status === 409 || error.message?.includes('duplicate') || error.message?.includes('unique')) {
-                const errorMessage = error.details 
+                const errorMessage = error.details
                     ? `이미 등록된 차수입니다.\n중복 등록을 시도하지 마세요.\n(${error.details})`
                     : '이미 등록된 차수입니다. 중복 등록을 시도하지 마세요.';
                 this.showNotification(errorMessage, 'error');
@@ -3402,14 +3403,14 @@ handleSequenceChange(e) {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.outboundStatus = new OutboundStatus();
-    
+
     // 전역 테스트 함수 비활성화 (중복 실행 방지)
     window.testInventoryUpdate = (partNumber = '49560-12345', quantity = 5) => {
         console.log('=== 전역 테스트 함수 비활성화됨 ===');
         console.log('테스트 함수는 중복 실행을 방지하기 위해 비활성화되었습니다.');
         return;
     };
-    
+
     // 전역 재고 동기화 함수
     window.validateInventorySync = () => {
         if (window.outboundStatus) {
@@ -3418,7 +3419,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('OutboundStatus가 초기화되지 않았습니다.');
         }
     };
-    
+
     window.fixInventorySync = () => {
         if (window.outboundStatus) {
             window.outboundStatus.fixInventorySync();
@@ -3426,6 +3427,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('OutboundStatus가 초기화되지 않았습니다.');
         }
     };
-    
+
     console.log('OutboundStatus 초기화 완료. 재고 동기화 함수: window.validateInventorySync(), window.fixInventorySync()');
 }); 

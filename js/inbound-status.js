@@ -13,21 +13,21 @@ class InboundStatus {
         this.fileData = null; // 파싱된 파일 데이터
         this.manualParts = []; // 수동 등록 파트 목록
         this.manualTable = null; // 수동 등록 Handsontable
-        
+
         // Performance optimizations
         this.cache = new Map();
         this.lastDataUpdate = 0;
         this.dataUpdateInterval = 30000; // 30 seconds
         this.isLoading = false;
         this.domCache = new Map();
-        
+
         // 정렬 상태
         this.sortColumn = null; // 현재 정렬 컬럼
         this.sortDirection = 'asc'; // 정렬 방향: 'asc' 또는 'desc'
-        
+
         // Supabase 클라이언트 초기화
         this.initializeSupabase();
-        
+
         this.init();
     }
 
@@ -43,20 +43,20 @@ class InboundStatus {
                 const day = String(today.getDate()).padStart(2, '0');
                 return `${year}-${month}-${day}`;
             }
-            
+
             const cleanDate = koreanDate.trim();
-            
+
             // YYYY-MM-DD 형식인 경우 (날짜만 있는 경우) - 그대로 반환
             if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
                 return cleanDate; // 날짜만 저장하므로 타임존 변환 불필요
             }
-            
+
             // YYYY/MM/DD 형식인 경우
             if (/^\d{4}\/\d{2}\/\d{2}$/.test(cleanDate)) {
                 const parts = cleanDate.split('/');
                 return `${parts[0]}-${parts[1]}-${parts[2]}`;
             }
-            
+
             // MM/DD/YYYY 형식인 경우
             if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDate)) {
                 const parts = cleanDate.split('/');
@@ -64,7 +64,7 @@ class InboundStatus {
                 const day = parts[1].padStart(2, '0');
                 return `${parts[2]}-${month}-${day}`;
             }
-            
+
             // DD/MM/YYYY 형식인 경우
             if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDate)) {
                 const parts = cleanDate.split('/');
@@ -72,7 +72,7 @@ class InboundStatus {
                 const month = parts[1].padStart(2, '0');
                 return `${parts[2]}-${month}-${day}`;
             }
-            
+
             // ISO 형식인 경우 (시간 정보 포함)
             if (cleanDate.includes('T')) {
                 const date = new Date(cleanDate);
@@ -84,7 +84,7 @@ class InboundStatus {
                     return `${year}-${month}-${day}`;
                 }
             }
-            
+
             // 기본적으로 현재 날짜 사용
             const today = new Date();
             const year = today.getFullYear();
@@ -105,12 +105,12 @@ class InboundStatus {
     convertToKoreanTime(centralDate) {
         try {
             if (!centralDate) return '-';
-            
+
             // 날짜가 이미 YYYY-MM-DD 형식인지 확인
             if (typeof centralDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(centralDate)) {
                 return centralDate; // 이미 날짜만 있으면 그대로 반환
             }
-            
+
             // ISO 형식인 경우 날짜 부분만 추출
             if (typeof centralDate === 'string' && centralDate.includes('T')) {
                 // 타임존 정보가 있으면 로컬 시간으로 변환
@@ -125,14 +125,14 @@ class InboundStatus {
                 // 타임존 정보가 없으면 그냥 날짜 부분만 추출
                 return centralDate.split('T')[0];
             }
-            
+
             // Date 객체로 변환 시도
             const date = new Date(centralDate);
             if (isNaN(date.getTime())) {
                 console.warn('유효하지 않은 날짜:', centralDate);
                 return '-';
             }
-            
+
             // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -148,12 +148,12 @@ class InboundStatus {
     formatDateOnly(dateValue) {
         try {
             if (!dateValue) return '-';
-            
+
             // 이미 YYYY-MM-DD 형식인 경우
             if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
                 return dateValue;
             }
-            
+
             // ISO 형식인 경우 날짜 부분만 추출
             if (typeof dateValue === 'string' && dateValue.includes('T')) {
                 // 타임존 정보가 있으면 로컬 시간으로 변환
@@ -168,14 +168,14 @@ class InboundStatus {
                 // 타임존 정보가 없으면 그냥 날짜 부분만 추출
                 return dateValue.split('T')[0];
             }
-            
+
             // Date 객체로 변환 시도
             const date = new Date(dateValue);
             if (isNaN(date.getTime())) {
                 console.warn('유효하지 않은 날짜:', dateValue);
                 return '-';
             }
-            
+
             // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -190,28 +190,28 @@ class InboundStatus {
     // 파트 번호 정리 함수 (마지막 알파벳 제거)
     cleanPartNumber(partNumber) {
         if (!partNumber || typeof partNumber !== 'string') return partNumber;
-        
+
         let trimmed = partNumber.trim();
         console.log(`원본 파트 번호: "${trimmed}"`);
-        
+
         // $ 기호를 S로 변환 (49580-$9000 → 49580-S9000)
         if (trimmed.includes('$')) {
             trimmed = trimmed.replace(/\$/g, 'S');
             console.log(`$ 기호 변환: ${partNumber} → ${trimmed}`);
         }
-        
+
         // 5자리숫자-영문숫자혼합 패턴에서 마지막 알파벳 제거
         // 49560-S9000K → 49560-S9000
         // 49560-P2600 → 49560-P2600 (변경 없음)
         const pattern = /^(\d{5}-[A-Z0-9]+)([A-Z])$/i;
         const match = trimmed.match(pattern);
-        
+
         if (match) {
             const cleaned = match[1];
             console.log(`파트 번호 정리: ${trimmed} → ${cleaned}`);
             return cleaned;
         }
-        
+
         console.log(`파트 번호 정리 없음: ${trimmed}`);
         return trimmed;
     }
@@ -252,16 +252,16 @@ class InboundStatus {
         try {
             // DOM 요소 캐싱
             this.cacheDOM();
-            
+
             // 이벤트 바인딩
             this.bindEvents();
-            
+
             // 데이터 로드
             await this.loadData();
-            
+
             // UI 초기화
             this.initializeUI();
-            
+
             console.log('InboundStatus 초기화 완료');
         } catch (error) {
             console.error('초기화 오류:', error);
@@ -294,7 +294,7 @@ class InboundStatus {
             } else if (e.target.closest('#processCsvUpload')) {
                 this.processCsvUpload();
             }
-            
+
             // 수동 등록 관련
             else if (e.target.closest('#manualRegisterBtn')) {
                 this.showManualRegisterModal();
@@ -303,12 +303,12 @@ class InboundStatus {
             } else if (e.target.closest('#saveManualRegister')) {
                 this.saveManualRegister();
             }
-            
+
             // 템플릿 다운로드
             else if (e.target.closest('#downloadTemplateBtn')) {
                 this.downloadTemplate();
             }
-            
+
             // 컨테이너 관련
             else if (e.target.closest('.delete-container-btn')) {
                 e.preventDefault();
@@ -324,7 +324,7 @@ class InboundStatus {
                 const containerId = e.target.closest('tr[data-container-id]').dataset.containerId;
                 this.showContainerDetails(containerId);
             }
-            
+
             // 모달 관련
             else if (e.target.closest('#cancelContainerDelete, #cancelContainerDeleteBtn')) {
                 this.closeContainerDeleteModal();
@@ -367,9 +367,9 @@ class InboundStatus {
                 const files = e.dataTransfer.files;
                 if (files.length > 0) {
                     this.handleFileSelect(files[0]);
-            }
-        });
-    }
+                }
+            });
+        }
 
         // 필터 이벤트 (디바운싱 적용)
         const filterInputs = ['dateFilter', 'containerFilter', 'statusFilter'];
@@ -389,7 +389,7 @@ class InboundStatus {
         document.getElementById('applyFilter')?.addEventListener('click', () => this.applyFilters());
         document.getElementById('resetFilter')?.addEventListener('click', () => this.resetFilters());
         document.getElementById('refreshData')?.addEventListener('click', () => this.loadData());
-        
+
         // 테이블 헤더 정렬 이벤트
         const sortableHeaders = document.querySelectorAll('#containerTable thead th[data-sort]');
         sortableHeaders.forEach(header => {
@@ -407,29 +407,31 @@ class InboundStatus {
 
         this.isLoading = true;
         this.showLoading(true);
-        
+
         try {
             // 컨테이너만 먼저 로드
             await this.loadContainers();
-            
+
             // 마스터 파트는 별도로 로드 (오류가 있어도 계속 진행)
             try {
                 await this.loadMasterParts();
             } catch (error) {
                 console.error('마스터 파트 로드 실패, 계속 진행:', error);
             }
-            
+
             // 초기 필터: 오늘 날짜로 설정 (날짜 필터가 비어있을 때만)
             const dateFilterElement = document.getElementById('dateFilter');
             if (dateFilterElement && !dateFilterElement.value) {
-                const today = new Date().toISOString().split('T')[0];
+                // 로컬 시간 기준 오늘 날짜 (UTC toISOString 대신 로컬 시간 사용)
+                const now = new Date();
+                const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 dateFilterElement.value = today;
             }
-            
+
             this.updateStatistics();
             this.applyFilters(); // 필터 적용하여 렌더링
             this.lastDataUpdate = Date.now();
-            
+
         } catch (error) {
             console.error('데이터 로드 오류:', error);
             this.showError('데이터를 불러오는 중 오류가 발생했습니다.');
@@ -441,44 +443,48 @@ class InboundStatus {
 
     async loadContainers() {
         try {
-        const { data, error } = await this.supabase
-            .from('arn_containers')
-            .select('*')
-            .order('created_at', { ascending: false });
-        
-            if (error) throw error;
-            
-            this.containers = data || [];
+            // 컨테이너와 파트를 병렬로 한 번에 로드 (N+1 쿼리 제거)
+            const [containersResult, partsResult] = await Promise.all([
+                this.supabase
+                    .from('arn_containers')
+                    .select('*')
+                    .order('created_at', { ascending: false }),
+                this.supabase
+                    .from('arn_parts')
+                    .select('id, part_number, quantity, arn_number')
+            ]);
+
+            if (containersResult.error) throw containersResult.error;
+
+            this.containers = containersResult.data || [];
             this.filteredContainers = [...this.containers];
-            
-            // 각 컨테이너의 파트 수량을 로드
-            for (let container of this.containers) {
-                try {
-                    const { data: parts, error: partsError } = await this.supabase
-            .from('arn_parts')
-                        .select('id, part_number, quantity')
-                        .eq('arn_number', container.arn_number);
-                    
-                    if (partsError) {
-                        console.error(`파트 수량 로드 오류 (${container.arn_number}):`, partsError);
-                        container.parts_count = 0;
-                        container.total_quantity = 0;
-                    } else {
-                        container.parts_count = parts ? parts.length : 0;
-                        container.total_quantity = parts ? parts.reduce((sum, part) => sum + (part.quantity || 0), 0) : 0;
+
+            // 파트 데이터를 ARN 번호별로 그룹화 (메모리에서 O(1) 조회)
+            const partsMap = new Map();
+            if (!partsResult.error && partsResult.data) {
+                for (const part of partsResult.data) {
+                    if (!partsMap.has(part.arn_number)) {
+                        partsMap.set(part.arn_number, []);
                     }
-                } catch (error) {
-                    console.error(`파트 수량 로드 예외 (${container.arn_number}):`, error);
-                    container.parts_count = 0;
-                    container.total_quantity = 0;
+                    partsMap.get(part.arn_number).push(part);
                 }
+            } else if (partsResult.error) {
+                console.error('파트 데이터 로드 오류:', partsResult.error);
             }
-            
+
+            // 각 컨테이너에 파트 정보 매핑
+            for (const container of this.containers) {
+                const parts = partsMap.get(container.arn_number) || [];
+                container.parts_count = parts.length;
+                container.total_quantity = parts.reduce((sum, part) => sum + (part.quantity || 0), 0);
+            }
+
         } catch (error) {
             console.error('컨테이너 로드 오류:', error);
             throw error;
         }
     }
+
 
     async loadMasterParts() {
         try {
@@ -486,16 +492,16 @@ class InboundStatus {
                 .from('parts')
                 .select('*')
                 .order('part_number');
-        
+
             if (error) {
                 console.error('마스터 파트 로드 오류:', error);
                 this.masterParts = [];
                 return;
             }
-            
+
             this.masterParts = data || [];
             this.populatePartSelect();
-            
+
         } catch (error) {
             console.error('마스터 파트 로드 예외:', error);
             this.masterParts = [];
@@ -505,7 +511,7 @@ class InboundStatus {
     populatePartSelect() {
         const select = document.getElementById('partNumberSelect');
         if (!select) return;
-        
+
         const selectPartText = (typeof i18n !== 'undefined' && i18n.t) ? i18n.t('select_part_option') : '파트를 선택하세요';
         select.innerHTML = `<option value="">${selectPartText}</option>`;
         this.masterParts.forEach(part => {
@@ -520,7 +526,7 @@ class InboundStatus {
         const totalArn = this.containers.length;
         const completedArn = this.containers.filter(c => c.status === 'COMPLETED').length;
         const pendingArn = this.containers.filter(c => c.status === 'PENDING').length;
-        
+
         this.domCache.get('totalArn').textContent = totalArn;
         this.domCache.get('completedArn').textContent = completedArn;
         this.domCache.get('pendingArn').textContent = pendingArn;
@@ -534,12 +540,12 @@ class InboundStatus {
             this.sortColumn = column;
             this.sortDirection = 'asc';
         }
-        
+
         // 정렬된 배열 생성
         const sorted = [...this.filteredContainers].sort((a, b) => {
             let aValue, bValue;
-            
-            switch(column) {
+
+            switch (column) {
                 case 'arn_number':
                     aValue = a.arn_number || '';
                     bValue = b.arn_number || '';
@@ -563,14 +569,14 @@ class InboundStatus {
                 default:
                     return 0;
             }
-            
+
             // 숫자 비교 (parts_count)
             if (column === 'parts_count') {
-                return this.sortDirection === 'asc' 
-                    ? aValue - bValue 
+                return this.sortDirection === 'asc'
+                    ? aValue - bValue
                     : bValue - aValue;
             }
-            
+
             // 문자열 비교
             if (aValue < bValue) {
                 return this.sortDirection === 'asc' ? -1 : 1;
@@ -580,12 +586,12 @@ class InboundStatus {
             }
             return 0;
         });
-        
+
         this.filteredContainers = sorted;
         this.updateSortIcons();
         this.renderContainers();
     }
-    
+
     updateSortIcons() {
         // 모든 헤더의 정렬 아이콘 초기화
         const headers = document.querySelectorAll('#containerTable thead th[data-sort]');
@@ -595,7 +601,7 @@ class InboundStatus {
                 icon.className = 'sort-icon fas fa-sort text-gray-400 ml-1';
             }
         });
-        
+
         // 현재 정렬된 컬럼의 아이콘 업데이트
         const activeHeader = document.querySelector(`#containerTable thead th[data-sort="${this.sortColumn}"]`);
         if (activeHeader) {
@@ -613,7 +619,7 @@ class InboundStatus {
     renderContainers() {
         const tbody = this.domCache.get('containerTableBody');
         if (!tbody) return;
-        
+
         if (this.filteredContainers.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -681,7 +687,7 @@ class InboundStatus {
 
     handleFileSelect(file) {
         if (!file) return;
-        
+
         if (!file.name.toLowerCase().endsWith('.csv')) {
             this.showError('CSV 파일만 업로드 가능합니다.');
             return;
@@ -696,7 +702,7 @@ class InboundStatus {
         const fileInfo = document.getElementById('fileInfo');
         const fileName = document.getElementById('fileName');
         const fileSize = document.getElementById('fileSize');
-        
+
         fileName.textContent = file.name;
         fileSize.textContent = this.formatFileSize(file.size);
         fileInfo.classList.remove('hidden');
@@ -711,12 +717,12 @@ class InboundStatus {
     }
 
     parseCsvFile(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
             try {
                 const csv = e.target.result;
                 const lines = csv.split('\n').filter(line => line.trim());
-                
+
                 if (lines.length < 2) {
                     this.showError('CSV 파일에 데이터가 없습니다.');
                     return;
@@ -727,10 +733,10 @@ class InboundStatus {
                     const result = [];
                     let current = '';
                     let inQuotes = false;
-                    
+
                     for (let i = 0; i < line.length; i++) {
                         const char = line[i];
-                        
+
                         if (char === '"') {
                             inQuotes = !inQuotes;
                         } else if (char === ',' && !inQuotes) {
@@ -747,24 +753,24 @@ class InboundStatus {
                 const headers = parseCsvLine(lines[0]);
                 const data = lines.slice(1).map(line => {
                     const values = parseCsvLine(line);
-                        const row = {};
-                        headers.forEach((header, index) => {
-                            // 따옴표 제거 및 공백 제거
-                            let value = values[index] || '';
-                            if (value.startsWith('"') && value.endsWith('"')) {
-                                value = value.slice(1, -1);
-                            }
-                            row[header] = value.trim();
-                        });
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        // 따옴표 제거 및 공백 제거
+                        let value = values[index] || '';
+                        if (value.startsWith('"') && value.endsWith('"')) {
+                            value = value.slice(1, -1);
+                        }
+                        row[header] = value.trim();
+                    });
                     return row;
                 });
 
                 this.fileData = data;
                 this.showCsvPreview(data);
                 document.getElementById('processCsvUpload').disabled = false;
-                
-        } catch (error) {
-            console.error('CSV 파싱 오류:', error);
+
+            } catch (error) {
+                console.error('CSV 파싱 오류:', error);
                 this.showError('CSV 파일을 읽는 중 오류가 발생했습니다.');
             }
         };
@@ -774,7 +780,7 @@ class InboundStatus {
     showCsvPreview(data) {
         const preview = document.getElementById('csvPreview');
         const tbody = document.getElementById('csvPreviewBody');
-        
+
         // 컨테이너별로 그룹화하고 같은 파트는 통합 (미리보기용)
         const containerGroups = {};
         data.forEach(row => {
@@ -782,10 +788,10 @@ class InboundStatus {
             const cleanedPartNumber = this.cleanPartNumber(row['Part_Number']);
             // 쉼표가 포함된 숫자 처리 (1,120 -> 1120)
             const quantity = parseInt(row['Quantity'].toString().replace(/,/g, '')) || 0;
-            
+
             // 각 행에서 도착 예정일 추출
             const arrivalDate = this.extractArrivalDate(row);
-            
+
             if (!containerGroups[containerNumber]) {
                 containerGroups[containerNumber] = {
                     containerNumber: containerNumber,
@@ -793,7 +799,7 @@ class InboundStatus {
                     parts: {}
                 };
             }
-            
+
             // 같은 파트가 이미 있으면 수량 합산
             if (containerGroups[containerNumber].parts[cleanedPartNumber]) {
                 containerGroups[containerNumber].parts[cleanedPartNumber] += quantity;
@@ -801,7 +807,7 @@ class InboundStatus {
                 containerGroups[containerNumber].parts[cleanedPartNumber] = quantity;
             }
         });
-        
+
         // 통합된 데이터를 배열로 변환
         const consolidatedData = [];
         Object.values(containerGroups).forEach(group => {
@@ -814,7 +820,7 @@ class InboundStatus {
                 });
             });
         });
-        
+
         tbody.innerHTML = consolidatedData.slice(0, 10).map(row => `
             <tr>
                 <td class="px-4 py-2 text-sm text-gray-800">${row.arrivalDate || ''}</td>
@@ -823,7 +829,7 @@ class InboundStatus {
                 <td class="px-4 py-2 text-sm text-gray-800">${row.quantity || ''}</td>
             </tr>
         `).join('');
-        
+
         if (consolidatedData.length > 10) {
             tbody.innerHTML += `
                 <tr>
@@ -833,7 +839,7 @@ class InboundStatus {
                 </tr>
             `;
         }
-        
+
         preview.classList.remove('hidden');
     }
 
@@ -848,7 +854,7 @@ class InboundStatus {
             '도착예정일', '도착 예정일', '도착일', '도착 일',
             '날짜', 'Date', 'date', '입고예정일', '입고 예정일'
         ];
-        
+
         // 먼저 명시적인 컬럼명으로 찾기
         for (const key of dateKeys) {
             if (row[key] && row[key].toString().trim()) {
@@ -859,7 +865,7 @@ class InboundStatus {
                 }
             }
         }
-        
+
         // 첫 번째 컬럼(A열)이 날짜 형식인지 확인
         const firstKey = Object.keys(row)[0];
         if (firstKey && row[firstKey]) {
@@ -869,7 +875,7 @@ class InboundStatus {
                 return normalizedDate;
             }
         }
-        
+
         // 모든 컬럼을 순회하며 날짜 형식 찾기
         for (const key in row) {
             if (row[key]) {
@@ -880,20 +886,20 @@ class InboundStatus {
                 }
             }
         }
-        
+
         return null;
     }
 
     normalizeDate(dateValue) {
         if (!dateValue) return null;
-        
+
         const dateStr = dateValue.toString().trim();
-        
+
         // 이미 YYYY-MM-DD 형식인 경우
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
             return dateStr;
         }
-        
+
         // Excel 날짜 숫자 형식인 경우 (예: 44927)
         if (/^\d+$/.test(dateStr) && dateStr.length > 4) {
             const excelDate = parseInt(dateStr);
@@ -901,7 +907,7 @@ class InboundStatus {
             const date = new Date((excelDate - 25569) * 86400 * 1000);
             return date.toISOString().split('T')[0];
         }
-        
+
         // YYYY/MM/DD 또는 MM/DD/YYYY 또는 MM/DD/YY 형식
         if (dateStr.includes('/')) {
             const parts = dateStr.split('/');
@@ -927,7 +933,7 @@ class InboundStatus {
                 }
             }
         }
-        
+
         // YYYY.MM.DD 형식
         if (dateStr.includes('.')) {
             const parts = dateStr.split('.');
@@ -947,12 +953,12 @@ class InboundStatus {
                 }
             }
         }
-        
+
         // Date 객체인 경우
         if (dateValue instanceof Date) {
             return dateValue.toISOString().split('T')[0];
         }
-        
+
         // 다른 형식 시도 - MM/DD/YYYY 또는 MM/DD/YY 형식으로 파싱
         // JavaScript Date는 MM/DD/YYYY 형식을 잘 파싱합니다
         const parsedDate = new Date(dateStr);
@@ -963,7 +969,7 @@ class InboundStatus {
                 return parsedDate.toISOString().split('T')[0];
             }
         }
-        
+
         return null;
     }
 
@@ -973,8 +979,8 @@ class InboundStatus {
             return;
         }
 
-            this.showLoading(true);
-            
+        this.showLoading(true);
+
         try {
             // 컨테이너별로 그룹화하고 같은 파트는 통합
             const containerGroups = {};
@@ -983,10 +989,10 @@ class InboundStatus {
                 const cleanedPartNumber = this.cleanPartNumber(row['Part_Number']);
                 // 쉼표가 포함된 숫자 처리 (1,120 -> 1120)
                 const quantity = parseInt(row['Quantity'].toString().replace(/,/g, '')) || 0;
-                
+
                 // 각 행에서 도착 예정일 추출
                 const arrivalDate = this.extractArrivalDate(row);
-                
+
                 if (!containerGroups[containerNumber]) {
                     containerGroups[containerNumber] = {
                         containerNumber: containerNumber,
@@ -999,12 +1005,12 @@ class InboundStatus {
                         containerGroups[containerNumber].arrivalDate = arrivalDate;
                     }
                     // 날짜가 있고 기존 날짜와 다르면 경고 (디버깅용)
-                    if (arrivalDate && containerGroups[containerNumber].arrivalDate && 
+                    if (arrivalDate && containerGroups[containerNumber].arrivalDate &&
                         arrivalDate !== containerGroups[containerNumber].arrivalDate) {
                         console.warn(`컨테이너 ${containerNumber}: 날짜 불일치 - 기존: ${containerGroups[containerNumber].arrivalDate}, 새: ${arrivalDate}`);
                     }
                 }
-                
+
                 // 같은 파트가 이미 있으면 수량 합산
                 if (containerGroups[containerNumber].parts[cleanedPartNumber]) {
                     containerGroups[containerNumber].parts[cleanedPartNumber] += quantity;
@@ -1016,12 +1022,12 @@ class InboundStatus {
             // 각 컨테이너별로 처리
             for (const containerNumber in containerGroups) {
                 const group = containerGroups[containerNumber];
-                
+
                 // ASN 번호 생성
-            const arnNumber = await this.generateArnNumber();
+                const arnNumber = await this.generateArnNumber();
                 // 추출한 날짜가 없으면 오늘 날짜 사용
                 let finalArrivalDate = group.arrivalDate;
-                
+
                 // 날짜가 null, undefined, 빈 문자열인 경우에만 오늘 날짜 사용
                 if (!finalArrivalDate || finalArrivalDate.trim() === '') {
                     finalArrivalDate = new Date().toISOString().split('T')[0];
@@ -1039,18 +1045,18 @@ class InboundStatus {
                         }
                     }
                 }
-                
+
                 // 날짜 형식 변환 (이미 YYYY-MM-DD 형식이면 그대로 사용)
                 const arrivalDate = this.convertToCentralTime(finalArrivalDate);
-                
+
                 // 컨테이너 생성
                 const { data: container, error: containerError } = await this.supabase
-                .from('arn_containers')
+                    .from('arn_containers')
                     .insert([{
-                    arn_number: arnNumber,
-                    container_number: containerNumber,
-                    arrival_date: arrivalDate,
-                    status: 'PENDING'
+                        arn_number: arnNumber,
+                        container_number: containerNumber,
+                        arrival_date: arrivalDate,
+                        status: 'PENDING'
                     }])
                     .select()
                     .single();
@@ -1084,28 +1090,28 @@ class InboundStatus {
                                     category: 'UNKNOWN',
                                     description: 'Auto-generated part'
                                 }]);
-                            
+
                             if (insertError) {
                                 console.warn(`파트 ${partNumber} 추가 실패:`, insertError);
-                }
-            }
-        } catch (error) {
+                            }
+                        }
+                    } catch (error) {
                         console.warn(`파트 ${partNumber} 확인 중 오류:`, error);
                     }
                 }
-            
+
                 // 파트 삽입
-            const { error: partsError } = await this.supabase
-                .from('arn_parts')
+                const { error: partsError } = await this.supabase
+                    .from('arn_parts')
                     .insert(partsData);
-            
+
                 if (partsError) throw partsError;
             }
-            
+
             this.showSuccess(`CSV 업로드가 완료되었습니다. ${Object.keys(containerGroups).length}개 컨테이너가 처리되었습니다.`);
             this.closeCsvUploadModal();
             await this.loadData();
-            
+
         } catch (error) {
             console.error('CSV 업로드 처리 오류:', error);
             this.showError('CSV 업로드 처리 중 오류가 발생했습니다.');
@@ -1117,19 +1123,19 @@ class InboundStatus {
     // 수동 등록 관련 메서드들
     async showManualRegisterModal() {
         document.getElementById('manualRegisterModal').classList.remove('hidden');
-        
+
         // ARN 번호 자동 생성
         await this.generateManualArnNumber();
-        
+
         // 기본 정보 초기화
         document.getElementById('manualContainerNumber').value = '';
         document.getElementById('manualArrivalDate').value = new Date().toISOString().split('T')[0];
-        
+
         // masterParts가 로드되지 않았으면 먼저 로드
         if (!this.masterParts || this.masterParts.length === 0) {
             await this.loadMasterParts();
         }
-        
+
         // Handsontable 초기화
         this.initializeManualTable();
     }
@@ -1155,7 +1161,7 @@ class InboundStatus {
         container.innerHTML = '';
 
         // masterParts가 로드되지 않았으면 빈 배열 사용
-        const partNumbers = this.masterParts && this.masterParts.length > 0 
+        const partNumbers = this.masterParts && this.masterParts.length > 0
             ? this.masterParts.map(part => part.part_number)
             : [];
 
@@ -1255,7 +1261,7 @@ class InboundStatus {
         this.manualParts = [];
         document.getElementById('manualContainerNumber').value = '';
         document.getElementById('manualArrivalDate').value = new Date().toISOString().split('T')[0];
-        
+
         // Handsontable 초기화
         if (this.manualTable) {
             this.manualTable.loadData(Array(10).fill().map(() => ['', ''])); // 10개 빈 행으로 초기화
@@ -1274,12 +1280,12 @@ class InboundStatus {
     async generateArnNumber() {
         const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
         const { data, error } = await this.supabase
-                .from('arn_containers')
-                .select('arn_number')
+            .from('arn_containers')
+            .select('arn_number')
             .like('arn_number', `ASN${today}%`)
-                .order('arn_number', { ascending: false })
-                .limit(1);
-            
+            .order('arn_number', { ascending: false })
+            .limit(1);
+
         if (error) throw error;
 
         let sequence = 1;
@@ -1298,18 +1304,18 @@ class InboundStatus {
             console.error('컨테이너를 찾을 수 없습니다:', containerId);
             return;
         }
-        
+
         // 파트 정보 로드
         try {
             const { data: parts, error } = await this.supabase
                 .from('arn_parts')
                 .select('*')
                 .eq('arn_number', container.arn_number);
-            
+
             if (error) {
                 console.error('파트 로드 오류:', error);
                 this.showError('파트 정보를 불러올 수 없습니다.');
-                    return;
+                return;
             }
 
             // 파트 상세 정보를 테이블에 표시
@@ -1337,7 +1343,7 @@ class InboundStatus {
 
         tbody.innerHTML = parts.map(part => {
             const statusClass = part.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
-            
+
             return `
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${container.arn_number}</td>
@@ -1368,26 +1374,26 @@ class InboundStatus {
             this.showError('도착 예정일을 선택해주세요.');
             return;
         }
-            
+
         // Handsontable에서 데이터 가져오기
         const tableData = this.manualTable ? this.manualTable.getData() : [];
         const validParts = tableData.filter(row => row[0] && row[1] && row[1] > 0);
-        
+
         if (validParts.length === 0) {
             this.showError('최소 하나의 파트를 추가해주세요.');
-                return;
-            }
-            
-            this.showLoading(true);
-            
+            return;
+        }
+
+        this.showLoading(true);
+
         try {
             // ARN 번호 자동 생성
             const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
             const arnNumber = `ASN${today}${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
-            
+
             // ARN 번호 필드에 표시
             document.getElementById('manualArnNumber').value = arnNumber;
-            
+
             const centralDate = this.convertToCentralTime(arrivalDate);
 
             // 컨테이너 생성
@@ -1425,7 +1431,7 @@ class InboundStatus {
                                 description: 'Auto-generated part',
                                 status: 'ACTIVE'
                             }]);
-                        
+
                         if (insertError) {
                             console.warn(`파트 ${partNumber} 추가 실패:`, insertError);
                         }
@@ -1443,18 +1449,18 @@ class InboundStatus {
                 quantity: parseInt(part[1]),
                 status: 'PENDING'
             }));
-            
+
             // 파트 삽입
             const { error: partsError } = await this.supabase
                 .from('arn_parts')
                 .insert(partsData);
-            
+
             if (partsError) throw partsError;
-            
+
             this.showSuccess('수동 등록이 완료되었습니다.');
             this.closeManualRegisterModal();
             await this.loadData();
-            
+
         } catch (error) {
             console.error('수동 등록 오류:', error);
             this.showError('수동 등록 중 오류가 발생했습니다.');
@@ -1493,10 +1499,10 @@ class InboundStatus {
             console.error('컨테이너를 찾을 수 없습니다:', containerId);
             return;
         }
-        
+
         console.log('컨테이너 삭제:', container);
         this.selectedContainer = container; // 선택된 컨테이너 저장
-        
+
         document.getElementById('deleteArnNumber').textContent = container.arn_number;
         document.getElementById('deleteContainerNumber').textContent = container.container_number;
 
@@ -1509,7 +1515,7 @@ class InboundStatus {
             console.error('컨테이너를 찾을 수 없습니다:', containerId);
             return;
         }
-        
+
         console.log('입고 모달:', container);
         this.selectedContainer = container; // 선택된 컨테이너 저장
 
@@ -1530,36 +1536,36 @@ class InboundStatus {
             this.showError('삭제할 컨테이너를 찾을 수 없습니다.');
             return;
         }
-        
-            this.showLoading(true);
-            
+
+        this.showLoading(true);
+
         try {
             // 먼저 관련된 파트들을 삭제
             const { error: partsError } = await this.supabase
                 .from('arn_parts')
                 .delete()
                 .eq('arn_number', this.selectedContainer.arn_number);
-            
+
             if (partsError) {
                 console.error('파트 삭제 오류:', partsError);
                 throw partsError;
             }
-            
+
             // 컨테이너 삭제
             const { error: containerError } = await this.supabase
                 .from('arn_containers')
                 .delete()
                 .eq('id', containerId);
-            
+
             if (containerError) {
                 console.error('컨테이너 삭제 오류:', containerError);
                 throw containerError;
             }
-            
+
             this.showSuccess('컨테이너가 성공적으로 삭제되었습니다.');
             this.closeContainerDeleteModal();
             await this.loadData();
-            
+
         } catch (error) {
             console.error('컨테이너 삭제 처리 오류:', error);
             this.showError('컨테이너 삭제 중 오류가 발생했습니다.');
@@ -1575,12 +1581,12 @@ class InboundStatus {
     async processInbound() {
         const containerId = this.selectedContainer?.id;
         const inboundDate = document.getElementById('inboundDate').value;
-        
+
         if (!containerId || !inboundDate) {
             this.showError('입고 처리할 컨테이너와 날짜를 확인해주세요.');
             return;
         }
-            
+
         this.showLoading(true);
 
         try {
@@ -1594,9 +1600,9 @@ class InboundStatus {
                     inbound_date: centralDate
                 })
                 .eq('id', containerId);
-            
+
             if (containerError) throw containerError;
-            
+
             // 2. 파트 상태 업데이트
             const { error: partsError } = await this.supabase
                 .from('arn_parts')
@@ -1613,7 +1619,7 @@ class InboundStatus {
             this.showSuccess('입고 처리가 완료되었습니다.');
             this.closeInboundDateModal();
             await this.loadData();
-            
+
         } catch (error) {
             console.error('입고 처리 오류:', error);
             this.showError('입고 처리 중 오류가 발생했습니다.');
@@ -1626,7 +1632,7 @@ class InboundStatus {
     async updateInventoryFromInbound(containerId, inboundDate) {
         try {
             console.log('재고 업데이트 시작:', containerId);
-            
+
             // 입고된 파트들 조회
             const { data: inboundParts, error: partsError } = await this.supabase
                 .from('arn_parts')
@@ -1702,7 +1708,7 @@ class InboundStatus {
                     reference_id: arnNumber,
                     notes: `입고 처리 - ARN: ${arnNumber}`
                 });
-                
+
             if (transactionError) {
                 console.error(`파트 ${partNumber} 거래 내역 기록 실패:`, transactionError);
                 throw transactionError;
@@ -1721,7 +1727,7 @@ class InboundStatus {
         const dateFilter = document.getElementById('dateFilter').value;
         const containerFilter = document.getElementById('containerFilter').value.trim().toLowerCase();
         const statusFilter = document.getElementById('statusFilter').value;
-        
+
         // 오늘 날짜 (YYYY-MM-DD 형식)
         const today = new Date().toISOString().split('T')[0];
 
@@ -1733,25 +1739,25 @@ class InboundStatus {
                 const matchesStatus = !statusFilter || container.status === statusFilter;
                 return matchesContainer && matchesStatus;
             }
-            
+
             // 날짜 필터 로직: 오늘 날짜 또는 지난 날짜 중 대기 상태인 컨테이너
             const containerDate = this.convertToKoreanTime(container.arrival_date);
             const isToday = containerDate === today;
             const isPastDate = containerDate < today;
             const isPending = container.status === 'PENDING';
-            
+
             // 오늘 날짜의 모든 컨테이너 또는 지난 날짜 중 대기 상태인 컨테이너
             const matchesDate = isToday || (isPastDate && isPending);
-            
+
             // 날짜 필터가 설정되어 있으면 해당 날짜도 포함
             const matchesDateFilter = !dateFilter || containerDate === dateFilter;
-            
+
             const matchesContainer = !containerFilter || container.container_number.toLowerCase().includes(containerFilter);
             const matchesStatus = !statusFilter || container.status === statusFilter;
 
             return (matchesDate || matchesDateFilter) && matchesContainer && matchesStatus;
         });
-        
+
         // 정렬이 설정되어 있으면 정렬 적용
         if (this.sortColumn) {
             this.sortContainers(this.sortColumn);
@@ -1767,7 +1773,7 @@ class InboundStatus {
         document.getElementById('dateFilter').value = today;
         document.getElementById('containerFilter').value = '';
         document.getElementById('statusFilter').value = '';
-        
+
         this.applyFilters(); // 필터 적용하여 렌더링
     }
 
@@ -1777,7 +1783,7 @@ class InboundStatus {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('manualArrivalDate').value = today;
         document.getElementById('inboundDate').value = today;
-        
+
         // 날짜 필터도 오늘 날짜로 초기화
         const dateFilterElement = document.getElementById('dateFilter');
         if (dateFilterElement) {
@@ -1806,11 +1812,11 @@ class InboundStatus {
         if (existingNotification) {
             existingNotification.remove();
         }
-        
+
         // Toast 알림 요소 생성
         const notification = document.createElement('div');
         notification.id = 'inboundToastNotification';
-        
+
         // 타입에 따른 색상 및 아이콘 설정
         let bgColor = 'bg-blue-500';
         let icon = 'fa-info-circle';
@@ -1824,7 +1830,7 @@ class InboundStatus {
             bgColor = 'bg-yellow-500';
             icon = 'fa-exclamation-triangle';
         }
-        
+
         notification.className = `fixed top-4 right-4 z-50 ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg max-w-md transition-all duration-300 transform translate-x-full`;
         notification.innerHTML = `
             <div class="flex items-center">
@@ -1832,14 +1838,14 @@ class InboundStatus {
                 <span class="font-semibold">${message}</span>
             </div>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         // 애니메이션으로 나타나기
         setTimeout(() => {
             notification.classList.remove('translate-x-full');
         }, 100);
-        
+
         // 3초 후 자동으로 사라지기
         setTimeout(() => {
             notification.classList.add('translate-x-full');
