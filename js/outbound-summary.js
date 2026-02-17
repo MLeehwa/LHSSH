@@ -1518,6 +1518,9 @@ class OutboundSummary {
         // 가로 요약 구조 생성
         const summaryStructure = this.createHorizontalSummaryStructure(confirmedData);
 
+        // 엑셀은 과거→최신 순서로 유지 (화면은 최신→과거)
+        summaryStructure.dates = [...summaryStructure.dates].sort();
+
         // 1행: 날짜 헤더
         const dateRow = ['파트 번호'];
         const sequenceRow = ['']; // 2행: 차수 헤더
