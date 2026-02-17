@@ -92,7 +92,8 @@
         .table-container {
             position: relative;
             overflow-x: auto;
-            overflow-y: hidden;
+            overflow-y: auto;
+            max-height: 70vh;
         }
 
         .table-container::-webkit-scrollbar {
@@ -155,8 +156,8 @@
     </style>
 </head>
 
-<body class="gradient-bg min-h-screen">
-    <div class="flex h-screen">
+<body class="gradient-bg min-h-screen overflow-x-hidden">
+    <div class="flex h-screen overflow-x-hidden">
         <!-- Sidebar -->
         <div class="w-64 glass-sidebar">
             <!-- Logo -->
@@ -264,7 +265,7 @@
         </div>
 
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
             <!-- Top Header -->
             <header class="glass-effect border-b border-gray-200">
                 <div class="flex items-center justify-between px-6 py-4">
@@ -458,7 +459,7 @@
                 </div>
 
                 <!-- Summary Table -->
-                <div class="glass-effect rounded-xl border-2 border-gray-200">
+                <div class="glass-effect rounded-xl border-2 border-gray-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                         <h3 class="text-lg font-medium text-gray-800">출고 요약</h3>
                         <div class="flex items-center space-x-2">
@@ -468,8 +469,8 @@
                             </label>
                         </div>
                     </div>
-                    <div class="overflow-x-auto relative">
-                        <div class="table-container" style="min-width: 100%;">
+                    <div class="table-container">
+                        <div style="min-width: 100%;">
                             <table class="w-full divide-y divide-white/20 border-2 border-gray-200" id="summaryTable">
                                 <thead class="bg-white/10 sticky top-0 z-10">
                                     <tr>
