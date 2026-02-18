@@ -792,11 +792,10 @@ class OutboundSummary {
 
     renderTable() {
         try {
-            console.log('=== renderTable 시작 ===');
-            console.log('filteredData:', this.filteredData?.length || 0);
-            console.log('filteredData 샘플:', this.filteredData?.slice(0, 2));
+            console.log('=== renderTable 시작 (날짜+차수 가로, 컴팩트) ===');
 
             const tbody = document.getElementById('summaryTableBody');
+            const thead = document.querySelector('#summaryTable thead tr');
 
             if (!tbody) {
                 console.error('summaryTableBody element not found');
@@ -804,10 +803,10 @@ class OutboundSummary {
             }
 
             if (!this.filteredData || this.filteredData.length === 0) {
-                console.log('필터링된 데이터가 없음 - 빈 테이블 표시');
+                if (thead) thead.innerHTML = '<th class="px-4 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">데이터 없음</th>';
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="35" class="px-6 py-8 text-center text-gray-500">
                             <div class="flex flex-col items-center">
                                 <i class="fas fa-inbox text-4xl mb-4 text-gray-300"></i>
                                 <p class="text-lg font-medium">조건에 맞는 출하 데이터가 없습니다.</p>
@@ -819,21 +818,14 @@ class OutboundSummary {
                 return;
             }
 
-            // 이미 확정된 데이터만 로드되므로 추가 필터링 불필요
             const confirmedData = this.filteredData;
-            console.log('확정된 데이터:', confirmedData.length, '개');
-            console.log('확정된 데이터 샘플:', confirmedData.slice(0, 2));
-
-            // 가로 요약 테이블 구조 생성
-            console.log('가로 요약 구조 생성 시작...');
             const summaryStructure = this.createHorizontalSummaryStructure(confirmedData);
-            console.log('생성된 요약 구조:', summaryStructure);
 
             if (!summaryStructure || summaryStructure.dates.length === 0) {
-                console.log('요약 구조가 비어있음 - 빈 구조 메시지 표시');
+                if (thead) thead.innerHTML = '<th class="px-4 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider">데이터 없음</th>';
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="35" class="px-6 py-8 text-center text-gray-500">
                             <div class="flex flex-col items-center">
                                 <i class="fas fa-exclamation-triangle text-4xl mb-4 text-gray-300"></i>
                                 <p class="text-lg font-medium">데이터를 처리할 수 없습니다.</p>
@@ -845,218 +837,120 @@ class OutboundSummary {
                 return;
             }
 
-            let html = '';
+            const sortedDates = [...summaryStructure.dates].sort();
+            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+            // 셀 폭: 극도로 컴팩트
+            const cellW = '26px';
+            const cellMax = '32px';
 
-            // 1. 날짜 헤더 행
-            const compactClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm';
-            const compactWidth = this.isCompactMode ? 'min-w-[50px] max-w-[70px]' : 'min-w-[60px] max-w-[80px]';
-
-            html += `
-                <tr class="bg-gradient-to-r from-blue-600 to-blue-700 border-b-2 border-blue-800">
-                    <td class="sticky left-0 z-20 bg-gradient-to-r from-blue-600 to-blue-700 ${compactClass} font-bold text-white border-r border-blue-800" style="min-width: 120px; max-width: 150px;">
-                        파트 번호
-                    </td>
-            `;
-
-            summaryStructure.dates.forEach(date => {
-                const dateObj = new Date(date);
-                // 날짜에 +1일 추가 (시간대 차이 보정)
-                dateObj.setDate(dateObj.getDate() + 1);
-                const formattedDate = this.isCompactMode
-                    ? dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
-                    : dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', weekday: 'short' });
-
-                const sequences = summaryStructure.dateSequences[date] || [];
-                const colSpan = sequences.length > 0 ? sequences.length : 1;
-
-                html += `
-                    <td colspan="${colSpan}" class="${compactClass} text-center font-bold text-white border-r border-blue-800 ${compactWidth}">
-                        ${formattedDate}
-                    </td>
-                `;
+            // === <thead> 동적 생성 (2행: 날짜 + 차수) ===
+            // 전체 컬럼 수 계산
+            let totalDataCols = 0;
+            sortedDates.forEach(d => {
+                totalDataCols += (summaryStructure.dateSequences[d] || []).length || 1;
             });
 
-            html += '</tr>';
+            // 1행: 날짜 헤더 (colspan으로 차수 묶기)
+            let row1 = `<th rowspan="2" class="sticky left-0 z-20 bg-blue-700 px-1 py-1 text-center text-[11px] font-bold text-white border-r border-blue-800 whitespace-nowrap" style="min-width:90px;">파트 번호</th>`;
 
-            // 2. 차수 헤더 행
-            const compactHeaderClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm';
-
-            html += `
-                <tr class="bg-blue-100 border-b border-blue-300">
-                    <td class="sticky left-0 z-20 bg-blue-100 ${compactHeaderClass} font-medium text-blue-900 border-r border-blue-300" style="min-width: 120px; max-width: 150px;">
-                        차수
-                    </td>
-            `;
-
-            summaryStructure.dates.forEach(date => {
+            sortedDates.forEach(date => {
+                const dateObj = new Date(date);
+                dateObj.setDate(dateObj.getDate() + 1);
+                const day = dateObj.getDate();
+                const dow = dateObj.getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const textColor = isWeekend ? 'text-red-200' : 'text-white';
                 const sequences = summaryStructure.dateSequences[date] || [];
+                const colSpan = sequences.length || 1;
 
+                row1 += `<th colspan="${colSpan}" class="bg-blue-700 px-0 py-1 text-center text-[11px] font-bold ${textColor} border-r border-blue-800 whitespace-nowrap">${day}<span class="text-[9px] opacity-60 ml-0.5">${dayNames[dow]}</span></th>`;
+            });
+
+            row1 += `<th rowspan="2" class="bg-blue-900 px-1 py-1 text-center text-[11px] font-bold text-white whitespace-nowrap" style="min-width:40px;">합계</th>`;
+
+            // 2행: 차수 서브헤더
+            let row2 = '';
+            sortedDates.forEach(date => {
+                const sequences = summaryStructure.dateSequences[date] || [];
                 if (sequences.length === 0) {
-                    html += `
-                        <td class="${compactHeaderClass} text-center text-xs text-blue-700 border-r border-blue-300 ${compactWidth}">
-                            -
-                        </td>
-                    `;
+                    row2 += `<th class="bg-blue-500 px-0 py-0.5 text-center text-[9px] text-blue-100 border-r border-blue-600" style="min-width:${cellW};max-width:${cellMax};">-</th>`;
                 } else {
-                    sequences.forEach((sequence, index) => {
-                        const isLast = index === sequences.length - 1;
-                        // 차수만 표시 (날짜 부분 제거)
-                        const sequenceName = this.isCompactMode
-                            ? (sequence === 'AS' ? 'AS' : sequence)
-                            : (sequence === 'AS' ? 'AS' : `${sequence}차`);
-
-                        // 해당 차수의 상태 확인 (시퀀스 레벨에서 직접 확인)
-                        let sequenceStatus = 'PENDING';
-
-                        // 디버깅을 위한 로그
-                        console.log(`=== 차수 상태 확인: ${date}-${sequence} ===`);
-
-                        // 해당 시퀀스의 모든 파트 중 하나라도 COMPLETED이면 COMPLETED로 표시
-                        const sequenceParts = summaryStructure.parts.filter(part => {
-                            const key = `${date}-${sequence}-${part}`;
-                            const status = summaryStructure.statuses[key];
-                            console.log(`파트 ${part} 상태: ${status} (키: ${key})`);
-                            return status === 'COMPLETED';
-                        });
-
-                        console.log(`COMPLETED 파트 수: ${sequenceParts.length}`);
-
-                        if (sequenceParts.length > 0) {
-                            sequenceStatus = 'COMPLETED';
-                        } else {
-                            // 모든 파트가 PENDING이거나 데이터가 없으면 PENDING
-                            const allParts = summaryStructure.parts.filter(part => {
-                                const key = `${date}-${sequence}-${part}`;
-                                const status = summaryStructure.statuses[key];
-                                return status === 'PENDING';
-                            });
-
-                            console.log(`PENDING 파트 수: ${allParts.length}`);
-
-                            if (allParts.length > 0) {
-                                sequenceStatus = 'PENDING';
-                            }
-                        }
-
-                        console.log(`최종 차수 상태: ${sequenceStatus}`);
-
-                        const statusText = sequenceStatus === 'COMPLETED' ? 'COMPLETED' : 'PENDING';
-                        const statusClass = sequenceStatus === 'COMPLETED' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100';
-
-                        html += `
-                            <td class="${compactHeaderClass} text-center border-r ${isLast ? 'border-blue-300' : 'border-blue-200'} ${compactWidth}">
-                                <div class="font-medium text-blue-800 mb-1">${sequenceName}</div>
-                                <span class="px-1 py-0.5 text-xs font-medium rounded-full ${statusClass}">
-                                    ${statusText}
-                                </span>
-                            </td>
-                        `;
+                    sequences.forEach((seq, i) => {
+                        const seqLabel = seq === 'AS' ? 'AS' : seq;
+                        const borderR = i === sequences.length - 1 ? 'border-blue-800' : 'border-blue-600';
+                        row2 += `<th class="bg-blue-500 px-0 py-0.5 text-center text-[9px] font-medium text-white border-r ${borderR}" style="min-width:${cellW};max-width:${cellMax};">${seqLabel}</th>`;
                     });
                 }
             });
 
-            html += '</tr>';
+            if (thead) {
+                // thead에 2행 삽입을 위해 thead 전체를 교체
+                const theadEl = thead.parentElement;
+                theadEl.innerHTML = `<tr>${row1}</tr><tr>${row2}</tr>`;
+            }
 
-            // 3. 파트별 데이터 행
-            const compactDataClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm';
+            // === <tbody>: 파트별 행 ===
+            let html = '';
+            let grandTotal = 0;
+            const seqDateTotals = {}; // 날짜-차수별 합계
 
             summaryStructure.parts.forEach((partNumber, rowIndex) => {
-                const isEvenRow = rowIndex % 2 === 0;
-                const rowBgClass = isEvenRow ? 'bg-gray-50' : 'bg-white';
-                const stickyBgClass = isEvenRow ? 'bg-gray-50' : 'bg-white';
-                let partTotal = 0; // 파트별 총합계
+                const isEven = rowIndex % 2 === 0;
+                const rowBg = isEven ? 'bg-gray-50' : 'bg-white';
+                const stickyBg = isEven ? 'bg-gray-50' : 'bg-white';
+                let partTotal = 0;
 
-                html += `
-                    <tr class="hover:bg-blue-50 transition-colors duration-150 border-b border-gray-200 ${rowBgClass}">
-                        <td class="sticky left-0 z-20 ${stickyBgClass} ${compactDataClass} font-medium text-gray-900 border-r border-gray-300" style="min-width: 120px; max-width: 150px;">
-                            ${partNumber}
-                        </td>
-                `;
+                html += `<tr class="${rowBg} hover:bg-blue-50 transition-colors border-b border-gray-100">`;
+                html += `<td class="sticky left-0 z-10 ${stickyBg} px-1 py-0.5 text-[11px] font-medium text-gray-900 border-r border-gray-300 whitespace-nowrap" style="min-width:90px;">${partNumber}</td>`;
 
-                summaryStructure.dates.forEach(date => {
+                sortedDates.forEach(date => {
                     const sequences = summaryStructure.dateSequences[date] || [];
-
                     if (sequences.length === 0) {
-                        html += `
-                            <td class="${compactDataClass} text-center text-gray-400 border-r border-gray-300 ${compactWidth}">
-                                -
-                            </td>
-                        `;
+                        html += `<td class="px-0 py-0.5 text-center text-[10px] text-gray-300 border-r border-gray-200" style="min-width:${cellW};max-width:${cellMax};">-</td>`;
                     } else {
-                        sequences.forEach((sequence, index) => {
-                            const isLast = index === sequences.length - 1;
-                            const quantity = summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0;
-                            partTotal += quantity; // 파트별 총합계 누적
+                        sequences.forEach((seq, i) => {
+                            const key = `${date}-${seq}-${partNumber}`;
+                            const qty = summaryStructure.quantities[key] || 0;
+                            partTotal += qty;
 
-                            html += `
-                                <td class="${compactDataClass} text-center text-gray-900 border-r ${isLast ? 'border-gray-300' : 'border-gray-200'} ${compactWidth}">
-                                    ${this.isCompactMode ? quantity.toLocaleString() : quantity.toLocaleString()}
-                                </td>
-                            `;
+                            // 날짜-차수 합계 누적
+                            const dtKey = `${date}-${seq}`;
+                            seqDateTotals[dtKey] = (seqDateTotals[dtKey] || 0) + qty;
+
+                            const borderR = i === sequences.length - 1 ? 'border-gray-300' : 'border-gray-200';
+                            const content = qty > 0 ? `<span class="text-[10px]">${qty}</span>` : '<span class="text-gray-300 text-[10px]">-</span>';
+                            html += `<td class="px-0 py-0.5 text-center border-r ${borderR}" style="min-width:${cellW};max-width:${cellMax};">${content}</td>`;
                         });
                     }
                 });
 
-                // 파트별 총합계 컬럼 추가
-                html += `
-                    <td class="${compactDataClass} text-center font-bold text-gray-900 border-r border-gray-300 ${compactWidth}">
-                        ${partTotal.toLocaleString()}
-                    </td>
-                `;
-
+                grandTotal += partTotal;
+                html += `<td class="px-1 py-0.5 text-center text-[10px] font-bold text-gray-900 bg-blue-50" style="min-width:40px;">${partTotal > 0 ? partTotal.toLocaleString() : '-'}</td>`;
                 html += '</tr>';
             });
 
-            // 4. 합계 행
-            const compactTotalClass = this.isCompactMode ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm';
+            // 합계 행
+            html += `<tr class="bg-gradient-to-r from-green-600 to-green-700 border-t-2 border-green-800">`;
+            html += `<td class="sticky left-0 z-10 bg-green-700 px-1 py-1 text-center text-[11px] font-bold text-white border-r border-green-800" style="min-width:90px;">합계</td>`;
 
-            html += `
-                <tr class="bg-gradient-to-r from-green-600 to-green-700 border-t-2 border-green-800">
-                    <td class="sticky left-0 z-20 bg-gradient-to-r from-green-600 to-green-700 ${compactTotalClass} font-bold text-white border-r border-green-800" style="min-width: 120px; max-width: 150px;">
-                        합계
-                    </td>
-            `;
-
-            let grandTotal = 0; // 전체 총합계
-
-            summaryStructure.dates.forEach(date => {
+            sortedDates.forEach(date => {
                 const sequences = summaryStructure.dateSequences[date] || [];
-
                 if (sequences.length === 0) {
-                    html += `
-                        <td class="${compactTotalClass} text-center font-bold text-white border-r border-green-800 ${compactWidth}">
-                            -
-                        </td>
-                    `;
+                    html += `<td class="px-0 py-1 text-center text-[10px] font-bold text-white border-r border-green-700" style="min-width:${cellW};max-width:${cellMax};">-</td>`;
                 } else {
-                    sequences.forEach((sequence, index) => {
-                        const isLast = index === sequences.length - 1;
-                        const totalQuantity = summaryStructure.parts.reduce((sum, partNumber) => {
-                            return sum + (summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0);
-                        }, 0);
-
-                        grandTotal += totalQuantity; // 전체 총합계 누적
-
-                        html += `
-                            <td class="${compactTotalClass} text-center font-bold text-white border-r ${isLast ? 'border-green-800' : 'border-green-700'} ${compactWidth}">
-                                ${totalQuantity.toLocaleString()}
-                            </td>
-                        `;
+                    sequences.forEach((seq, i) => {
+                        const total = seqDateTotals[`${date}-${seq}`] || 0;
+                        const borderR = i === sequences.length - 1 ? 'border-green-800' : 'border-green-700';
+                        html += `<td class="px-0 py-1 text-center text-[10px] font-bold text-white border-r ${borderR}" style="min-width:${cellW};max-width:${cellMax};">${total > 0 ? total.toLocaleString() : '-'}</td>`;
                     });
                 }
             });
 
-            // 총합계 컬럼 추가
-            html += `
-                <td class="${compactTotalClass} text-center font-bold text-white border-r border-green-800 ${compactWidth}">
-                    ${grandTotal.toLocaleString()}
-                </td>
-            `;
-
+            html += `<td class="px-1 py-1 text-center text-[10px] font-bold text-white bg-green-800" style="min-width:40px;">${grandTotal > 0 ? grandTotal.toLocaleString() : '-'}</td>`;
             html += '</tr>';
 
             tbody.innerHTML = html;
-            console.log('가로 요약 테이블 렌더링 완료');
+            console.log('날짜+차수 가로(컴팩트) 테이블 렌더링 완료');
 
         } catch (error) {
             console.error('테이블 렌더링 중 오류:', error);
@@ -1064,7 +958,7 @@ class OutboundSummary {
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-red-500">
+                        <td colspan="35" class="px-6 py-8 text-center text-red-500">
                             <div class="flex flex-col items-center">
                                 <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
                                 <p class="text-lg font-medium">테이블 렌더링 중 오류가 발생했습니다.</p>
@@ -1306,7 +1200,7 @@ class OutboundSummary {
                     const cell = worksheet.getCell(rowIndex + 1, colIndex + 1);
                     cell.value = cellValue;
 
-                    // 헤더 행 스타일링 (1행: 날짜, 2행: 차수)
+                    // 헤더 행 스타일링 (1행만)
                     if (rowIndex === 0) {
                         cell.fill = {
                             type: 'pattern',
@@ -1316,22 +1210,7 @@ class OutboundSummary {
                         cell.font = {
                             bold: true,
                             color: { argb: 'FFFFFFFF' }, // 흰색
-                            size: 13
-                        };
-                        cell.alignment = {
-                            horizontal: 'center',
-                            vertical: 'middle'
-                        };
-                    } else if (rowIndex === 1) {
-                        cell.fill = {
-                            type: 'pattern',
-                            pattern: 'solid',
-                            fgColor: { argb: 'FF5B9BD5' } // 중간 파란색
-                        };
-                        cell.font = {
-                            bold: true,
-                            color: { argb: 'FFFFFFFF' }, // 흰색
-                            size: 11
+                            size: 12
                         };
                         cell.alignment = {
                             horizontal: 'center',
@@ -1379,39 +1258,10 @@ class OutboundSummary {
                 });
             });
 
-            // 날짜 헤더 병합 설정
-            if (mainData.length > 1) {
-                const dateRow = mainData[0];
-                let currentDate = '';
-                let startCol = 1; // 0번째 컬럼은 '파트 번호'이므로 1부터 시작
-
-                for (let col = 1; col < dateRow.length; col++) {
-                    const cellDate = dateRow[col];
-
-                    if (cellDate !== currentDate) {
-                        // 이전 날짜 범위 병합
-                        if (currentDate && col > startCol) {
-                            worksheet.mergeCells(1, startCol + 1, 1, col);
-                            console.log('병합 범위 추가:', startCol + 1, '~', col);
-                        }
-
-                        // 새 날짜 시작
-                        currentDate = cellDate;
-                        startCol = col;
-                    }
-                }
-
-                // 마지막 날짜 범위 병합
-                if (currentDate && dateRow.length > startCol) {
-                    worksheet.mergeCells(1, startCol + 1, 1, dateRow.length);
-                    console.log('마지막 병합 범위 추가:', startCol + 1, '~', dateRow.length);
-                }
-            }
-
             // 컬럼 너비 설정
             worksheet.getColumn(1).width = 20; // 파트 번호 컬럼
             for (let i = 2; i <= mainData[0].length; i++) {
-                worksheet.getColumn(i).width = 12; // 날짜/차수 컬럼들
+                worksheet.getColumn(i).width = 10; // 날짜/합계 컬럼들
             }
 
             console.log('메인 시트 스타일링 완료');
@@ -1508,105 +1358,85 @@ class OutboundSummary {
 
 
     generateExcelData() {
-        // 이미 확정된 데이터만 로드되므로 추가 필터링 불필요
         const confirmedData = this.filteredData;
 
         if (confirmedData.length === 0) {
             return [['파트 번호']];
         }
 
-        // 가로 요약 구조 생성
         const summaryStructure = this.createHorizontalSummaryStructure(confirmedData);
+        const sortedDates = [...summaryStructure.dates].sort();
 
-        // 엑셀은 과거→최신 순서로 유지 (화면은 최신→과거)
-        summaryStructure.dates = [...summaryStructure.dates].sort();
+        // 1행: 날짜 헤더 (각 날짜에 차수만큼 셀)
+        const headerRow1 = ['파트 번호'];
+        // 2행: 차수 서브헤더
+        const headerRow2 = [''];
 
-        // 1행: 날짜 헤더
-        const dateRow = ['파트 번호'];
-        const sequenceRow = ['']; // 2행: 차수 헤더
-
-        summaryStructure.dates.forEach(date => {
+        sortedDates.forEach(date => {
+            const dateObj = new Date(date);
+            dateObj.setDate(dateObj.getDate() + 1);
+            const formattedDate = dateObj.toLocaleDateString('ko-KR', {
+                month: '2-digit',
+                day: '2-digit',
+                weekday: 'short'
+            });
             const sequences = summaryStructure.dateSequences[date] || [];
             if (sequences.length === 0) {
-                // 날짜에 +1일 추가
-                const dateObj = new Date(date);
-                dateObj.setDate(dateObj.getDate() + 1);
-                const adjustedDate = dateObj.toISOString().split('T')[0];
-                dateRow.push(adjustedDate);
-                sequenceRow.push('');
+                headerRow1.push(formattedDate);
+                headerRow2.push('-');
             } else {
-                sequences.forEach(sequence => {
-                    const dateObj = new Date(date);
-                    // 날짜에 +1일 추가 (시간대 차이 보정)
-                    dateObj.setDate(dateObj.getDate() + 1);
-                    const formattedDate = dateObj.toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit'
-                    });
-                    dateRow.push(formattedDate);
-
-                    const sequenceName = sequence === 'AS' ? 'AS' : `${sequence}차`;
-                    sequenceRow.push(sequenceName);
+                sequences.forEach((seq, i) => {
+                    headerRow1.push(i === 0 ? formattedDate : '');
+                    headerRow2.push(seq === 'AS' ? 'AS' : `${seq}차`);
                 });
             }
         });
+        headerRow1.push('합계');
+        headerRow2.push('');
 
-        // 총합계 컬럼 헤더 추가
-        dateRow.push('총합계');
-        sequenceRow.push('');
-
-        const rows = [dateRow, sequenceRow];
+        const rows = [headerRow1, headerRow2];
 
         // 파트별 데이터 행
+        const seqDateTotals = {};
         summaryStructure.parts.forEach(partNumber => {
             const row = [partNumber];
-            let partTotal = 0; // 파트별 총합계
+            let partTotal = 0;
 
-            summaryStructure.dates.forEach(date => {
+            sortedDates.forEach(date => {
                 const sequences = summaryStructure.dateSequences[date] || [];
-
                 if (sequences.length === 0) {
                     row.push('');
                 } else {
-                    sequences.forEach(sequence => {
-                        const quantity = summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0;
-                        row.push(quantity);
-                        partTotal += quantity; // 파트별 총합계 누적
+                    sequences.forEach(seq => {
+                        const qty = summaryStructure.quantities[`${date}-${seq}-${partNumber}`] || 0;
+                        partTotal += qty;
+                        const dtKey = `${date}-${seq}`;
+                        seqDateTotals[dtKey] = (seqDateTotals[dtKey] || 0) + qty;
+                        row.push(qty || '');
                     });
                 }
             });
 
-            // 파트별 총합계를 마지막 컬럼에 추가
-            row.push(partTotal);
-
+            row.push(partTotal || '');
             rows.push(row);
         });
 
         // 합계 행
         const totalRow = ['합계'];
-        let grandTotal = 0; // 전체 총합계
-
-        summaryStructure.dates.forEach(date => {
+        let grandTotal = 0;
+        sortedDates.forEach(date => {
             const sequences = summaryStructure.dateSequences[date] || [];
-
             if (sequences.length === 0) {
                 totalRow.push('');
             } else {
-                sequences.forEach(sequence => {
-                    let total = 0;
-                    summaryStructure.parts.forEach(partNumber => {
-                        total += summaryStructure.quantities[`${date}-${sequence}-${partNumber}`] || 0;
-                    });
-                    totalRow.push(total);
-                    grandTotal += total; // 전체 총합계 누적
+                sequences.forEach(seq => {
+                    const total = seqDateTotals[`${date}-${seq}`] || 0;
+                    grandTotal += total;
+                    totalRow.push(total || '');
                 });
             }
         });
-
-        // 전체 총합계를 마지막 컬럼에 추가
-        totalRow.push(grandTotal);
-
+        totalRow.push(grandTotal || '');
         rows.push(totalRow);
 
         return rows;
