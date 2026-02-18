@@ -1,6 +1,7 @@
 // Inventory Status JavaScript - Performance Optimized
 class InventoryStatus {
     constructor() {
+        console.log('[LHSSH] 재고현황 v20260218');
         this.inventory = [];
         this.transactions = [];
         this.filteredInventory = [];
