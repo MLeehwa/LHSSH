@@ -309,6 +309,11 @@ class InboundStatus {
                 this.downloadTemplate();
             }
 
+            // Excel 내보내기
+            else if (e.target.closest('#exportExcelBtn')) {
+                this.exportToExcel();
+            }
+
             // 컨테이너 관련
             else if (e.target.closest('.delete-container-btn')) {
                 e.preventDefault();
@@ -1855,6 +1860,186 @@ class InboundStatus {
                 }
             }, 300);
         }, 3000);
+    }
+
+    // ==================== Excel 내보내기 ====================
+    async exportToExcel() {
+        try {
+            // ExcelJS 확인
+            if (typeof ExcelJS === 'undefined') {
+                this.showNotification('ExcelJS 라이브러리가 로드되지 않았습니다.', 'error');
+                return;
+            }
+
+            const startDateEl = document.getElementById('exportStartDate');
+            const endDateEl = document.getElementById('exportEndDate');
+            const startDate = startDateEl?.value;
+            const endDate = endDateEl?.value;
+
+            if (!startDate || !endDate) {
+                this.showNotification('시작일과 종료일을 선택해주세요.', 'warning');
+                return;
+            }
+
+            if (startDate > endDate) {
+                this.showNotification('시작일이 종료일보다 늦을 수 없습니다.', 'warning');
+                return;
+            }
+
+            this.showLoading(true);
+            console.log(`[Excel Export] 기간: ${startDate} ~ ${endDate}`);
+
+            // 1. 완료된 컨테이너 조회 (입고일 범위)
+            const { data: containers, error: cErr } = await this.supabase
+                .from('arn_containers')
+                .select('*')
+                .eq('status', 'COMPLETED')
+                .gte('inbound_date', startDate)
+                .lte('inbound_date', endDate)
+                .order('inbound_date', { ascending: true });
+
+            if (cErr) throw cErr;
+
+            if (!containers || containers.length === 0) {
+                this.showLoading(false);
+                this.showNotification('선택한 기간에 입고 완료된 컨테이너가 없습니다.', 'warning');
+                return;
+            }
+
+            // 2. 해당 컨테이너들의 ARN 번호로 파트 조회
+            const arnNumbers = containers.map(c => c.arn_number);
+            const { data: parts, error: pErr } = await this.supabase
+                .from('arn_parts')
+                .select('*')
+                .in('arn_number', arnNumbers);
+
+            if (pErr) throw pErr;
+
+            // ARN → 컨테이너 매핑
+            const containerMap = new Map();
+            containers.forEach(c => containerMap.set(c.arn_number, c));
+
+            // 3. 엑셀 데이터 구성 (컨테이너별 / 파트별 한 행)
+            const rows = [];
+            (parts || []).forEach(part => {
+                const container = containerMap.get(part.arn_number);
+                if (!container) return;
+                rows.push({
+                    containerNumber: container.container_number || 'N/A',
+                    partNumber: part.part_number || '',
+                    quantity: part.quantity || 0,
+                    inboundDate: this.formatDateOnly(container.inbound_date)
+                });
+            });
+
+            // 컨테이너 → 입고일 → 파트 순 정렬
+            rows.sort((a, b) => {
+                if (a.inboundDate !== b.inboundDate) return a.inboundDate.localeCompare(b.inboundDate);
+                if (a.containerNumber !== b.containerNumber) return a.containerNumber.localeCompare(b.containerNumber);
+                return a.partNumber.localeCompare(b.partNumber);
+            });
+
+            if (rows.length === 0) {
+                this.showLoading(false);
+                this.showNotification('해당 기간에 파트 데이터가 없습니다.', 'warning');
+                return;
+            }
+
+            // 4. ExcelJS 워크북 생성
+            const workbook = new ExcelJS.Workbook();
+            const ws = workbook.addWorksheet('입고현황');
+
+            // 헤더
+            const headers = ['컨테이너 번호', '파트 번호', '수량', '입고일'];
+            const headerRow = ws.addRow(headers);
+            headerRow.eachCell(cell => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF4472C4' }
+                };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+
+            // 데이터 행
+            rows.forEach((row, idx) => {
+                const dataRow = ws.addRow([
+                    row.containerNumber,
+                    row.partNumber,
+                    row.quantity,
+                    row.inboundDate
+                ]);
+                dataRow.eachCell(cell => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' }
+                    };
+                    cell.font = { size: 10 };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+            });
+
+            // 합계 행
+            const totalQty = rows.reduce((sum, r) => sum + r.quantity, 0);
+            const totalRow = ws.addRow(['합계', '', totalQty, '']);
+            totalRow.eachCell(cell => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFFF8C00' }
+                };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+
+            // 컬럼 너비
+            ws.getColumn(1).width = 20;
+            ws.getColumn(2).width = 20;
+            ws.getColumn(3).width = 12;
+            ws.getColumn(4).width = 15;
+
+            // 5. 파일 다운로드
+            const fileName = `inbound_status_${startDate}_to_${endDate}.xlsx`;
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(url);
+
+            console.log(`[Excel Export] 완료 - ${rows.length}행 내보내기`);
+            this.showNotification(`입고 현황이 Excel로 내보내기되었습니다. (${rows.length}건)`, 'success');
+
+        } catch (error) {
+            console.error('[Excel Export] 오류:', error);
+            this.showNotification('Excel 내보내기 중 오류가 발생했습니다.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
     }
 }
 
