@@ -633,7 +633,7 @@ class QuickInventoryEdit {
                     console.warn(`[WARN] 로컬 배열에서 ${partNumber}를 찾을 수 없음`);
                 }
 
-                // 2. 거래 내역 기록 (트리거가 ADJUSTMENT 타입은 건너뛰도록 수정됨)
+                // 2. 거래 내역 기록
                 const transactionData = {
                     transaction_date: today,
                     part_number: partNumber,
@@ -643,17 +643,29 @@ class QuickInventoryEdit {
                     notes: globalMemo || `실사 조정: ${currentStock} → ${change.newStock}`
                 };
 
-                // 백그라운드로 실행 (트리거가 ADJUSTMENT는 건너뛰므로 재고에 영향 없음)
-                this.supabase
+                const { error: transactionError } = await this.supabase
                     .from('inventory_transactions')
-                    .insert(transactionData)
-                    .then(({ error: transactionError }) => {
-                        if (transactionError) {
-                            console.warn(`거래 내역 기록 오류 (${partNumber}):`, transactionError);
-                        } else {
-                            console.log(`[SUCCESS] 거래 내역 기록 완료 (${partNumber})`);
-                        }
-                    });
+                    .insert(transactionData);
+
+                if (transactionError) {
+                    console.warn(`거래 내역 기록 오류 (${partNumber}):`, transactionError);
+                } else {
+                    console.log(`[SUCCESS] 거래 내역 기록 완료 (${partNumber})`);
+                }
+
+                // 3. daily_inventory_snapshot 업데이트 (입고/출고와 동일 패턴)
+                try {
+                    await this.supabase
+                        .from('daily_inventory_snapshot')
+                        .upsert({
+                            snapshot_date: today,
+                            part_number: partNumber,
+                            closing_stock: change.newStock
+                        }, { onConflict: 'snapshot_date,part_number' });
+                    console.log(`[SUCCESS] 스냅샷 업데이트 완료 (${partNumber})`);
+                } catch (snapshotErr) {
+                    console.warn(`daily_inventory_snapshot 업데이트 오류 (${partNumber}):`, snapshotErr);
+                }
 
                 successCount++;
             }

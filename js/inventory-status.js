@@ -2228,7 +2228,7 @@ class InventoryStatus {
                                 stock.previous_stock += t.quantity || 0;
                             } else if (t.transaction_type === 'OUTBOUND') {
                                 stock.previous_stock -= t.quantity || 0;
-                            } else if (t.transaction_type === 'ADJUSTMENT') {
+                            } else if (t.transaction_type === 'ADJUSTMENT' || t.transaction_type === 'PHYSICAL_INVENTORY') {
                                 stock.previous_stock += t.quantity || 0;
                             }
                         }
@@ -2242,7 +2242,7 @@ class InventoryStatus {
                                 stock.daily_inbound += t.quantity || 0;
                             } else if (t.transaction_type === 'OUTBOUND') {
                                 stock.daily_outbound += t.quantity || 0;
-                            } else if (t.transaction_type === 'ADJUSTMENT') {
+                            } else if (t.transaction_type === 'ADJUSTMENT' || t.transaction_type === 'PHYSICAL_INVENTORY') {
                                 stock.daily_adjustment += t.quantity || 0;
                             }
                         }
