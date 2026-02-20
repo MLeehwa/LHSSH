@@ -214,9 +214,9 @@ class OutboundSummary {
                 this.switchToMonthlyView();
             } else if (e.target.matches('#weeklyViewBtn')) {
                 this.switchToWeeklyView();
-            } else if (e.target.matches('#refreshDataBtn')) {
+            } else if (e.target.closest('#refreshDataBtn')) {
                 this.refreshData();
-            } else if (e.target.matches('#exportBtn')) {
+            } else if (e.target.closest('#exportBtn') || e.target.closest('#exportExcelBtn')) {
                 this.exportData('excel');
             }
         });
