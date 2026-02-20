@@ -209,12 +209,7 @@ class OutboundSummary {
 
         // Single event listener for all interactions
         container.addEventListener('click', (e) => {
-            // View mode buttons
-            if (e.target.matches('#monthlyViewBtn')) {
-                this.switchToMonthlyView();
-            } else if (e.target.matches('#weeklyViewBtn')) {
-                this.switchToWeeklyView();
-            } else if (e.target.closest('#refreshDataBtn')) {
+            if (e.target.closest('#refreshDataBtn')) {
                 this.refreshData();
             } else if (e.target.closest('#exportBtn') || e.target.closest('#exportExcelBtn')) {
                 this.exportData('excel');
@@ -223,7 +218,14 @@ class OutboundSummary {
 
         // Dropdown change events
         container.addEventListener('change', (e) => {
-            if (e.target.matches('#yearFilter, #monthFilter')) {
+            if (e.target.matches('#viewModeToggle')) {
+                const mode = e.target.value;
+                if (mode === 'monthly') {
+                    this.switchToMonthlyView();
+                } else if (mode === 'weekly') {
+                    this.switchToWeeklyView();
+                }
+            } else if (e.target.matches('#yearFilter, #monthFilter')) {
                 this.handleMonthChange();
             } else if (e.target.matches('#weekFilter')) {
                 this.handleWeekChange();
@@ -250,16 +252,16 @@ class OutboundSummary {
 
     switchToMonthlyView() {
         this.currentView = 'monthly';
-        document.getElementById('monthlyViewBtn').classList.add('bg-blue-600', 'text-white');
-        document.getElementById('weeklyViewBtn').classList.remove('bg-blue-600', 'text-white');
+        const toggle = document.getElementById('viewModeToggle');
+        if (toggle) toggle.value = 'monthly';
         this.updateDropdownVisibility();
         this.applyFilters();
     }
 
     switchToWeeklyView() {
         this.currentView = 'weekly';
-        document.getElementById('weeklyViewBtn').classList.add('bg-blue-600', 'text-white');
-        document.getElementById('monthlyViewBtn').classList.remove('bg-blue-600', 'text-white');
+        const toggle = document.getElementById('viewModeToggle');
+        if (toggle) toggle.value = 'weekly';
         this.updateDropdownVisibility();
         this.applyFilters();
     }
@@ -1200,32 +1202,49 @@ class OutboundSummary {
                     const cell = worksheet.getCell(rowIndex + 1, colIndex + 1);
                     cell.value = cellValue;
 
-                    // 헤더 행 스타일링 (1행만)
+                    // 행별 스타일링
                     if (rowIndex === 0) {
+                        // 1행: 날짜 헤더
                         cell.fill = {
                             type: 'pattern',
                             pattern: 'solid',
-                            fgColor: { argb: 'FF4472C4' } // 진한 파란색
+                            fgColor: { argb: 'FF4472C4' }
                         };
                         cell.font = {
                             bold: true,
-                            color: { argb: 'FFFFFFFF' }, // 흰색
+                            color: { argb: 'FFFFFFFF' },
                             size: 12
                         };
                         cell.alignment = {
                             horizontal: 'center',
                             vertical: 'middle'
                         };
-                    } else if (rowIndex === mainData.length - 1) {
-                        // 합계 행 스타일링
+                    } else if (rowIndex === 1) {
+                        // 2행: 차수 서브헤더
                         cell.fill = {
                             type: 'pattern',
                             pattern: 'solid',
-                            fgColor: { argb: 'FFFF8C00' } // 주황색
+                            fgColor: { argb: 'FF5B9BD5' }
                         };
                         cell.font = {
                             bold: true,
-                            color: { argb: 'FFFFFFFF' }, // 흰색
+                            color: { argb: 'FFFFFFFF' },
+                            size: 11
+                        };
+                        cell.alignment = {
+                            horizontal: 'center',
+                            vertical: 'middle'
+                        };
+                    } else if (rowIndex === mainData.length - 1) {
+                        // 합계 행
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFFF8C00' }
+                        };
+                        cell.font = {
+                            bold: true,
+                            color: { argb: 'FFFFFFFF' },
                             size: 11
                         };
                         cell.alignment = {
@@ -1233,22 +1252,20 @@ class OutboundSummary {
                             vertical: 'middle'
                         };
                     } else {
-                        // 데이터 행 스타일링
+                        // 데이터 행
                         cell.fill = {
                             type: 'pattern',
                             pattern: 'solid',
-                            fgColor: rowIndex % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' // 번갈아가는 배경색
+                            fgColor: { argb: rowIndex % 2 === 0 ? 'FFFFFFFF' : 'FFF2F2F2' }
                         };
-                        cell.font = {
-                            size: 10
-                        };
+                        cell.font = { size: 10 };
                         cell.alignment = {
                             horizontal: 'center',
                             vertical: 'middle'
                         };
                     }
 
-                    // 모든 셀에 테두리 적용
+                    // 테두리
                     cell.border = {
                         top: { style: 'thin' },
                         bottom: { style: 'thin' },
@@ -1258,10 +1275,33 @@ class OutboundSummary {
                 });
             });
 
+            // === 셀 병합 ===
+            const firstRow = mainData[0];
+
+            // 1. 날짜 헤더 가로 병합 (1행: 같은 날짜의 차수 컬럼들을 하나로)
+            let mergeStartCol = null;
+            for (let col = 1; col < firstRow.length; col++) {
+                const cellVal = firstRow[col];
+                if (cellVal !== '' && cellVal !== null && cellVal !== undefined) {
+                    if (mergeStartCol !== null && (col - 1) > mergeStartCol) {
+                        // 이전 그룹 병합: data[mergeStartCol..col-1] → Excel[mergeStartCol+1..col]
+                        worksheet.mergeCells(1, mergeStartCol + 1, 1, col);
+                    }
+                    mergeStartCol = col;
+                }
+            }
+
+            // 2. '파트 번호' 세로 병합 (1-2행, 첫 번째 열)
+            worksheet.mergeCells(1, 1, 2, 1);
+
+            // 3. '합계' 세로 병합 (1-2행, 마지막 열)
+            const lastCol = firstRow.length;
+            worksheet.mergeCells(1, lastCol, 2, lastCol);
+
             // 컬럼 너비 설정
-            worksheet.getColumn(1).width = 20; // 파트 번호 컬럼
-            for (let i = 2; i <= mainData[0].length; i++) {
-                worksheet.getColumn(i).width = 10; // 날짜/합계 컬럼들
+            worksheet.getColumn(1).width = 20;
+            for (let i = 2; i <= firstRow.length; i++) {
+                worksheet.getColumn(i).width = 10;
             }
 
             console.log('메인 시트 스타일링 완료');
@@ -1301,7 +1341,7 @@ class OutboundSummary {
                             cell.fill = {
                                 type: 'pattern',
                                 pattern: 'solid',
-                                fgColor: rowIndex % 2 === 0 ? 'FFFFFFFF' : 'FFF8F4FF' // 연한 보라색
+                                fgColor: { argb: rowIndex % 2 === 0 ? 'FFFFFFFF' : 'FFF8F4FF' }
                             };
                             cell.font = {
                                 size: 10
