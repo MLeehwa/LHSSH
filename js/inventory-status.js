@@ -2114,42 +2114,44 @@ class InventoryStatus {
                     prevSnapshot.forEach(p => prevStockMap.set(p.part_number, p.closing_stock));
                 }
 
-                // 실제 입고/출고 거래 가져오기 (INBOUND, OUTBOUND만)
+                // 실제 입고/출고/실사조정 거래 가져오기
                 const { data: dailyTrans } = await this.supabase
                     .from('inventory_transactions')
                     .select('part_number, transaction_type, quantity')
                     .eq('transaction_date', calculationDate)
-                    .in('transaction_type', ['INBOUND', 'OUTBOUND']);
+                    .in('transaction_type', ['INBOUND', 'OUTBOUND', 'PHYSICAL_INVENTORY']);
 
                 const inboundMap = new Map();
                 const outboundMap = new Map();
+                const adjustmentMap = new Map();
                 if (dailyTrans) {
                     dailyTrans.forEach(t => {
                         if (t.transaction_type === 'INBOUND') {
                             inboundMap.set(t.part_number, (inboundMap.get(t.part_number) || 0) + (t.quantity || 0));
                         } else if (t.transaction_type === 'OUTBOUND') {
                             outboundMap.set(t.part_number, (outboundMap.get(t.part_number) || 0) + (t.quantity || 0));
+                        } else if (t.transaction_type === 'PHYSICAL_INVENTORY') {
+                            adjustmentMap.set(t.part_number, (adjustmentMap.get(t.part_number) || 0) + (t.quantity || 0));
                         }
                     });
                 }
 
                 // 스냅샷 → dateStockData 변환
-                // 마감재고(closing_stock) = 전날마감(시작) + 입고 - 출고 + 실사조정
-                // 실사조정 = 마감재고 - 전날마감 - 입고 + 출고 (잔차)
+                // 금일 재고 = 전날 재고 + 입고 - 출고 + 실사조정 (공식 기반 계산)
+                // 실사조정은 실제 PHYSICAL_INVENTORY 트랜잭션에서만 가져옴
                 this.dateStockData = snapshotData
                     .filter(item => partSet.has(item.part_number))
                     .map(item => {
-                        const closingStock = item.closing_stock;
                         const prevStock = prevStockMap.get(item.part_number);
                         const inbound = inboundMap.get(item.part_number) || 0;
                         const outbound = outboundMap.get(item.part_number) || 0;
+                        const adjustment = adjustmentMap.get(item.part_number) || 0;
 
-                        // 전날 스냅샷이 있으면 잔차를 실사조정으로 계산
-                        let adjustment = 0;
-                        const startStock = prevStock !== undefined ? prevStock : closingStock;
-                        if (prevStock !== undefined) {
-                            adjustment = closingStock - prevStock - inbound + outbound;
-                        }
+                        // 전날 스냅샷이 있으면 사용, 없으면 현재 스냅샷의 closing_stock 사용
+                        const startStock = prevStock !== undefined ? prevStock : item.closing_stock;
+
+                        // 금일 재고 = 전날 재고 + 입고 - 출고 + 실사조정
+                        const calculatedStock = startStock + inbound - outbound + adjustment;
 
                         return {
                             part_number: item.part_number,
@@ -2157,7 +2159,7 @@ class InventoryStatus {
                             daily_inbound: inbound,
                             daily_outbound: outbound,
                             daily_adjustment: adjustment,
-                            calculated_stock: closingStock
+                            calculated_stock: calculatedStock
                         };
                     });
 

@@ -11,7 +11,7 @@ class PhysicalInventoryAdmin {
     async init() {
         // Supabase 클라이언트 초기화
         this.initializeSupabase();
-        
+
         await this.loadSessions();
         this.bindEvents();
         this.renderSessions();
@@ -207,7 +207,7 @@ class PhysicalInventoryAdmin {
             return;
         }
 
-        if (!physicalStock || physicalStock < 0) {
+        if (isNaN(physicalStock) || physicalStock < 0) {
             this.showAlert('올바른 실사 수량을 입력해주세요.', 'danger');
             return;
         }
@@ -276,16 +276,16 @@ class PhysicalInventoryAdmin {
         if (!tbody) return;
 
         tbody.innerHTML = '';
-        
+
         this.sessions.forEach(session => {
             const row = document.createElement('tr');
             row.className = 'session-row hover:bg-white/10 transition-colors duration-200 cursor-pointer';
             row.dataset.sessionId = session.id;
-            
+
             const statusClass = this.getStatusClass(session.status);
 
             const isCompleted = session.status === 'COMPLETED';
-            const deleteButton = isCompleted 
+            const deleteButton = isCompleted
                 ? '<span class="text-gray-400 text-sm">삭제 불가</span>'
                 : `<button onclick="event.stopPropagation(); window.physicalInventoryAdmin.deleteSession(${session.id}, '${(session.notes || '세션명 없음').replace(/'/g, "\\'")}')" 
                             class="delete-session-btn bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-all duration-200 text-sm">
@@ -299,7 +299,7 @@ class PhysicalInventoryAdmin {
                 <td>${new Date(session.created_at).toLocaleString()}</td>
                 <td>${deleteButton}</td>
             `;
-            
+
             tbody.appendChild(row);
         });
 
@@ -346,27 +346,27 @@ class PhysicalInventoryAdmin {
 
         console.log('renderInventoryItems 호출됨, 아이템 수:', this.inventoryItems?.length || 0);
         console.log('현재 pendingEdits:', this.pendingEdits);
-        
+
         tbody.innerHTML = '';
-        
+
         if (!this.inventoryItems || this.inventoryItems.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-white/60">${i18n.t('no_inventory_items')}</td></tr>`;
             return;
         }
-        
+
         this.inventoryItems.forEach(item => {
             // Check for pending edits
             const pendingEdit = this.pendingEdits[item.id];
             const physicalStockValue = pendingEdit?.physical_stock !== undefined ? pendingEdit.physical_stock : item.physical_stock;
             const notesValue = pendingEdit?.notes !== undefined ? pendingEdit.notes : (item.notes || '');
-            
+
             // Set original values for comparison (use pending edit values if available, otherwise use DB values)
             const originalPhysicalStock = pendingEdit?.physical_stock !== undefined ? pendingEdit.physical_stock : item.physical_stock;
             const originalNotes = pendingEdit?.notes !== undefined ? pendingEdit.notes : (item.notes || '');
-            
+
             // 확정 여부 확인 (개별 항목 상태 기반)
             const isConfirmed = item.status === 'COMPLETED';
-            
+
             console.log(`아이템 ${item.id} 렌더링:`, {
                 itemId: item.id,
                 itemIdType: typeof item.id,
@@ -381,11 +381,11 @@ class PhysicalInventoryAdmin {
                 isConfirmed: isConfirmed,
                 confirmedAt: item.confirmed_at
             });
-            
+
             const row = document.createElement('tr');
             const statusClass = this.getStatusClass(item.status);
-            const differenceClass = item.difference > 0 ? 'text-success' : 
-                                  item.difference < 0 ? 'text-danger' : 'text-muted';
+            const differenceClass = item.difference > 0 ? 'text-success' :
+                item.difference < 0 ? 'text-danger' : 'text-muted';
 
             // Add pending-edit class if there are unsaved changes and not confirmed
             if (pendingEdit && !isConfirmed) {
@@ -436,16 +436,16 @@ class PhysicalInventoryAdmin {
                     </div>
                 </td>
                 <td>
-                    ${isConfirmed 
-                        ? '<span class="text-gray-400 text-sm">삭제 불가</span>'
-                        : `<button onclick="event.stopPropagation(); window.physicalInventoryAdmin.deleteInventoryItem(${item.id}, '${item.part_number.replace(/'/g, "\\'")}')" 
+                    ${isConfirmed
+                    ? '<span class="text-gray-400 text-sm">삭제 불가</span>'
+                    : `<button onclick="event.stopPropagation(); window.physicalInventoryAdmin.deleteInventoryItem(${item.id}, '${item.part_number.replace(/'/g, "\\'")}')" 
                             class="delete-item-btn bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-all duration-200 text-sm">
                             <i class="fas fa-trash mr-1"></i>삭제
                         </button>`
-                    }
+                }
                 </td>
             `;
-            
+
             tbody.appendChild(row);
         });
 
@@ -457,7 +457,7 @@ class PhysicalInventoryAdmin {
     // 실사 항목 이벤트 바인딩
     bindInventoryItemEvents() {
         console.log('bindInventoryItemEvents 호출됨');
-        
+
         // 실사 재고 수량 변경 이벤트
         const stockInputs = document.querySelectorAll('.physical-stock-input');
         console.log('실사 재고 입력 필드 수:', stockInputs.length);
@@ -466,7 +466,7 @@ class PhysicalInventoryAdmin {
                 console.log('실사 재고 입력 변경됨:', e.target.value);
                 this.updatePhysicalStock(e.target);
             });
-            
+
             // Enter 키로 즉시 저장
             input.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
@@ -494,7 +494,7 @@ class PhysicalInventoryAdmin {
                 console.log('비고 입력 변경됨:', e.target.value);
                 this.updateNotes(e.target);
             });
-            
+
             // Enter 키 이벤트 추가
             input.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
@@ -510,10 +510,10 @@ class PhysicalInventoryAdmin {
         const newValue = parseInt(input.value);
         const originalValue = parseInt(input.dataset.originalValue);
 
-        console.log('updatePhysicalStock 호출:', { 
-            itemId, 
+        console.log('updatePhysicalStock 호출:', {
+            itemId,
             itemIdType: typeof itemId,
-            newValue, 
+            newValue,
             originalValue,
             inventoryItemsLength: this.inventoryItems.length,
             inventoryItemsIds: this.inventoryItems.map(item => ({ id: item.id, idType: typeof item.id }))
@@ -599,11 +599,11 @@ class PhysicalInventoryAdmin {
         // physical_inventory_items만 즉시 업데이트 (inventory는 세션 완료 시에만)
         try {
             console.log('실사 재고 즉시 DB 반영 시작 (physical_inventory_items만):', itemId, newValue);
-            
+
             // physical_inventory_items 테이블만 업데이트
             const { error: itemError } = await this.supabase
                 .from('physical_inventory_items')
-                .update({ 
+                .update({
                     physical_stock: newValue
                 })
                 .eq('id', itemId);
@@ -651,10 +651,10 @@ class PhysicalInventoryAdmin {
         const newValue = input.value.trim();
         const originalValue = input.dataset.originalValue || '';
 
-        console.log('updateNotes 호출:', { 
-            itemId, 
+        console.log('updateNotes 호출:', {
+            itemId,
             itemIdType: typeof itemId,
-            newValue, 
+            newValue,
             originalValue,
             inventoryItemsLength: this.inventoryItems.length,
             inventoryItemsIds: this.inventoryItems.map(item => ({ id: item.id, idType: typeof item.id }))
@@ -827,18 +827,18 @@ class PhysicalInventoryAdmin {
     async updateInventoryAndCreateTransactions() {
         console.log('=== inventory 업데이트 및 transaction 기록 시작 (세션 완료 시) ===');
         console.log('현재 pendingEdits:', this.pendingEdits);
-        
+
         const transactions = [];
         const inventoryUpdates = [];
 
         for (const item of this.inventoryItems) {
             const dbStock = item.system_stock || item.db_stock || 0;
-            
+
             // pendingEdits에서 수정된 값이 있으면 사용, 없으면 원래 값 사용
             const pendingEdit = this.pendingEdits[item.id];
-            const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ? 
+            const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ?
                 pendingEdit.physical_stock : item.physical_stock;
-            
+
             const difference = finalPhysicalStock - dbStock;
 
             console.log(`파트 ${item.part_number}: DB=${dbStock}, 실사=${finalPhysicalStock}, 차이=${difference}`);
@@ -855,11 +855,11 @@ class PhysicalInventoryAdmin {
             // transaction 기록 데이터 (차이가 있는 경우만, 세션 완료 시에만)
             if (difference !== 0) {
                 // pendingEdits에서 수정된 비고가 있으면 사용, 없으면 원래 비고 사용
-                const finalNotes = pendingEdit?.notes !== undefined ? 
+                const finalNotes = pendingEdit?.notes !== undefined ?
                     pendingEdit.notes : (item.notes || '');
-                
+
                 // 비고가 있으면 포함, 없으면 기본 메시지
-                const transactionNotes = finalNotes ? 
+                const transactionNotes = finalNotes ?
                     `실사재고 (${new Date().toLocaleDateString()}) - ${finalNotes}` :
                     `실사재고 (${new Date().toLocaleDateString()})`;
 
@@ -880,14 +880,14 @@ class PhysicalInventoryAdmin {
         // inventory 테이블 직접 업데이트 (실사 전용, 트리거 우회)
         if (inventoryUpdates.length > 0) {
             console.log('inventory 테이블 직접 업데이트 (실사 전용, 트리거 우회):', inventoryUpdates);
-            
+
             for (const update of inventoryUpdates) {
                 try {
                     // 먼저 UPDATE 시도
                     console.log(`inventory UPDATE 시도: ${update.part_number} = ${update.current_stock}`);
                     const { data: updateData, error: updateError } = await this.supabase
                         .from('inventory')
-                        .update({ 
+                        .update({
                             current_stock: update.current_stock,
                             last_updated: new Date().toISOString()
                         })
@@ -928,7 +928,7 @@ class PhysicalInventoryAdmin {
         // inventory_transactions에 기록
         if (transactions.length > 0) {
             console.log('inventory_transactions 기록:', transactions);
-            
+
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
                 .insert(transactions);
@@ -939,24 +939,40 @@ class PhysicalInventoryAdmin {
             }
         }
 
-        console.log('=== inventory 업데이트 및 transaction 기록 완료 ===');
+        // daily_inventory_snapshot 업데이트 (inbound/outbound와 동일 패턴)
+        const transactionDate = new Date().toISOString().split('T')[0];
+        for (const update of inventoryUpdates) {
+            try {
+                await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .upsert({
+                        snapshot_date: transactionDate,
+                        part_number: update.part_number,
+                        closing_stock: update.current_stock
+                    }, { onConflict: 'snapshot_date,part_number' });
+            } catch (snapshotErr) {
+                console.warn(`daily_inventory_snapshot 업데이트 오류 (${update.part_number}):`, snapshotErr);
+            }
+        }
+
+        console.log('=== inventory 업데이트 및 transaction 기록 + 스냅샷 업데이트 완료 ===');
     }
 
     // inventory 테이블만 직접 업데이트 (transaction 기록 없음)
     async updateInventoryOnly() {
         console.log('=== inventory 테이블만 직접 업데이트 시작 ===');
         console.log('현재 pendingEdits:', this.pendingEdits);
-        
+
         const inventoryUpdates = [];
 
         for (const item of this.inventoryItems) {
             const dbStock = item.system_stock || item.db_stock || 0;
-            
+
             // pendingEdits에서 수정된 값이 있으면 사용, 없으면 원래 값 사용
             const pendingEdit = this.pendingEdits[item.id];
-            const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ? 
+            const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ?
                 pendingEdit.physical_stock : item.physical_stock;
-            
+
             const difference = finalPhysicalStock - dbStock;
 
             console.log(`파트 ${item.part_number}: DB=${dbStock}, 실사=${finalPhysicalStock}, 차이=${difference}`);
@@ -973,14 +989,14 @@ class PhysicalInventoryAdmin {
         // inventory 테이블 직접 업데이트 (트리거 없이)
         if (inventoryUpdates.length > 0) {
             console.log('inventory 테이블 직접 업데이트:', inventoryUpdates);
-            
+
             for (const update of inventoryUpdates) {
                 try {
                     // 먼저 UPDATE 시도
                     console.log(`inventory UPDATE 시도: ${update.part_number} = ${update.current_stock}`);
                     const { data: updateData, error: updateError } = await this.supabase
                         .from('inventory')
-                        .update({ 
+                        .update({
                             current_stock: update.current_stock,
                             last_updated: new Date().toISOString()
                         })
@@ -1033,7 +1049,7 @@ class PhysicalInventoryAdmin {
         const itemsWithDifference = this.inventoryItems.filter(item => {
             const dbStock = item.system_stock || item.db_stock || 0;
             const pendingEdit = this.pendingEdits[item.id];
-            const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ? 
+            const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ?
                 pendingEdit.physical_stock : item.physical_stock;
             return (finalPhysicalStock - dbStock) !== 0;
         });
@@ -1050,14 +1066,14 @@ class PhysicalInventoryAdmin {
             itemsWithDifference.forEach(item => {
                 const dbStock = item.system_stock || item.db_stock || 0;
                 const pendingEdit = this.pendingEdits[item.id];
-                const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ? 
+                const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ?
                     pendingEdit.physical_stock : item.physical_stock;
-                const finalNotes = pendingEdit?.notes !== undefined ? 
+                const finalNotes = pendingEdit?.notes !== undefined ?
                     pendingEdit.notes : (item.notes || '');
                 const difference = finalPhysicalStock - dbStock;
                 const differenceText = difference > 0 ? `+${difference}` : difference.toString();
                 const differenceClass = difference > 0 ? 'text-green-600' : 'text-red-600';
-                
+
                 modalContent += `
                     <div class="p-3 bg-gray-50 rounded mb-2">
                         <div class="flex justify-between items-center mb-1">
@@ -1127,9 +1143,9 @@ class PhysicalInventoryAdmin {
             // 1. physical_inventory_items의 모든 항목을 COMPLETED로 변경 (수정된 값 반영)
             for (const item of this.inventoryItems) {
                 const pendingEdit = this.pendingEdits[item.id];
-                const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ? 
+                const finalPhysicalStock = pendingEdit?.physical_stock !== undefined ?
                     pendingEdit.physical_stock : item.physical_stock;
-                const finalNotes = pendingEdit?.notes !== undefined ? 
+                const finalNotes = pendingEdit?.notes !== undefined ?
                     pendingEdit.notes : (item.notes || '');
                 const dbStock = item.system_stock || item.db_stock || 0;
                 const difference = finalPhysicalStock - dbStock;
@@ -1143,7 +1159,7 @@ class PhysicalInventoryAdmin {
 
                 const { error: itemError } = await this.supabase
                     .from('physical_inventory_items')
-                    .update({ 
+                    .update({
                         status: 'COMPLETED',  // status 업데이트 추가
                         physical_stock: finalPhysicalStock,
                         notes: finalNotes
@@ -1171,8 +1187,8 @@ class PhysicalInventoryAdmin {
                 throw new Error(`세션 상태 변경 실패: ${sessionError.message}`);
             }
 
-            // 3. inventory 테이블만 직접 업데이트 (transaction 기록 없음)
-            await this.updateInventoryOnly();
+            // 3. inventory 업데이트 + transaction 기록 + snapshot 업데이트
+            await this.updateInventoryAndCreateTransactions();
 
             // 로컬 상태 업데이트
             if (this.currentSession) {
@@ -1180,11 +1196,11 @@ class PhysicalInventoryAdmin {
             }
 
             this.showAlert('실사 세션이 완료되었습니다.', 'success');
-            
+
             // 데이터 새로고침
             await this.loadSessions();
             await this.loadSessionDetails(this.currentSession.id);
-            
+
         } catch (error) {
             console.error('세션 완료 오류:', error);
             this.showAlert(`세션 완료 중 오류가 발생했습니다: ${error.message}`, 'danger');
@@ -1254,12 +1270,12 @@ class PhysicalInventoryAdmin {
     async refreshData() {
         await this.loadSessions();
         this.renderSessions();
-        
+
         // 현재 세션이 선택되어 있다면 해당 세션의 데이터도 새로고침
         if (this.currentSession) {
             await this.loadSessionDetails(this.currentSession.id);
         }
-        
+
         this.showAlert('데이터가 새로고침되었습니다.', 'success');
     }
 
@@ -1272,19 +1288,19 @@ class PhysicalInventoryAdmin {
         // 세션 목록 섹션 표시
         document.getElementById('sessionsSection').style.display = 'block';
         document.getElementById('sessionDetailsSection').style.display = 'none';
-        
 
-        
+
+
         // 세션 선택 드롭다운 초기화
         const sessionSelect = document.getElementById('sessionSelect');
         if (sessionSelect) {
             sessionSelect.value = '';
         }
-        
+
         // 현재 세션 초기화
         this.currentSession = null;
         this.inventoryItems = [];
-        
+
         this.showAlert('세션 목록으로 돌아갔습니다.', 'info');
     }
 
@@ -1321,7 +1337,7 @@ class PhysicalInventoryAdmin {
     showAlert(message, type) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} p-4 mb-4 rounded-lg border`;
-        
+
         // 타입별 스타일 적용
         switch (type) {
             case 'success':
@@ -1336,17 +1352,17 @@ class PhysicalInventoryAdmin {
             default:
                 alertDiv.className += ' bg-blue-100 border-blue-400 text-blue-700';
         }
-        
+
         alertDiv.textContent = message;
-        
+
         // 알림 컨테이너 찾기
-        let container = document.getElementById('alertContainer') || 
-                       document.querySelector('.flex-1') ||
-                       document.body;
-        
+        let container = document.getElementById('alertContainer') ||
+            document.querySelector('.flex-1') ||
+            document.body;
+
         if (container) {
             container.insertBefore(alertDiv, container.firstChild);
-            
+
             setTimeout(() => {
                 if (alertDiv.parentNode) {
                     alertDiv.remove();
@@ -1366,25 +1382,25 @@ class PhysicalInventoryAdmin {
         console.log('Inventory Items Count:', this.inventoryItems?.length || 0);
         console.log('Inventory Items:', this.inventoryItems);
         console.log('Pending Edits:', this.pendingEdits);
-        
+
         // 모든 input 필드의 data-item-id 확인
         const stockInputs = document.querySelectorAll('.physical-stock-input');
         const notesInputs = document.querySelectorAll('.notes-input');
-        
+
         console.log('Stock Inputs:', Array.from(stockInputs).map(input => ({
             itemId: input.dataset.itemId,
             itemIdType: typeof input.dataset.itemId,
             value: input.value,
             originalValue: input.dataset.originalValue
         })));
-        
+
         console.log('Notes Inputs:', Array.from(notesInputs).map(input => ({
             itemId: input.dataset.itemId,
             itemIdType: typeof input.dataset.itemId,
             value: input.value,
             originalValue: input.dataset.originalValue
         })));
-        
+
         console.log('=== End Debug Info ===');
     }
 
@@ -1392,26 +1408,26 @@ class PhysicalInventoryAdmin {
 }
 
 // 페이지 로드 시 초기화
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     window.physicalInventoryAdmin = new PhysicalInventoryAdmin();
-    
+
     // 차이 표시 실시간 업데이트 함수 추가
-    PhysicalInventoryAdmin.prototype.updateDifferenceDisplay = function(itemId, difference) {
+    PhysicalInventoryAdmin.prototype.updateDifferenceDisplay = function (itemId, difference) {
         const row = document.querySelector(`tr[data-item-id="${itemId}"]`);
         if (row) {
             const differenceCell = row.querySelector('td:nth-child(4)'); // 차이 컬럼
             if (differenceCell) {
-                const differenceClass = difference > 0 ? 'text-green-600 font-bold' : 
-                                      difference < 0 ? 'text-red-600 font-bold' : 'text-gray-600';
+                const differenceClass = difference > 0 ? 'text-green-600 font-bold' :
+                    difference < 0 ? 'text-red-600 font-bold' : 'text-gray-600';
                 const differenceText = difference > 0 ? `+${difference}` : difference;
-                
+
                 differenceCell.innerHTML = `<span class="${differenceClass}">${differenceText}</span>`;
             }
         }
     };
 
     // 수정 중인 항목 하이라이트 함수 추가
-    PhysicalInventoryAdmin.prototype.highlightPendingEdit = function(itemId) {
+    PhysicalInventoryAdmin.prototype.highlightPendingEdit = function (itemId) {
         const row = document.querySelector(`tr[data-item-id="${itemId}"]`);
         if (row) {
             row.style.backgroundColor = '#fef3c7'; // 노란색 배경
@@ -1419,9 +1435,9 @@ document.addEventListener('DOMContentLoaded', function() {
             row.classList.add('pending-edit-row');
         }
     };
-    
+
     // 전역 디버깅 함수 추가
-    window.debugInventory = function() {
+    window.debugInventory = function () {
         if (window.physicalInventoryAdmin) {
             window.physicalInventoryAdmin.debugInventoryState();
         } else {
