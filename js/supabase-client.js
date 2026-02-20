@@ -14,21 +14,21 @@ const initializeSupabase = () => {
                 url: 'https://vzemucykhxlxgjuldibf.supabase.co',
                 anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6ZW11Y3lraHhseGdqdWxkaWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzA4MjcsImV4cCI6MjA2ODk0NjgyN30.L9DN-V33rQj6atDnDhVeIOyzGP5I_3uVWSVfMObqrbQ'
             };
-            
+
             // URL 유효성 검사
             if (!config.url || !config.url.startsWith('https://')) {
                 throw new Error('Supabase URL이 올바르지 않습니다.');
             }
-            
+
             if (!config.anonKey) {
                 throw new Error('Supabase API 키가 설정되지 않았습니다.');
             }
-            
+
             console.log('Supabase 클라이언트 생성 시도:', {
                 url: config.url,
                 hasKey: !!config.anonKey
             });
-            
+
             supabaseClient = window.supabase.createClient(
                 config.url,
                 config.anonKey,
@@ -48,14 +48,14 @@ const initializeSupabase = () => {
                     }
                 }
             );
-            
+
             console.log('Supabase 클라이언트 초기화 성공');
-            
+
             // 간단한 연결 테스트 (비동기, 에러 발생 시에도 계속 진행)
             testSupabaseConnection(supabaseClient).catch(err => {
                 console.warn('Supabase 연결 테스트 실패 (계속 진행):', err);
             });
-            
+
         } catch (error) {
             console.error('Supabase 클라이언트 초기화 실패:', error);
             throw error;
@@ -75,10 +75,10 @@ async function testSupabaseConnection(client) {
             .from('parts')
             .select('count')
             .limit(1);
-        
+
         if (error) {
             console.warn('Supabase 연결 테스트 실패:', error);
-            
+
             // 프로젝트가 일시 중지된 경우를 감지
             if (error.message && (
                 error.message.includes('paused') ||
@@ -92,7 +92,7 @@ async function testSupabaseConnection(client) {
         }
     } catch (error) {
         console.warn('Supabase 연결 테스트 중 예외 발생:', error);
-        
+
         // 네트워크 오류인 경우
         if (error.message && error.message.includes('Failed to fetch')) {
             console.warn('⚠️ 네트워크 오류: Supabase 프로젝트가 일시 중지되었을 수 있습니다.');
@@ -184,7 +184,7 @@ class DatabaseService {
     // 에러 처리 공통 메서드
     handleError(error, context = '') {
         console.error(`Database error in ${context}:`, error);
-        
+
         // 원본 에러 메시지가 있으면 포함
         let errorMessage = `데이터베이스 오류`;
         if (error.message) {
@@ -192,7 +192,7 @@ class DatabaseService {
         } else if (error.originalError && error.originalError.message) {
             errorMessage += `: ${error.originalError.message}`;
         }
-        
+
         const enhancedError = new Error(errorMessage);
         enhancedError.originalError = error;
         throw enhancedError;
@@ -213,7 +213,7 @@ class DatabaseService {
 class PartService extends DatabaseService {
     async getAllParts(retryCount = 0) {
         const maxRetries = 2;
-        
+
         try {
             // Supabase 클라이언트 확인
             if (!this.supabase) {
@@ -221,18 +221,18 @@ class PartService extends DatabaseService {
             }
 
             console.log(`Supabase 클라이언트 확인 완료, parts 테이블 조회 시작... (시도 ${retryCount + 1}/${maxRetries + 1})`);
-            
+
             // Supabase 쿼리 실행
             const queryPromise = this.supabase
                 .from('parts')
                 .select('*')
                 .order('created_at', { ascending: false });
-            
+
             const { data, error } = await queryPromise;
-            
+
             if (error) {
                 console.error('Supabase 쿼리 오류:', error);
-                
+
                 // 특정 오류에 대해 재시도
                 if (retryCount < maxRetries && (
                     error.message?.includes('Failed to fetch') ||
@@ -243,12 +243,12 @@ class PartService extends DatabaseService {
                     await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 지수 백오프
                     return this.getAllParts(retryCount + 1);
                 }
-                
+
                 throw error;
             }
-            
+
             console.log('파트 데이터 조회 성공, 개수:', data?.length || 0);
-            
+
             // 성공 시 로컬 스토리지에 캐시 저장
             if (data && Array.isArray(data)) {
                 try {
@@ -258,7 +258,7 @@ class PartService extends DatabaseService {
                     console.warn('로컬 스토리지 저장 실패:', e);
                 }
             }
-            
+
             return data || [];
         } catch (error) {
             console.error('getAllParts 오류 상세:', {
@@ -267,7 +267,7 @@ class PartService extends DatabaseService {
                 code: error.code,
                 retryCount: retryCount
             });
-            
+
             // 네트워크 오류인 경우 로컬 캐시 확인
             if (error.message && (
                 error.message.includes('Failed to fetch') ||
@@ -276,16 +276,16 @@ class PartService extends DatabaseService {
                 error.message.includes('시간이 초과')
             )) {
                 console.warn('네트워크 오류 발생, 로컬 캐시 확인 중...');
-                
+
                 // 로컬 스토리지에서 캐시된 데이터 확인 (24시간 이내)
                 try {
                     const cacheTime = localStorage.getItem('parts_cache_time');
                     const cacheData = localStorage.getItem('parts_cache');
-                    
+
                     if (cacheTime && cacheData) {
                         const age = Date.now() - parseInt(cacheTime);
                         const maxAge = 24 * 60 * 60 * 1000; // 24시간
-                        
+
                         if (age < maxAge) {
                             console.log('로컬 캐시에서 데이터 로드 (오프라인 모드)');
                             const cachedParts = JSON.parse(cacheData);
@@ -298,7 +298,7 @@ class PartService extends DatabaseService {
                 } catch (e) {
                     console.warn('로컬 캐시 읽기 실패:', e);
                 }
-                
+
                 // 캐시가 없거나 만료된 경우 에러 발생
                 let errorMessage = '❌ 네트워크 연결 실패 - Supabase 서버에 접근할 수 없습니다.\n\n';
                 errorMessage += '🔍 확인 사항:\n';
@@ -308,7 +308,7 @@ class PartService extends DatabaseService {
                 errorMessage += '3. diagnose-connection.html 파일로 상세 진단 실행\n';
                 errorMessage += '4. 방화벽/프록시 설정 확인\n\n';
                 errorMessage += '💡 Supabase 대시보드에서 프로젝트를 재개(resume)해주세요.';
-                
+
                 const networkError = new Error(errorMessage);
                 networkError.originalError = error;
                 networkError.isNetworkError = true;
@@ -325,7 +325,7 @@ class PartService extends DatabaseService {
                 .from('parts')
                 .insert([partData])
                 .select();
-            
+
             if (error) throw error;
             return data[0];
         } catch (error) {
@@ -340,7 +340,7 @@ class PartService extends DatabaseService {
                 .update(partData)
                 .eq('id', id)
                 .select();
-            
+
             if (error) throw error;
             return data[0];
         } catch (error) {
@@ -354,19 +354,19 @@ class PartService extends DatabaseService {
             if (partData.product_type && partData.product_type !== 'PRODUCTION' && partData.product_type !== 'AS') {
                 throw new Error(`Invalid product_type: ${partData.product_type}. Must be 'PRODUCTION' or 'AS'`);
             }
-            
+
             // product_type이 없으면 기본값 설정하지 않음 (기존 값 유지)
             const updateData = { ...partData };
             if (!updateData.product_type) {
                 delete updateData.product_type; // 기존 값 유지를 위해 필드 제거
             }
-            
+
             const { data, error } = await this.supabase
                 .from('parts')
                 .update(updateData)
                 .eq('part_number', partNumber)
                 .select();
-            
+
             if (error) throw error;
             return data[0];
         } catch (error) {
@@ -397,7 +397,7 @@ class InboundService extends DatabaseService {
                 .from('arn_containers')
                 .select('*')
                 .order('created_at', { ascending: false });
-            
+
             if (error) throw error;
             return data;
         } catch (error) {
@@ -411,7 +411,7 @@ class InboundService extends DatabaseService {
                 .from('arn_containers')
                 .insert([arnData])
                 .select();
-            
+
             if (error) throw error;
             return data[0];
         } catch (error) {
@@ -425,7 +425,7 @@ class InboundService extends DatabaseService {
                 .from('arn_parts')
                 .select('*')
                 .eq('arn_number', arnNumber);
-            
+
             if (error) throw error;
             return data;
         } catch (error) {
@@ -442,7 +442,7 @@ class OutboundService extends DatabaseService {
                 .from('outbound_sequences')
                 .select('*')
                 .order('outbound_date', { ascending: false });
-            
+
             if (error) throw error;
             return data;
         } catch (error) {
@@ -456,7 +456,7 @@ class OutboundService extends DatabaseService {
                 .from('outbound_sequences')
                 .insert([sequenceData])
                 .select();
-            
+
             if (error) throw error;
             return data[0];
         } catch (error) {
@@ -470,7 +470,7 @@ class OutboundService extends DatabaseService {
                 .from('outbound_parts')
                 .upsert(partsData)
                 .select();
-            
+
             if (error) throw error;
             return data;
         } catch (error) {
@@ -487,7 +487,7 @@ class InventoryService extends DatabaseService {
                 .from('inventory')
                 .select('*')
                 .order('part_number');
-            
+
             if (error) throw error;
             return data;
         } catch (error) {
@@ -497,42 +497,56 @@ class InventoryService extends DatabaseService {
 
     async updateInventory(partNumber, quantity, type) {
         try {
-            // 트랜잭션으로 재고 업데이트 및 거래 내역 기록
+            // 1. 현재 재고 조회
             const { data: currentInventory, error: fetchError } = await this.supabase
                 .from('inventory')
                 .select('current_stock')
                 .eq('part_number', partNumber)
                 .single();
-            
+
             if (fetchError) throw fetchError;
 
-            const newStock = type === 'INBOUND' 
+            const newStock = type === 'INBOUND'
                 ? currentInventory.current_stock + quantity
-                : currentInventory.current_stock - quantity;
+                : Math.max(0, currentInventory.current_stock - quantity);
 
-            // 재고 업데이트
+            // 2. inventory 직접 UPDATE
             const { error: updateError } = await this.supabase
                 .from('inventory')
-                .update({ 
+                .update({
                     current_stock: newStock,
                     last_updated: new Date().toISOString()
                 })
                 .eq('part_number', partNumber);
-            
+
             if (updateError) throw updateError;
 
-            // 거래 내역 기록
+            // 3. 거래 내역 기록 (이력용, 트리거 무관)
+            const transactionDate = new Date().toISOString().split('T')[0];
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
                 .insert([{
-                    transaction_date: new Date().toISOString().split('T')[0],
+                    transaction_date: transactionDate,
                     part_number: partNumber,
                     transaction_type: type,
                     quantity: quantity,
                     reference_id: `${type}-${Date.now()}`
                 }]);
-            
+
             if (transactionError) throw transactionError;
+
+            // 4. daily_inventory_snapshot 업데이트
+            try {
+                await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .upsert({
+                        snapshot_date: transactionDate,
+                        part_number: partNumber,
+                        closing_stock: newStock
+                    }, { onConflict: 'snapshot_date,part_number' });
+            } catch (snapshotErr) {
+                console.warn('daily_inventory_snapshot 업데이트 오류 (무시 가능):', snapshotErr);
+            }
 
             return newStock;
         } catch (error) {

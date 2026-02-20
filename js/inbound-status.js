@@ -1665,15 +1665,12 @@ class InboundStatus {
     async updatePartInventory(partNumber, quantity, inboundDate, arnNumber) {
         try {
             console.log(`파트 ${partNumber} 재고 업데이트: +${quantity}`);
+            const transactionDate = inboundDate.includes('T') ? inboundDate.split('T')[0] : inboundDate;
 
-            // ⚠️ 중요: inventory를 직접 업데이트하지 않습니다!
-            // inventory_transactions에 INSERT하면 트리거가 자동으로 inventory를 업데이트합니다.
-            // 직접 업데이트하면 중복으로 재고가 증가합니다.
-
-            // 1. inventory에 파트가 없으면 생성 (트리거가 ON CONFLICT DO NOTHING을 사용하므로)
+            // 1. inventory 조회 및 직접 UPDATE
             const { data: existingInventory, error: inventoryError } = await this.supabase
                 .from('inventory')
-                .select('part_number')
+                .select('part_number, current_stock')
                 .eq('part_number', partNumber)
                 .maybeSingle();
 
@@ -1681,28 +1678,40 @@ class InboundStatus {
                 console.warn(`파트 ${partNumber} 재고 조회 오류:`, inventoryError);
             }
 
+            let newStock = quantity;
             if (!existingInventory) {
-                // 재고가 없으면 초기값 0으로 생성 (트리거가 자동으로 업데이트함)
+                // 재고가 없으면 새로 생성
                 const { error: insertError } = await this.supabase
                     .from('inventory')
                     .insert({
                         part_number: partNumber,
-                        current_stock: 0,
+                        current_stock: quantity,
                         status: 'in_stock',
                         last_updated: new Date().toISOString()
                     });
-
                 if (insertError) {
-                    console.warn(`파트 ${partNumber} 재고 생성 실패 (트리거가 자동 생성할 수 있음):`, insertError);
-                    // 트리거가 자동으로 생성할 수 있으므로 오류를 무시하고 계속 진행
+                    console.warn(`파트 ${partNumber} 재고 생성 실패:`, insertError);
                 } else {
-                    console.log(`파트 ${partNumber} 재고 초기화 (0으로 생성)`);
+                    console.log(`파트 ${partNumber} 재고 신규 생성: ${quantity}`);
+                }
+            } else {
+                // 기존 재고에 직접 더하기
+                newStock = (existingInventory.current_stock || 0) + quantity;
+                const { error: updateError } = await this.supabase
+                    .from('inventory')
+                    .update({
+                        current_stock: newStock,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('part_number', partNumber);
+                if (updateError) {
+                    console.error(`파트 ${partNumber} 재고 업데이트 실패:`, updateError);
+                } else {
+                    console.log(`파트 ${partNumber} 재고: ${existingInventory.current_stock} → ${newStock}`);
                 }
             }
 
-            // 2. inventory_transactions에 거래 내역 기록
-            // 트리거가 자동으로 inventory를 업데이트합니다
-            const transactionDate = inboundDate.includes('T') ? inboundDate.split('T')[0] : inboundDate;
+            // 2. inventory_transactions에 거래 내역 기록 (이력용, 트리거 무관)
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
                 .insert({
@@ -1717,9 +1726,22 @@ class InboundStatus {
             if (transactionError) {
                 console.error(`파트 ${partNumber} 거래 내역 기록 실패:`, transactionError);
                 throw transactionError;
-            } else {
-                console.log(`파트 ${partNumber} 거래 내역 기록 완료 (트리거가 자동으로 재고 업데이트)`);
             }
+
+            // 3. daily_inventory_snapshot 업데이트
+            try {
+                await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .upsert({
+                        snapshot_date: transactionDate,
+                        part_number: partNumber,
+                        closing_stock: newStock
+                    }, { onConflict: 'snapshot_date,part_number' });
+            } catch (snapshotErr) {
+                console.warn('daily_inventory_snapshot 업데이트 오류 (무시 가능):', snapshotErr);
+            }
+
+            console.log(`파트 ${partNumber} 입고 처리 완료 (직접 UPDATE + 트랜잭션 + 스냅샷)`);
 
         } catch (error) {
             console.error(`파트 ${partNumber} 재고 업데이트 실패:`, error);

@@ -476,6 +476,10 @@
                                     class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all duration-200">
                                     <i class="fas fa-calculator mr-2"></i>계산
                                 </button>
+                                <button id="snapshotUploadBtn"
+                                    class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-all duration-200">
+                                    <i class="fas fa-file-excel mr-2"></i>엑셀 업로드
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -714,6 +718,55 @@
         </div>
     </div>
 
+    <!-- Snapshot Upload Modal -->
+    <div id="snapshotUploadModal"
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">
+                        <i class="fas fa-file-excel text-green-600 mr-2"></i>일일 마감재고 엑셀 업로드
+                    </h3>
+                    <button onclick="inventoryStatus.closeSnapshotUploadModal()"
+                        class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p class="text-sm text-blue-800">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <strong>엑셀 형식:</strong> 첫 행 = 헤더(날짜, 파트번호1, 파트번호2, ...), 이후 행 = 날짜별 마감 재고 수량
+                    </p>
+                </div>
+
+                <div
+                    class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-400 transition-colors mb-4">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                    <p class="text-gray-600 mb-4">엑셀 파일을 선택하세요 (.xlsx, .xls)</p>
+                    <input type="file" id="snapshotFileInput" accept=".xlsx,.xls"
+                        onchange="inventoryStatus.previewSnapshotFile()"
+                        class="block mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                </div>
+
+                <div id="snapshotPreview" class="mb-4">
+                    <!-- 미리보기 표시 -->
+                </div>
+
+                <div class="flex justify-end space-x-4">
+                    <button onclick="inventoryStatus.closeSnapshotUploadModal()"
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-times mr-2"></i>취소
+                    </button>
+                    <button onclick="inventoryStatus.uploadDailySnapshot()"
+                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        <i class="fas fa-upload mr-2"></i>업로드
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Indicator -->
     <div id="loading" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
@@ -791,6 +844,11 @@
         // 날짜별 재고 계산 버튼
         document.getElementById('calculateStockBtn').addEventListener('click', () => {
             inventoryStatus.calculateDateStock();
+        });
+
+        // 스냅샷 엑셀 업로드 버튼
+        document.getElementById('snapshotUploadBtn').addEventListener('click', () => {
+            inventoryStatus.showSnapshotUploadModal();
         });
 
         // 로그아웃 함수

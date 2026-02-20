@@ -1424,71 +1424,64 @@ class OutboundStatus {
             // 재고 부족 확인
             const currentStock = existingInventory.current_stock || 0;
             console.log(`=== 재고 차감 전 확인 ===`);
-            console.log(`파트 번호: ${partNumber}`);
-            console.log(`차감 예정 수량: ${outboundQuantity}개`);
-            console.log(`현재 재고: ${currentStock}개`);
-            console.log(`차감 후 예상 재고: ${currentStock - outboundQuantity}개`);
+            console.log(`파트: ${partNumber}, 현재: ${currentStock}, 차감: ${outboundQuantity}`);
 
             if (currentStock < outboundQuantity) {
-                console.warn(`재고 부족: ${partNumber} - 현재 재고 ${currentStock}개, 출고 요청 ${outboundQuantity}개. 재고 차감을 건너뜁니다.`);
+                console.warn(`재고 부족: ${partNumber} - 현재 ${currentStock}개, 요청 ${outboundQuantity}개. 건너뜁니다.`);
                 return;
             }
 
-            // inventory_transactions에 기록하고 inventory 직접 업데이트
-            // transaction_date는 실제 출고 날짜(outbound_date)로 설정
             const transactionDate = sequenceDate ?
                 (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) :
                 new Date().toISOString().split('T')[0];
 
-            console.log(`=== 거래 내역 기록 및 재고 직접 업데이트 ===`);
-            console.log(`거래 날짜: ${transactionDate} (출고 날짜: ${sequenceDate})`);
+            // 1. inventory 직접 UPDATE (1회만)
+            const newStock = currentStock - outboundQuantity;
+            const { error: updateError } = await this.supabase
+                .from('inventory')
+                .update({
+                    current_stock: newStock,
+                    last_updated: new Date().toISOString()
+                })
+                .eq('part_number', partNumber);
 
-            // inventory_transactions에 기록
-            const transactionData = {
-                transaction_date: transactionDate,
-                part_number: partNumber,
-                transaction_type: 'OUTBOUND',
-                quantity: outboundQuantity,
-                reference_id: (sequence && sequence.sequence_number) ? sequence.sequence_number : `OUTBOUND_${Date.now()}`,
-                notes: `출고 처리 - 수량: ${outboundQuantity}개 (${sequenceDate || '오늘'} 출고)`
-            };
+            if (updateError) {
+                console.error(`파트 ${partNumber} 재고 업데이트 실패:`, updateError);
+                throw updateError;
+            }
+            console.log(`파트 ${partNumber} 재고: ${currentStock} → ${newStock}`);
 
-            console.log('거래 내역 삽입 데이터:', transactionData);
-
+            // 2. inventory_transactions에 기록 (이력용)
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
-                .insert(transactionData);
+                .insert({
+                    transaction_date: transactionDate,
+                    part_number: partNumber,
+                    transaction_type: 'OUTBOUND',
+                    quantity: outboundQuantity,
+                    reference_id: (sequence && sequence.sequence_number) ? sequence.sequence_number : `OUTBOUND_${Date.now()}`,
+                    notes: `출고 처리 - 수량: ${outboundQuantity}개 (${sequenceDate || '오늘'} 출고)`
+                });
 
             if (transactionError) {
                 console.error(`파트 ${partNumber} 거래 내역 기록 실패:`, transactionError);
-                throw transactionError;
-            } else {
-                console.log(`파트 ${partNumber} 거래 내역 기록 성공`);
+                // 거래 내역 실패해도 재고 업데이트는 이미 완료
             }
 
-            // inventory 테이블 직접 업데이트 (트리거가 비활성화되어 있으므로)
-            await this.updateInventoryDirectly(partNumber, outboundQuantity, 'OUTBOUND');
+            // 3. daily_inventory_snapshot 업데이트
+            try {
+                await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .upsert({
+                        snapshot_date: transactionDate,
+                        part_number: partNumber,
+                        closing_stock: newStock
+                    }, { onConflict: 'snapshot_date,part_number' });
+            } catch (snapshotErr) {
+                console.warn('daily_inventory_snapshot 업데이트 오류 (무시 가능):', snapshotErr);
+            }
 
-            console.log(`파트 ${partNumber} 거래 내역 기록 및 재고 업데이트 완료`);
-
-            // 트리거가 실행된 후 재고 확인
-            setTimeout(async () => {
-                const { data: updatedInventory } = await this.supabase
-                    .from('inventory')
-                    .select('current_stock')
-                    .eq('part_number', partNumber)
-                    .maybeSingle();
-
-                if (updatedInventory) {
-                    console.log(`=== 트리거 실행 후 재고 확인 ===`);
-                    console.log(`파트 번호: ${partNumber}`);
-                    console.log(`예상 재고: ${currentStock - outboundQuantity}개`);
-                    console.log(`실제 재고: ${updatedInventory.current_stock}개`);
-                    console.log(`차이: ${updatedInventory.current_stock - (currentStock - outboundQuantity)}개`);
-                }
-            }, 1000);
-
-            console.log(`=== 재고 차감 완료 ===`);
+            console.log(`=== 재고 차감 완료 (직접 UPDATE + 트랜잭션 + 스냅샷) ===`);
 
         } catch (error) {
             console.error(`파트 ${partNumber} 재고 차감 실패:`, error);
@@ -1676,10 +1669,22 @@ class OutboundStatus {
 
             if (transactionError) {
                 console.error(`파트 ${partNumber} 거래 내역 기록 실패:`, transactionError);
-                // 거래 내역 기록 실패해도 재고 업데이트는 성공으로 처리
-            } else {
-                console.log(`파트 ${partNumber} 거래 내역 기록 완료`);
             }
+
+            // 3. daily_inventory_snapshot 업데이트
+            try {
+                await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .upsert({
+                        snapshot_date: transactionDate,
+                        part_number: partNumber,
+                        closing_stock: newStock
+                    }, { onConflict: 'snapshot_date,part_number' });
+            } catch (snapshotErr) {
+                console.warn('daily_inventory_snapshot 업데이트 오류 (무시 가능):', snapshotErr);
+            }
+
+            console.log(`파트 ${partNumber} 재고 증가 완료 (직접 UPDATE + 트랜잭션 + 스냅샷)`);
 
         } catch (error) {
             console.error(`파트 ${partNumber} 재고 증가 실패:`, error);
@@ -2381,7 +2386,23 @@ class OutboundStatus {
             }
 
             console.log('재고 배치 업데이트 완료');
-            console.log(`성공적으로 처리된 파트: ${validParts.length}개`);
+
+            // 5. daily_inventory_snapshot 배치 업데이트
+            for (const update of inventoryUpdates) {
+                try {
+                    await this.supabase
+                        .from('daily_inventory_snapshot')
+                        .upsert({
+                            snapshot_date: transactionDate,
+                            part_number: update.part_number,
+                            closing_stock: update.current_stock
+                        }, { onConflict: 'snapshot_date,part_number' });
+                } catch (snapshotErr) {
+                    console.warn(`daily_inventory_snapshot 업데이트 오류 (${update.part_number}):`, snapshotErr);
+                }
+            }
+
+            console.log(`성공적으로 처리된 파트: ${validParts.length}개 (직접 UPDATE + 트랜잭션 + 스냅샷)`);
 
         } catch (error) {
             console.error('재고 배치 처리 중 오류:', error);
@@ -2413,6 +2434,8 @@ class OutboundStatus {
             // 2. 재고 복구 업데이트
             console.log('재고 복구 배치 업데이트 시작...');
 
+            const today = new Date().toISOString().split('T')[0];
+
             for (const part of parts) {
                 const inventory = currentInventory.find(inv => inv.part_number === part.part_number);
                 if (!inventory) {
@@ -2422,6 +2445,7 @@ class OutboundStatus {
 
                 const newStock = inventory.current_stock + (part.actual_qty || 0);
 
+                // 1. inventory 직접 UPDATE
                 const { error: updateError } = await this.supabase
                     .from('inventory')
                     .update({ current_stock: newStock })
@@ -2429,12 +2453,41 @@ class OutboundStatus {
 
                 if (updateError) {
                     console.error(`파트 ${part.part_number} 재고 복구 실패:`, updateError);
-                } else {
-                    console.log(`파트 ${part.part_number} 재고 복구 완료: ${inventory.current_stock} → ${newStock}`);
+                    continue;
+                }
+                console.log(`파트 ${part.part_number} 재고 복구: ${inventory.current_stock} → ${newStock}`);
+
+                // 2. inventory_transactions에 복구 거래 기록
+                try {
+                    await this.supabase
+                        .from('inventory_transactions')
+                        .insert({
+                            transaction_date: today,
+                            part_number: part.part_number,
+                            transaction_type: 'INBOUND',
+                            quantity: part.actual_qty || 0,
+                            reference_id: `RESTORE_${Date.now()}`,
+                            notes: `출고 취소 복구 - 수량: ${part.actual_qty}개`
+                        });
+                } catch (txErr) {
+                    console.warn(`파트 ${part.part_number} 복구 거래 기록 실패:`, txErr);
+                }
+
+                // 3. daily_inventory_snapshot 업데이트
+                try {
+                    await this.supabase
+                        .from('daily_inventory_snapshot')
+                        .upsert({
+                            snapshot_date: today,
+                            part_number: part.part_number,
+                            closing_stock: newStock
+                        }, { onConflict: 'snapshot_date,part_number' });
+                } catch (snapshotErr) {
+                    console.warn(`daily_inventory_snapshot 업데이트 오류 (${part.part_number}):`, snapshotErr);
                 }
             }
 
-            console.log('재고 복구 배치 업데이트 완료');
+            console.log('재고 복구 배치 완료 (직접 UPDATE + 트랜잭션 + 스냅샷)');
 
         } catch (error) {
             console.error('재고 복구 배치 처리 중 오류:', error);
@@ -2523,8 +2576,8 @@ class OutboundStatus {
         // 간단한 알림 표시
         const notification = document.createElement('div');
         notification.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${type === 'success' ? 'bg-green-500 text-white' :
-                type === 'error' ? 'bg-red-500 text-white' :
-                    'bg-blue-500 text-white'
+            type === 'error' ? 'bg-red-500 text-white' :
+                'bg-blue-500 text-white'
             }`;
         notification.textContent = message;
 
