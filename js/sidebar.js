@@ -11,7 +11,6 @@
         { href: 'inventory-status.html', icon: 'fas fa-boxes', label: '재고 현황' },
         { href: 'outbound-summary.html', icon: 'fas fa-chart-bar', label: '출하 현황' },
         { href: 'physical-inventory.html', icon: 'fas fa-clipboard-check', label: '실사 관리', special: true },
-        { href: 'quick-inventory-edit.html', icon: 'fas fa-table', label: '빠른 재고 수정' },
         { href: 'daily-inventory-enhanced.html', icon: 'fas fa-calendar-day', label: '일일 재고' }
     ];
 
