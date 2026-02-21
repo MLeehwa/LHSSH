@@ -2066,6 +2066,8 @@ class InventoryStatus {
         this.showLoading(true);
 
         try {
+            // 자동 동기화: 완료된 입고 컨테이너 중 누락된 트랜잭션 자동 보충
+            await this.syncMissingInboundTransactions(true);
             // AS 체크박스 상태 확인
             const includeAS = document.getElementById('includeASCheckboxDateStock')?.checked || false;
 
@@ -2168,14 +2170,15 @@ class InventoryStatus {
                 console.log(`스냅샷 없음 (${calculationDate}). 순방향 계산 시도...`);
 
                 // 가장 가까운 이전 스냅샷 찾기
-                const { data: prevSnapshots } = await this.supabase
+                // 1단계: 기준일 이전에서 가장 가까운 스냅샷 날짜 1개만 조회
+                const { data: latestSnap } = await this.supabase
                     .from('daily_inventory_snapshot')
-                    .select('snapshot_date, part_number, closing_stock')
+                    .select('snapshot_date')
                     .lt('snapshot_date', calculationDate)
                     .order('snapshot_date', { ascending: false })
-                    .limit(100); // 최대 파트 수만큼
+                    .limit(1);
 
-                if (!prevSnapshots || prevSnapshots.length === 0) {
+                if (!latestSnap || latestSnap.length === 0) {
                     this.showNotification(`${calculationDate} 이전에 스냅샷 데이터가 없습니다. 엑셀 업로드로 기준 데이터를 등록해주세요.`, 'warning');
                     this.dateStockData = [];
                     this.renderDateStockTable();
@@ -2183,12 +2186,17 @@ class InventoryStatus {
                     return;
                 }
 
-                // 가장 가까운 날짜의 스냅샷 사용
-                const baseDate = prevSnapshots[0].snapshot_date;
+                // 2단계: 해당 날짜의 모든 파트 스냅샷 조회 (limit 없이)
+                const baseDate = latestSnap[0].snapshot_date;
+                const { data: prevSnapshots } = await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .select('part_number, closing_stock')
+                    .eq('snapshot_date', baseDate);
+
                 const baseStockMap = new Map();
-                prevSnapshots
-                    .filter(s => s.snapshot_date === baseDate)
-                    .forEach(s => baseStockMap.set(s.part_number, s.closing_stock));
+                if (prevSnapshots) {
+                    prevSnapshots.forEach(s => baseStockMap.set(s.part_number, s.closing_stock));
+                }
 
                 console.log(`기준 스냅샷: ${baseDate} (${baseStockMap.size}개 파트)`);
 
@@ -2220,8 +2228,14 @@ class InventoryStatus {
 
                 // 기준일 이전까지의 거래를 누적 (전날 재고 계산)
                 if (rangeTrans) {
+                    // 날짜 정규화 헬퍼 (Supabase에서 "2026-02-19T00:00:00+00:00" 형태로 올 수 있음)
+                    const normalizeDate = (d) => {
+                        if (!d) return '';
+                        return typeof d === 'string' ? d.split('T')[0] : new Date(d).toISOString().split('T')[0];
+                    };
+
                     // 기준일 이전의 거래
-                    rangeTrans.filter(t => t.transaction_date < calculationDate).forEach(t => {
+                    rangeTrans.filter(t => normalizeDate(t.transaction_date) < calculationDate).forEach(t => {
                         if (stockMap.has(t.part_number)) {
                             const stock = stockMap.get(t.part_number);
                             if (t.transaction_type === 'INBOUND') {
@@ -2235,7 +2249,7 @@ class InventoryStatus {
                     });
 
                     // 기준일의 거래만 집계
-                    rangeTrans.filter(t => t.transaction_date === calculationDate).forEach(t => {
+                    rangeTrans.filter(t => normalizeDate(t.transaction_date) === calculationDate).forEach(t => {
                         if (stockMap.has(t.part_number)) {
                             const stock = stockMap.get(t.part_number);
                             if (t.transaction_type === 'INBOUND') {
@@ -2266,6 +2280,111 @@ class InventoryStatus {
             this.showNotification('재고 조회 중 오류가 발생했습니다: ' + error.message, 'error');
         } finally {
             this.showLoading(false);
+        }
+    }
+
+    // ==================== 누락된 입고 트랜잭션 동기화 ====================
+    async syncMissingInboundTransactions(silent = false) {
+        try {
+            if (!silent) this.showLoading(true);
+            console.log('=== 누락된 입고 트랜잭션 동기화 시작 ===');
+
+            // 1. 완료된 모든 arn_containers 조회
+            const { data: completedContainers, error: cErr } = await this.supabase
+                .from('arn_containers')
+                .select('arn_number, container_number, inbound_date, status')
+                .eq('status', 'COMPLETED');
+
+            if (cErr) throw cErr;
+            if (!completedContainers || completedContainers.length === 0) {
+                if (!silent) this.showNotification('완료된 입고 컨테이너가 없습니다.', 'info');
+                if (!silent) this.showLoading(false);
+                return;
+            }
+
+            console.log(`완료된 컨테이너: ${completedContainers.length}개`);
+
+            // 2. 기존 inventory_transactions에서 이미 기록된 ARN 번호 확인
+            const arnNumbers = completedContainers.map(c => c.arn_number);
+            const { data: existingTrans, error: tErr } = await this.supabase
+                .from('inventory_transactions')
+                .select('reference_id')
+                .eq('transaction_type', 'INBOUND')
+                .in('reference_id', arnNumbers);
+
+            if (tErr) throw tErr;
+
+            const existingArnSet = new Set((existingTrans || []).map(t => t.reference_id));
+            const missingContainers = completedContainers.filter(c => !existingArnSet.has(c.arn_number));
+
+            if (missingContainers.length === 0) {
+                console.log('누락된 입고 트랜잭션 없음 - 동기화 완료');
+                if (!silent) this.showNotification('누락된 입고 트랜잭션이 없습니다. 모든 데이터가 동기화 되어 있습니다.', 'success');
+                if (!silent) this.showLoading(false);
+                return;
+            }
+
+            console.log(`누락된 컨테이너: ${missingContainers.length}개`);
+            let totalInserted = 0;
+            let totalErrors = 0;
+
+            // 3. 누락된 컨테이너별로 파트 조회 후 트랜잭션 생성
+            for (const container of missingContainers) {
+                const { data: parts, error: pErr } = await this.supabase
+                    .from('arn_parts')
+                    .select('part_number, quantity')
+                    .eq('arn_number', container.arn_number);
+
+                if (pErr) {
+                    console.error(`ARN ${container.arn_number} 파트 조회 오류:`, pErr);
+                    totalErrors++;
+                    continue;
+                }
+
+                if (!parts || parts.length === 0) continue;
+
+                // inbound_date 정규화
+                const transactionDate = container.inbound_date
+                    ? (container.inbound_date.includes('T') ? container.inbound_date.split('T')[0] : container.inbound_date)
+                    : new Date().toISOString().split('T')[0];
+
+                // 트랜잭션 레코드 생성
+                const transRecords = parts.map(p => ({
+                    transaction_date: transactionDate,
+                    part_number: p.part_number,
+                    transaction_type: 'INBOUND',
+                    quantity: p.quantity,
+                    reference_id: container.arn_number,
+                    notes: `입고 동기화 - ARN: ${container.arn_number}, 컨테이너: ${container.container_number}`
+                }));
+
+                const { error: insertErr } = await this.supabase
+                    .from('inventory_transactions')
+                    .insert(transRecords);
+
+                if (insertErr) {
+                    console.error(`ARN ${container.arn_number} 트랜잭션 삽입 오류:`, insertErr);
+                    totalErrors++;
+                } else {
+                    totalInserted += transRecords.length;
+                    console.log(`ARN ${container.arn_number}: ${transRecords.length}건 입고 트랜잭션 생성 (날짜: ${transactionDate})`);
+                }
+            }
+
+            const message = `동기화 완료: ${totalInserted}건 입고 트랜잭션 생성` +
+                (totalErrors > 0 ? `, ${totalErrors}건 오류` : '');
+            if (!silent) this.showNotification(message, totalErrors > 0 ? 'warning' : 'success');
+            if (silent && totalInserted > 0) {
+                console.log(`[자동 동기화] ${message}`);
+                this.showNotification(`자동 동기화: ${totalInserted}건 누락된 입고 트랜잭션 보충됨`, 'info');
+            }
+            console.log('=== 누락된 입고 트랜잭션 동기화 완료 ===');
+
+        } catch (error) {
+            console.error('입고 트랜잭션 동기화 오류:', error);
+            if (!silent) this.showNotification('동기화 중 오류가 발생했습니다: ' + error.message, 'error');
+        } finally {
+            if (!silent) this.showLoading(false);
         }
     }
 

@@ -344,6 +344,10 @@
                                     class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-all duration-200">
                                     <i class="fas fa-file-excel mr-2"></i>엑셀 업로드
                                 </button>
+                                <button id="syncInboundBtn"
+                                    class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition-all duration-200">
+                                    <i class="fas fa-sync mr-2"></i>입고 동기화
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -650,7 +654,7 @@
     <script src="../js/config.js?v=20260218"></script>
     <script src="../js/supabase-client.js?v=20260218"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="../js/inventory-status.js?v=20260218"></script>
+    <script src="../js/inventory-status.js?v=20260220"></script>
     <script>
         // Tab switching functionality
         function switchTab(activeTab) {
@@ -713,6 +717,13 @@
         // 스냅샷 엑셀 업로드 버튼
         document.getElementById('snapshotUploadBtn').addEventListener('click', () => {
             inventoryStatus.showSnapshotUploadModal();
+        });
+
+        // 입고 동기화 버튼
+        document.getElementById('syncInboundBtn').addEventListener('click', () => {
+            if (confirm('완료된 입고 컨테이너 중 누락된 트랜잭션을 동기화합니다.\n계속하시겠습니까?')) {
+                inventoryStatus.syncMissingInboundTransactions();
+            }
         });
 
         // 로그아웃 함수
