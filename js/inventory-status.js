@@ -348,23 +348,79 @@ class InventoryStatus {
 
         const allowedPartNumbers = new Set(filteredParts.map(p => p.part_number));
 
-        // 2. inventory 테이블에서 데이터 가져오기
-        const { data: inventoryData, error: inventoryError } = await this.supabase
-            .from('inventory')
-            .select('*')
-            .order('part_number');
+        // 2. 마감재고 기준: daily_inventory_snapshot에서 가장 최근 스냅샷의 closing_stock 사용
+        // (inventory.current_stock 대신 마감기준 재고를 보여주기 위함)
+        let result = [];
 
-        if (inventoryError) {
-            console.error('재고 데이터 로드 오류:', inventoryError);
-            return this.getMockInventory();
+        // 2-1. 가장 최근 스냅샷 날짜 조회
+        const { data: latestSnapshot } = await this.supabase
+            .from('daily_inventory_snapshot')
+            .select('snapshot_date')
+            .order('snapshot_date', { ascending: false })
+            .limit(1);
+
+        if (latestSnapshot && latestSnapshot.length > 0) {
+            const latestDate = latestSnapshot[0].snapshot_date;
+            console.log(`마감재고 기준일: ${latestDate}`);
+
+            // 2-2. 해당 날짜의 모든 스냅샷 데이터 조회
+            const { data: snapshotData, error: snapError } = await this.supabase
+                .from('daily_inventory_snapshot')
+                .select('part_number, closing_stock, snapshot_date')
+                .eq('snapshot_date', latestDate);
+
+            if (!snapError && snapshotData && snapshotData.length > 0) {
+                // 스냅샷 기준 재고 데이터 구성
+                result = snapshotData
+                    .filter(item => allowedPartNumbers.has(item.part_number))
+                    .map(item => ({
+                        part_number: item.part_number,
+                        current_stock: item.closing_stock,
+                        status: item.closing_stock > 0 ? 'in_stock' : 'out_of_stock',
+                        last_updated: item.snapshot_date
+                    }));
+
+                // 스냅샷에 없는 파트는 inventory 테이블에서 가져오기
+                const snapshotPartSet = new Set(snapshotData.map(s => s.part_number));
+                const missingParts = [...allowedPartNumbers].filter(p => !snapshotPartSet.has(p));
+
+                if (missingParts.length > 0) {
+                    const { data: inventoryFallback } = await this.supabase
+                        .from('inventory')
+                        .select('*')
+                        .in('part_number', missingParts);
+
+                    if (inventoryFallback) {
+                        result = result.concat(inventoryFallback.filter(item => allowedPartNumbers.has(item.part_number)));
+                    }
+                }
+
+                console.log(`마감재고 데이터: ${result.length}개 (스냅샷 기준일: ${latestDate})`);
+            }
         }
 
-        // 3. 필터링된 파트만 포함
-        const result = (inventoryData || []).filter(item =>
-            allowedPartNumbers.has(item.part_number)
-        );
+        // 3. 스냅샷이 없으면 기존 inventory 테이블 fallback
+        if (result.length === 0) {
+            console.log('스냅샷 데이터 없음 → inventory 테이블 fallback');
+            const { data: inventoryData, error: inventoryError } = await this.supabase
+                .from('inventory')
+                .select('*')
+                .order('part_number');
 
-        console.log('필터링된 재고 데이터 개수:', result.length, '(전체:', inventoryData?.length || 0, ', AS 포함:', includeAS, ')');
+            if (inventoryError) {
+                console.error('재고 데이터 로드 오류:', inventoryError);
+                return this.getMockInventory();
+            }
+
+            result = (inventoryData || []).filter(item =>
+                allowedPartNumbers.has(item.part_number)
+            );
+        }
+
+        // 파트번호순 정렬
+        result.sort((a, b) => (a.part_number || '').localeCompare(b.part_number || ''));
+
+        console.log('필터링된 재고 데이터 개수:', result.length, '(AS 포함:', includeAS, ')');
 
         this.cache.set(cacheKey, result);
         return result;
