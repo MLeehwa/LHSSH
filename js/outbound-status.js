@@ -2295,14 +2295,21 @@ class OutboundStatus {
 
             console.log('현재 재고 조회 완료:', currentInventory.length, '개 파트');
 
-            // 2. 재고 부족 파트 확인
+            // 2. 재고 부족 파트 확인 (트랜잭션은 무조건 기록, 재고차감만 가능한 파트에서 수행)
             const insufficientStock = [];
-            const validParts = [];
+            const validParts = []; // 재고 차감 가능한 파트
+            const allPartsForTxn = parts.filter(p => p.actual_qty > 0); // 트랜잭션 기록용 (actual_qty > 0인 모든 파트)
 
             for (const part of parts) {
                 const inventory = currentInventory.find(inv => inv.part_number === part.part_number);
                 if (!inventory) {
-                    console.warn(`파트 ${part.part_number}의 재고 정보가 없습니다. 건너뜁니다.`);
+                    console.warn(`파트 ${part.part_number}의 재고 정보가 없습니다. 트랜잭션은 기록합니다.`);
+                    insufficientStock.push({
+                        part_number: part.part_number,
+                        current_stock: 0,
+                        required: part.actual_qty,
+                        reason: 'NO_INVENTORY_RECORD'
+                    });
                     continue;
                 }
 
@@ -2310,24 +2317,27 @@ class OutboundStatus {
                     insufficientStock.push({
                         part_number: part.part_number,
                         current_stock: inventory.current_stock,
-                        required: part.actual_qty
+                        required: part.actual_qty,
+                        reason: 'INSUFFICIENT_STOCK'
                     });
+                    // 재고가 부족해도 있는 만큼은 차감 (validParts에 추가)
+                    validParts.push(part);
                 } else {
                     validParts.push(part);
                 }
             }
 
             if (insufficientStock.length > 0) {
-                console.warn('재고 부족 파트들:', insufficientStock);
+                console.warn('재고 부족/미등록 파트들:', insufficientStock);
             }
 
-            if (validParts.length === 0) {
-                console.warn('처리 가능한 파트가 없습니다.');
+            if (allPartsForTxn.length === 0) {
+                console.warn('기록할 출고 수량이 있는 파트가 없습니다.');
                 return;
             }
 
-            // 3. inventory_transactions 배치 삽입
-            const transactionData = validParts.map(part => ({
+            // 3. inventory_transactions 배치 삽입 (actual_qty > 0인 모든 파트에 대해 기록)
+            const transactionData = allPartsForTxn.map(part => ({
                 transaction_date: transactionDate,
                 part_number: part.part_number,
                 transaction_type: 'OUTBOUND',

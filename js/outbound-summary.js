@@ -323,7 +323,6 @@ class OutboundSummary {
             this.cache.clear();
 
             console.log('데이터 로드 완료. 총 데이터:', this.outboundData.length);
-            console.log('첫 번째 조합된 데이터 샘플:', this.outboundData?.[0]);
             const currentYear = now.getFullYear();
             const currentMonth = now.getMonth() + 1;
 
@@ -338,6 +337,11 @@ class OutboundSummary {
 
             this.renderTable();
             this.updateStats();
+
+            // 출고 데이터 교차 검증 (비동기, UI 차단 없음)
+            this.crossValidateOutboundData().catch(err =>
+                console.warn('출고 교차 검증 실패:', err)
+            );
 
         } catch (error) {
             console.error('데이터 로드 중 오류:', error);
@@ -547,13 +551,107 @@ class OutboundSummary {
         }
 
         console.log('조합된 출하 데이터:', combinedData.length, '개 항목');
-        if (combinedData.length > 0) {
-            console.log('첫 번째 조합된 항목:', combinedData[0]);
-        }
         return combinedData;
     }
 
+    // ==================== 출고 데이터 교차 검증 ====================
+    async crossValidateOutboundData() {
+        if (!this.supabase || this.outboundData.length === 0) return;
 
+        console.log('=== 출고 데이터 교차 검증 시작 ===');
+
+        try {
+            // 1. outbound_parts의 COMPLETED 데이터를 날짜+파트별로 집계
+            const completedData = this.outboundData.filter(d => d.status === 'COMPLETED');
+            if (completedData.length === 0) {
+                console.log('검증할 완료된 출고 데이터가 없습니다.');
+                return;
+            }
+
+            const outboundByDatePart = new Map();
+            completedData.forEach(item => {
+                const key = `${item.date}|${item.partNumber}`;
+                outboundByDatePart.set(key, (outboundByDatePart.get(key) || 0) + (item.actualQty || 0));
+            });
+
+            // 날짜 범위 산출
+            const allDates = [...new Set(completedData.map(d => d.date))].filter(d => d && d !== '-').sort();
+            if (allDates.length === 0) return;
+
+            const startDate = allDates[0];
+            const endDate = allDates[allDates.length - 1];
+
+            // 2. inventory_transactions에서 같은 기간의 OUTBOUND 트랜잭션 가져오기
+            const { data: transactions, error } = await this.supabase
+                .from('inventory_transactions')
+                .select('part_number, quantity, transaction_date')
+                .eq('transaction_type', 'OUTBOUND')
+                .gte('transaction_date', startDate)
+                .lte('transaction_date', endDate);
+
+            if (error) {
+                console.warn('교차 검증용 트랜잭션 조회 실패:', error);
+                return;
+            }
+
+            // 트랜잭션을 날짜+파트별로 집계
+            const transByDatePart = new Map();
+            (transactions || []).forEach(t => {
+                const date = typeof t.transaction_date === 'string'
+                    ? t.transaction_date.split('T')[0]
+                    : new Date(t.transaction_date).toISOString().split('T')[0];
+                const key = `${date}|${t.part_number}`;
+                transByDatePart.set(key, (transByDatePart.get(key) || 0) + Math.abs(t.quantity || 0));
+            });
+
+            // 3. 비교 및 불일치 보고
+            let mismatches = 0;
+            const mismatchDetails = [];
+
+            outboundByDatePart.forEach((outboundQty, key) => {
+                const transQty = transByDatePart.get(key) || 0;
+                if (outboundQty !== transQty) {
+                    mismatches++;
+                    const [date, partNumber] = key.split('|');
+                    mismatchDetails.push({
+                        date,
+                        partNumber,
+                        outboundParts: outboundQty,
+                        inventoryTransactions: transQty,
+                        diff: outboundQty - transQty
+                    });
+                }
+            });
+
+            // 트랜잭션에만 존재하는 항목도 체크
+            transByDatePart.forEach((transQty, key) => {
+                if (!outboundByDatePart.has(key)) {
+                    mismatches++;
+                    const [date, partNumber] = key.split('|');
+                    mismatchDetails.push({
+                        date,
+                        partNumber,
+                        outboundParts: 0,
+                        inventoryTransactions: transQty,
+                        diff: -transQty,
+                        note: 'outbound_parts에 없음'
+                    });
+                }
+            });
+
+            if (mismatches > 0) {
+                console.warn(`⚠️ 출고 데이터 불일치 발견: ${mismatches}건`);
+                console.table(mismatchDetails.slice(0, 20));
+            } else {
+                console.log('✅ 출고 데이터 교차 검증 통과: outbound_parts ↔ inventory_transactions 일치');
+            }
+
+            console.log(`=== 교차 검증 완료: ${outboundByDatePart.size}개 항목 검사, ${mismatches}건 불일치 ===`);
+
+        } catch (err) {
+            console.warn('교차 검증 중 예외:', err);
+        }
+    }
 
     getMockOutboundData() {
         return [

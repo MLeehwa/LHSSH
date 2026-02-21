@@ -963,6 +963,14 @@
                 }
             }
 
+            // 파트 번호 정규화 함수 (별칭 매핑)
+            function normalizePartNumber(partNumber) {
+                const PART_ALIASES = {
+                    '49560-XL050': '49560-DU050'
+                };
+                return PART_ALIASES[partNumber] || partNumber;
+            }
+
             // GS1-128 바코드 파싱 함수 (다양한 형식 지원)
             function parseGS1Barcode(barcode) {
                 try {
@@ -1045,7 +1053,7 @@
                         }
 
                         return {
-                            partNumber,
+                            partNumber: normalizePartNumber(partNumber),
                             quantity,
                             uniqueNumber
                         };
@@ -1060,7 +1068,7 @@
                     if (pattern1) {
                         console.log('패턴 1 매칭 성공:', pattern1);
                         return {
-                            partNumber: pattern1[1], // 49601-S9000
+                            partNumber: normalizePartNumber(pattern1[1]), // 49601-S9000
                             quantity: parseInt(pattern1[2]), // 80
                             uniqueNumber: pattern1[3] // P1100082225460
                         };
@@ -1071,7 +1079,7 @@
                     if (pattern2) {
                         console.log('패턴 2 매칭 성공:', pattern2);
                         return {
-                            partNumber: pattern2[1], // 49601-S9000
+                            partNumber: normalizePartNumber(pattern2[1]), // 49601-S9000
                             quantity: parseInt(pattern2[2]), // 80
                             uniqueNumber: null // 태그번호 없음
                         };
@@ -1082,7 +1090,7 @@
                     if (pattern3) {
                         console.log('패턴 3 매칭 성공 (파트 번호만):', pattern3);
                         return {
-                            partNumber: pattern3[1], // 49601-S9000
+                            partNumber: normalizePartNumber(pattern3[1]), // 49601-S9000
                             quantity: 1, // 기본값
                             uniqueNumber: null
                         };
@@ -1096,7 +1104,7 @@
                     if (partMatch4) {
                         console.log('패턴 4 매칭 성공:', { part: partMatch4[1], qty: qtyMatch4?.[1], tag: tagMatch4?.[1] });
                         return {
-                            partNumber: partMatch4[1],
+                            partNumber: normalizePartNumber(partMatch4[1]),
                             quantity: qtyMatch4 ? parseInt(qtyMatch4[1]) : 1,
                             uniqueNumber: tagMatch4 ? tagMatch4[1] : null
                         };
@@ -1113,7 +1121,7 @@
                         if (partLine) {
                             console.log('패턴 5 매칭 성공 (여러 줄):', { part: partLine, qty: qtyLine, tag: tagLine });
                             return {
-                                partNumber: partLine,
+                                partNumber: normalizePartNumber(partLine),
                                 quantity: qtyLine ? parseInt(qtyLine) : 1,
                                 uniqueNumber: tagLine || null
                             };
@@ -1224,7 +1232,9 @@
 
                 try {
                     console.log('입고 확정 시작:', selectedContainer);
-                    const today = new Date().toISOString().split('T')[0];
+                    // 로컬 날짜 사용 (UTC 변환 방지)
+                    const now = new Date();
+                    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                     console.log('오늘 날짜:', today);
 
                     // 각 파트별로 inventory 테이블 업데이트 및 거래 내역 기록
@@ -1258,7 +1268,7 @@
                                 .from('inventory')
                                 .update({
                                     current_stock: newStock,
-                                    last_updated: new Date().toISOString()
+                                    last_updated: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`; })()
                                 })
                                 .eq('part_number', part.part_number);
 
@@ -1277,7 +1287,7 @@
                                     part_number: part.part_number,
                                     current_stock: part.quantity,
                                     status: 'in_stock',
-                                    last_updated: new Date().toISOString()
+                                    last_updated: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`; })()
                                 });
 
                             if (insertError) {
@@ -1354,7 +1364,7 @@
                                         quantity: 1, // 기본값 (실제 수량은 part.scannedQuantity에서 확인)
                                         status: 'COMPLETED',
                                         inbound_date: today,
-                                        scanned_at: new Date().toISOString()
+                                        scanned_at: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`; })()
                                     });
                                 }
                             }

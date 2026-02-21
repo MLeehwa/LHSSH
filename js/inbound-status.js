@@ -31,6 +31,20 @@ class InboundStatus {
         this.init();
     }
 
+    // 로컬 날짜 문자열 반환 (America/Chicago 기준 YYYY-MM-DD)
+    getLocalDateString(date = new Date()) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // 로컬 ISO 타임스탬프 반환
+    getLocalISOString(date = new Date()) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
     // 한국 시간을 미국 중부 시간으로 변환
     convertToCentralTime(koreanDate) {
         try {
@@ -73,16 +87,9 @@ class InboundStatus {
                 return `${parts[2]}-${month}-${day}`;
             }
 
-            // ISO 형식인 경우 (시간 정보 포함)
+            // ISO 형식인 경우 (시간 정보 포함) - 날짜 부분만 직접 추출
             if (cleanDate.includes('T')) {
-                const date = new Date(cleanDate);
-                if (!isNaN(date.getTime())) {
-                    // 로컬 시간 기준으로 날짜만 추출
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
+                return cleanDate.split('T')[0];
             }
 
             // 기본적으로 현재 날짜 사용
@@ -111,18 +118,8 @@ class InboundStatus {
                 return centralDate; // 이미 날짜만 있으면 그대로 반환
             }
 
-            // ISO 형식인 경우 날짜 부분만 추출
+            // ISO 형식인 경우 날짜 부분만 직접 추출 (Date 객체 변환 시 UTC→CST 날짜 밀림 방지)
             if (typeof centralDate === 'string' && centralDate.includes('T')) {
-                // 타임존 정보가 있으면 로컬 시간으로 변환
-                const date = new Date(centralDate);
-                if (!isNaN(date.getTime())) {
-                    // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
-                // 타임존 정보가 없으면 그냥 날짜 부분만 추출
                 return centralDate.split('T')[0];
             }
 
@@ -154,18 +151,8 @@ class InboundStatus {
                 return dateValue;
             }
 
-            // ISO 형식인 경우 날짜 부분만 추출
+            // ISO 형식인 경우 날짜 부분만 직접 추출 (Date 객체 변환 시 UTC→CST 날짜 밀림 방지)
             if (typeof dateValue === 'string' && dateValue.includes('T')) {
-                // 타임존 정보가 있으면 로컬 시간으로 변환
-                const date = new Date(dateValue);
-                if (!isNaN(date.getTime())) {
-                    // 로컬 시간대 기준으로 날짜 포맷팅 (UTC 변환 방지)
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
-                // 타임존 정보가 없으면 그냥 날짜 부분만 추출
                 return dateValue.split('T')[0];
             }
 
@@ -325,6 +312,13 @@ class InboundStatus {
                 e.stopPropagation();
                 const containerId = e.target.closest('.inbound-btn').dataset.containerId;
                 this.showInboundDateModal(containerId);
+            } else if (e.target.closest('.edit-inbound-date-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                const containerId = e.target.closest('.edit-inbound-date-btn').dataset.containerId;
+                this.showEditInboundDateModal(containerId);
+            } else if (e.target.closest('#confirmEditInboundDate')) {
+                this.saveEditInboundDate();
             } else if (e.target.closest('tr[data-container-id]') && !e.target.closest('button')) {
                 const containerId = e.target.closest('tr[data-container-id]').dataset.containerId;
                 this.showContainerDetails(containerId);
@@ -638,6 +632,7 @@ class InboundStatus {
 
         tbody.innerHTML = this.filteredContainers.map(container => {
             const koreanDate = this.convertToKoreanTime(container.arrival_date);
+            const inboundDate = container.inbound_date ? this.formatDateOnly(container.inbound_date) : null;
             const partCount = container.parts_count || 0;
             const statusClass = container.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
 
@@ -645,7 +640,10 @@ class InboundStatus {
                 <tr class="hover:bg-gray-50 cursor-pointer" data-container-id="${container.id}">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${container.arn_number}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${container.container_number || 'N/A'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${koreanDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                        ${koreanDate}
+                        ${inboundDate ? `<br><span class="text-xs text-blue-600">입고: ${inboundDate}</span>` : ''}
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-2 py-1 text-xs font-medium rounded-full ${statusClass}">
                             ${container.status === 'COMPLETED' ? '완료' : '대기'}
@@ -656,13 +654,17 @@ class InboundStatus {
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         ${container.status !== 'COMPLETED' ? `
-                            <button class="delete-container-btn text-red-600 hover:text-red-900 mr-3" data-container-id="${container.id}">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <button class="inbound-btn text-green-600 hover:text-green-900" data-container-id="${container.id}">
-                                <i class="fas fa-arrow-down"></i>
-                            </button>
-                        ` : ''}
+                        <button class="delete-container-btn text-red-600 hover:text-red-900 mr-3" data-container-id="${container.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <button class="inbound-btn text-green-600 hover:text-green-900" data-container-id="${container.id}">
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                    ` : `
+                        <button class="edit-inbound-date-btn text-blue-600 hover:text-blue-900" data-container-id="${container.id}" title="입고일 수정">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    `}
                     </td>
                 </tr>
             `;
@@ -910,7 +912,10 @@ class InboundStatus {
             const excelDate = parseInt(dateStr);
             // Excel의 날짜는 1900-01-01부터의 일수 (실제로는 1899-12-30부터)
             const date = new Date((excelDate - 25569) * 86400 * 1000);
-            return date.toISOString().split('T')[0];
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
 
         // YYYY/MM/DD 또는 MM/DD/YYYY 또는 MM/DD/YY 형식
@@ -961,7 +966,10 @@ class InboundStatus {
 
         // Date 객체인 경우
         if (dateValue instanceof Date) {
-            return dateValue.toISOString().split('T')[0];
+            const y = dateValue.getFullYear();
+            const m = String(dateValue.getMonth() + 1).padStart(2, '0');
+            const d = String(dateValue.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
 
         // 다른 형식 시도 - MM/DD/YYYY 또는 MM/DD/YY 형식으로 파싱
@@ -971,7 +979,10 @@ class InboundStatus {
             // Date 객체가 유효한지 확인 (1900-2100 범위)
             const year = parsedDate.getFullYear();
             if (year >= 1900 && year <= 2100) {
-                return parsedDate.toISOString().split('T')[0];
+                const y = parsedDate.getFullYear();
+                const m = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                const d = String(parsedDate.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
             }
         }
 
@@ -1035,7 +1046,7 @@ class InboundStatus {
 
                 // 날짜가 null, undefined, 빈 문자열인 경우에만 오늘 날짜 사용
                 if (!finalArrivalDate || finalArrivalDate.trim() === '') {
-                    finalArrivalDate = new Date().toISOString().split('T')[0];
+                    finalArrivalDate = this.getLocalDateString();
                 } else {
                     // 이미 YYYY-MM-DD 형식인지 확인
                     if (!/^\d{4}-\d{2}-\d{2}$/.test(finalArrivalDate)) {
@@ -1046,7 +1057,7 @@ class InboundStatus {
                         } else {
                             // 정규화 실패 시 오늘 날짜 사용
                             console.warn(`컨테이너 ${containerNumber}: 날짜 정규화 실패 (${finalArrivalDate}), 오늘 날짜 사용`);
-                            finalArrivalDate = new Date().toISOString().split('T')[0];
+                            finalArrivalDate = this.getLocalDateString();
                         }
                     }
                 }
@@ -1134,7 +1145,7 @@ class InboundStatus {
 
         // 기본 정보 초기화
         document.getElementById('manualContainerNumber').value = '';
-        document.getElementById('manualArrivalDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('manualArrivalDate').value = this.getLocalDateString();
 
         // masterParts가 로드되지 않았으면 먼저 로드
         if (!this.masterParts || this.masterParts.length === 0) {
@@ -1265,7 +1276,7 @@ class InboundStatus {
     resetManualRegister() {
         this.manualParts = [];
         document.getElementById('manualContainerNumber').value = '';
-        document.getElementById('manualArrivalDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('manualArrivalDate').value = this.getLocalDateString();
 
         // Handsontable 초기화
         if (this.manualTable) {
@@ -1283,7 +1294,7 @@ class InboundStatus {
     }
 
     async generateArnNumber() {
-        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const today = this.getLocalDateString().replace(/-/g, '');
         const { data, error } = await this.supabase
             .from('arn_containers')
             .select('arn_number')
@@ -1393,7 +1404,7 @@ class InboundStatus {
 
         try {
             // ARN 번호 자동 생성
-            const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+            const today = this.getLocalDateString().replace(/-/g, '');
             const arnNumber = `ASN${today}${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
             // ARN 번호 필드에 표시
@@ -1526,7 +1537,7 @@ class InboundStatus {
 
         document.getElementById('inboundArnNumber').textContent = container.arn_number;
         document.getElementById('inboundContainerNumber').textContent = container.container_number;
-        document.getElementById('inboundDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('inboundDate').value = this.getLocalDateString();
 
         document.getElementById('inboundDateModal').classList.remove('hidden');
     }
@@ -1581,6 +1592,174 @@ class InboundStatus {
 
     closeInboundDateModal() {
         document.getElementById('inboundDateModal').classList.add('hidden');
+    }
+
+    // 입고일 수정 모달 표시
+    showEditInboundDateModal(containerId) {
+        const container = this.containers.find(c => c.id == containerId);
+        if (!container) {
+            console.error('컨테이너를 찾을 수 없습니다:', containerId);
+            return;
+        }
+
+        this.selectedContainer = container;
+        document.getElementById('editArnNumber').textContent = container.arn_number;
+        document.getElementById('editContainerNumber').textContent = container.container_number;
+        document.getElementById('editCurrentDate').textContent = this.formatDateOnly(container.inbound_date);
+        document.getElementById('editInboundDate').value = this.formatDateOnly(container.inbound_date);
+        document.getElementById('editInboundDateModal').classList.remove('hidden');
+    }
+
+    // 입고일 수정 저장
+    async saveEditInboundDate() {
+        const newDate = document.getElementById('editInboundDate').value;
+        const container = this.selectedContainer;
+
+        console.log('=== 입고일 수정 시작 ===');
+        console.log('새 날짜:', newDate);
+        console.log('컨테이너:', container);
+
+        if (!newDate || !container) {
+            this.showError('날짜와 컨테이너 정보를 확인해주세요.');
+            return;
+        }
+
+        // DB 원본에서 날짜 추출 (split으로 UTC 밀림 방지)
+        const oldDate = container.inbound_date
+            ? (container.inbound_date.includes('T') ? container.inbound_date.split('T')[0] : container.inbound_date)
+            : null;
+
+        console.log('이전 날짜:', oldDate);
+        console.log('DB 원본 inbound_date:', container.inbound_date);
+
+        if (newDate === oldDate) {
+            this.showNotification('날짜가 동일합니다.', 'warning');
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            // 0. 해당 ARN의 파트 목록 및 수량 조회
+            const { data: arnParts, error: partsError } = await this.supabase
+                .from('arn_parts')
+                .select('part_number, quantity')
+                .eq('arn_number', container.arn_number);
+
+            console.log('ARN 파트 목록:', arnParts);
+            if (partsError) console.warn('파트 목록 조회 오류:', partsError);
+
+            // 1. arn_containers 입고일 업데이트
+            console.log('Step 1: arn_containers 업데이트');
+            const { data: updatedContainer, error: containerError } = await this.supabase
+                .from('arn_containers')
+                .update({ inbound_date: newDate })
+                .eq('id', container.id)
+                .select();
+
+            console.log('Step 1 결과:', { data: updatedContainer, error: containerError });
+            if (containerError) throw containerError;
+
+            // 2. inventory_transactions 날짜 업데이트
+            console.log('Step 2: inventory_transactions 업데이트');
+            const { data: updatedTrans, error: transError } = await this.supabase
+                .from('inventory_transactions')
+                .update({ transaction_date: newDate })
+                .eq('reference_id', container.arn_number)
+                .eq('transaction_type', 'INBOUND')
+                .select();
+
+            console.log('Step 2 결과:', { data: updatedTrans, error: transError });
+
+            // 3. scanned_unique_codes 입고일 업데이트
+            try {
+                console.log('Step 3: scanned_unique_codes 업데이트');
+                await this.supabase
+                    .from('scanned_unique_codes')
+                    .update({ inbound_date: newDate })
+                    .eq('arn_number', container.arn_number);
+            } catch (scanErr) {
+                console.warn('스캔 코드 날짜 업데이트 오류 (무시 가능):', scanErr);
+            }
+
+            // 4. daily_inventory_snapshot 업데이트 (이전 날짜 감소, 새 날짜 증가)
+            if (arnParts && arnParts.length > 0) {
+                console.log('Step 4: daily_inventory_snapshot 업데이트');
+                for (const part of arnParts) {
+                    const qty = part.quantity || 0;
+                    if (qty <= 0) continue;
+
+                    // 이전 날짜 스냅샷에서 해당 수량 차감
+                    if (oldDate) {
+                        const { data: oldSnapshot } = await this.supabase
+                            .from('daily_inventory_snapshot')
+                            .select('closing_stock')
+                            .eq('snapshot_date', oldDate)
+                            .eq('part_number', part.part_number)
+                            .maybeSingle();
+
+                        if (oldSnapshot) {
+                            const newClosing = (oldSnapshot.closing_stock || 0) - qty;
+                            await this.supabase
+                                .from('daily_inventory_snapshot')
+                                .update({ closing_stock: Math.max(0, newClosing) })
+                                .eq('snapshot_date', oldDate)
+                                .eq('part_number', part.part_number);
+                            console.log(`  ${part.part_number}: 이전 날짜(${oldDate}) ${oldSnapshot.closing_stock} → ${Math.max(0, newClosing)}`);
+                        }
+                    }
+
+                    // 새 날짜 스냅샷에 해당 수량 추가
+                    const { data: newSnapshot } = await this.supabase
+                        .from('daily_inventory_snapshot')
+                        .select('closing_stock')
+                        .eq('snapshot_date', newDate)
+                        .eq('part_number', part.part_number)
+                        .maybeSingle();
+
+                    if (newSnapshot) {
+                        const newClosing = (newSnapshot.closing_stock || 0) + qty;
+                        await this.supabase
+                            .from('daily_inventory_snapshot')
+                            .update({ closing_stock: newClosing })
+                            .eq('snapshot_date', newDate)
+                            .eq('part_number', part.part_number);
+                        console.log(`  ${part.part_number}: 새 날짜(${newDate}) ${newSnapshot.closing_stock} → ${newClosing}`);
+                    } else {
+                        // 새 날짜 스냅샷이 없으면 생성
+                        await this.supabase
+                            .from('daily_inventory_snapshot')
+                            .insert({
+                                snapshot_date: newDate,
+                                part_number: part.part_number,
+                                closing_stock: qty
+                            });
+                        console.log(`  ${part.part_number}: 새 날짜(${newDate}) 스냅샷 생성: ${qty}`);
+                    }
+                }
+            }
+
+            // 5. inventory 테이블의 last_updated 갱신
+            if (arnParts && arnParts.length > 0) {
+                console.log('Step 5: inventory last_updated 갱신');
+                for (const part of arnParts) {
+                    await this.supabase
+                        .from('inventory')
+                        .update({ last_updated: this.getLocalISOString() })
+                        .eq('part_number', part.part_number);
+                }
+            }
+
+            this.showSuccess(`입고일이 ${oldDate} → ${newDate}로 수정되었습니다.`);
+            document.getElementById('editInboundDateModal').classList.add('hidden');
+            await this.loadData();
+
+        } catch (error) {
+            console.error('입고일 수정 오류:', error);
+            this.showError(`입고일 수정 중 오류가 발생했습니다: ${error.message}`);
+        } finally {
+            this.showLoading(false);
+        }
     }
 
     async processInbound() {
@@ -1687,7 +1866,7 @@ class InboundStatus {
                         part_number: partNumber,
                         current_stock: quantity,
                         status: 'in_stock',
-                        last_updated: new Date().toISOString()
+                        last_updated: this.getLocalISOString()
                     });
                 if (insertError) {
                     console.warn(`파트 ${partNumber} 재고 생성 실패:`, insertError);
@@ -1701,7 +1880,7 @@ class InboundStatus {
                     .from('inventory')
                     .update({
                         current_stock: newStock,
-                        last_updated: new Date().toISOString()
+                        last_updated: this.getLocalISOString()
                     })
                     .eq('part_number', partNumber);
                 if (updateError) {
@@ -1756,7 +1935,7 @@ class InboundStatus {
         const statusFilter = document.getElementById('statusFilter').value;
 
         // 오늘 날짜 (YYYY-MM-DD 형식)
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.getLocalDateString();
 
         this.filteredContainers = this.containers.filter(container => {
             // 컨테이너 번호가 입력되면 날짜 필터 무시 (컨테이너 번호 우선순위)
@@ -1796,7 +1975,7 @@ class InboundStatus {
 
     resetFilters() {
         // 오늘 날짜로 리셋
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.getLocalDateString();
         document.getElementById('dateFilter').value = today;
         document.getElementById('containerFilter').value = '';
         document.getElementById('statusFilter').value = '';
@@ -1807,7 +1986,7 @@ class InboundStatus {
     // UI 관련 메서드들
     initializeUI() {
         // 현재 날짜를 기본값으로 설정
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.getLocalDateString();
         document.getElementById('manualArrivalDate').value = today;
         document.getElementById('inboundDate').value = today;
 
@@ -1912,17 +2091,35 @@ class InboundStatus {
             console.log(`[Excel Export] 기간: ${startDate} ~ ${endDate}`);
 
             // 1. 완료된 컨테이너 조회 (입고일 범위)
-            const { data: containers, error: cErr } = await this.supabase
+            // UTC vs 로컬 시간 차이로 인한 날짜 누락 방지: 쿼리 범위를 ±1일 확장 후 클라이언트에서 재필터링
+            const expandedStart = new Date(startDate + 'T00:00:00');
+            expandedStart.setDate(expandedStart.getDate() - 1);
+            const expandedEnd = new Date(endDate + 'T00:00:00');
+            expandedEnd.setDate(expandedEnd.getDate() + 1);
+            const expandedStartStr = `${expandedStart.getFullYear()}-${String(expandedStart.getMonth() + 1).padStart(2, '0')}-${String(expandedStart.getDate()).padStart(2, '0')}`;
+            const expandedEndStr = `${expandedEnd.getFullYear()}-${String(expandedEnd.getMonth() + 1).padStart(2, '0')}-${String(expandedEnd.getDate()).padStart(2, '0')}`;
+
+            console.log(`[Excel Export] 확장 쿼리 범위: ${expandedStartStr} ~ ${expandedEndStr} (원래: ${startDate} ~ ${endDate})`);
+
+            const { data: allContainers, error: cErr } = await this.supabase
                 .from('arn_containers')
                 .select('*')
                 .eq('status', 'COMPLETED')
-                .gte('inbound_date', startDate)
-                .lte('inbound_date', endDate)
+                .gte('inbound_date', expandedStartStr)
+                .lte('inbound_date', expandedEndStr)
                 .order('inbound_date', { ascending: true });
 
             if (cErr) throw cErr;
 
-            if (!containers || containers.length === 0) {
+            // 로컬 시간 기준으로 정확히 재필터링
+            const containers = (allContainers || []).filter(c => {
+                const localDate = this.formatDateOnly(c.inbound_date);
+                return localDate >= startDate && localDate <= endDate;
+            });
+
+            console.log(`[Excel Export] 확장 쿼리: ${allContainers?.length || 0}건, 로컬 날짜 필터 후: ${containers.length}건`);
+
+            if (containers.length === 0) {
                 this.showLoading(false);
                 this.showNotification('선택한 기간에 입고 완료된 컨테이너가 없습니다.', 'warning');
                 return;

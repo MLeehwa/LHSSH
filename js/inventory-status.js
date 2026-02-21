@@ -2451,16 +2451,395 @@ class InventoryStatus {
         }
     }
 
-    // ==================== 전체 스냅샷 재계산 (기준일 → 오늘) ====================
+    // ==================== 누락된 출고 트랜잭션 동기화 ====================
+    async syncMissingOutboundTransactions(silent = false) {
+        try {
+            if (!silent) this.showLoading(true);
+            console.log('=== 누락된 출고 트랜잭션 동기화 시작 ===');
+
+            // 1. 완료된 모든 outbound_sequences 조회
+            const { data: completedSequences, error: sErr } = await this.supabase
+                .from('outbound_sequences')
+                .select('id, sequence_number, outbound_date, status')
+                .eq('status', 'COMPLETED');
+
+            if (sErr) throw sErr;
+            if (!completedSequences || completedSequences.length === 0) {
+                if (!silent) this.showNotification('완료된 출고 차수가 없습니다.', 'info');
+                if (!silent) this.showLoading(false);
+                return;
+            }
+
+            console.log(`완료된 출고 차수: ${completedSequences.length}개`);
+
+            // 2. 해당 차수들의 outbound_parts 조회
+            const sequenceIds = completedSequences.map(s => s.id);
+            let allOutboundParts = [];
+            for (let i = 0; i < sequenceIds.length; i += 50) {
+                const batch = sequenceIds.slice(i, i + 50);
+                const { data, error } = await this.supabase
+                    .from('outbound_parts')
+                    .select('sequence_id, part_number, actual_qty, scanned_qty')
+                    .in('sequence_id', batch);
+                if (error) throw error;
+                if (data) allOutboundParts = allOutboundParts.concat(data);
+            }
+
+            // sequence_id → sequence 매핑
+            const seqMap = new Map();
+            completedSequences.forEach(s => seqMap.set(s.id, s));
+
+            // 3. 기존 OUTBOUND 트랜잭션에서 이미 기록된 것 확인
+            const sequenceNumbers = completedSequences.map(s => s.sequence_number);
+            let existingTrans = [];
+            for (let i = 0; i < sequenceNumbers.length; i += 50) {
+                const batch = sequenceNumbers.slice(i, i + 50);
+                const { data, error } = await this.supabase
+                    .from('inventory_transactions')
+                    .select('reference_id, part_number')
+                    .eq('transaction_type', 'OUTBOUND')
+                    .in('reference_id', batch);
+                if (error) throw error;
+                if (data) existingTrans = existingTrans.concat(data);
+            }
+
+            const existingKeySet = new Set(existingTrans.map(t => `${t.reference_id}__${t.part_number}`));
+
+            // 4. 누락된 출고 트랜잭션 생성
+            let totalInserted = 0;
+            let totalErrors = 0;
+            const transRecords = [];
+
+            for (const part of allOutboundParts) {
+                const seq = seqMap.get(part.sequence_id);
+                if (!seq) continue;
+
+                const qty = part.actual_qty || part.scanned_qty || 0;
+                if (qty <= 0) continue;
+
+                const key = `${seq.sequence_number}__${part.part_number}`;
+                if (existingKeySet.has(key)) continue;
+
+                const transactionDate = seq.outbound_date
+                    ? (seq.outbound_date.includes('T') ? seq.outbound_date.split('T')[0] : seq.outbound_date)
+                    : new Date().toISOString().split('T')[0];
+
+                transRecords.push({
+                    transaction_date: transactionDate,
+                    part_number: part.part_number,
+                    transaction_type: 'OUTBOUND',
+                    quantity: qty,
+                    reference_id: seq.sequence_number,
+                    notes: `출고 동기화 - 차수: ${seq.sequence_number}`
+                });
+            }
+
+            if (transRecords.length === 0) {
+                console.log('누락된 출고 트랜잭션 없음 - 동기화 완료');
+                if (!silent) this.showNotification('누락된 출고 트랜잭션이 없습니다. 모든 데이터가 동기화 되어 있습니다.', 'success');
+                if (!silent) this.showLoading(false);
+                return;
+            }
+
+            // 배치 삽입 (50개씩)
+            for (let i = 0; i < transRecords.length; i += 50) {
+                const batch = transRecords.slice(i, i + 50);
+                const { error: insertErr } = await this.supabase
+                    .from('inventory_transactions')
+                    .insert(batch);
+
+                if (insertErr) {
+                    console.error('출고 트랜잭션 삽입 오류:', insertErr);
+                    totalErrors++;
+                } else {
+                    totalInserted += batch.length;
+                }
+            }
+
+            const message = `출고 동기화 완료: ${totalInserted}건 출고 트랜잭션 생성` +
+                (totalErrors > 0 ? `, ${totalErrors}건 오류` : '');
+            console.log(message);
+            if (!silent) this.showNotification(message, totalErrors > 0 ? 'warning' : 'success');
+
+        } catch (error) {
+            console.error('출고 트랜잭션 동기화 오류:', error);
+            if (!silent) this.showNotification('출고 동기화 오류: ' + error.message, 'error');
+        } finally {
+            if (!silent) this.showLoading(false);
+        }
+    }
+
+    // ==================== 스냅샷 자동 전파 (임의 기준일 → 오늘) ====================
+    async cascadeSnapshotsFromDate(baseDate) {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        console.log(`=== 스냅샷 자동 전파: ${baseDate} → ${today} ===`);
+
+        // 1. 기준일의 스냅샷 데이터
+        const { data: baseSnapshots } = await this.supabase
+            .from('daily_inventory_snapshot')
+            .select('part_number, closing_stock')
+            .eq('snapshot_date', baseDate);
+
+        if (!baseSnapshots || baseSnapshots.length === 0) {
+            throw new Error(`기준일(${baseDate}) 스냅샷 데이터가 없습니다.`);
+        }
+
+        // 기준일 재고 맵
+        const stockMap = new Map();
+        baseSnapshots.forEach(s => stockMap.set(s.part_number, s.closing_stock || 0));
+        console.log(`기준일 ${baseDate}: ${stockMap.size}개 파트`);
+
+        // 2. 기준일 다음날 ~ 오늘까지 모든 트랜잭션 가져오기
+        const nextDate = new Date(baseDate + 'T12:00:00');
+        nextDate.setDate(nextDate.getDate() + 1);
+        const nextDateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+
+        if (nextDateStr > today) {
+            console.log('기준일이 오늘이므로 전파할 날짜가 없습니다.');
+            return;
+        }
+
+        const { data: allTrans, error: transErr } = await this.supabase
+            .from('inventory_transactions')
+            .select('part_number, transaction_type, quantity, transaction_date')
+            .gte('transaction_date', nextDateStr)
+            .lte('transaction_date', today)
+            .in('transaction_type', ['INBOUND', 'OUTBOUND'])
+            .order('transaction_date', { ascending: true });
+
+        if (transErr) throw transErr;
+
+        // 날짜 정규화 헬퍼
+        const normalizeDate = (d) => {
+            if (!d) return '';
+            return typeof d === 'string' ? d.split('T')[0] : new Date(d).toISOString().split('T')[0];
+        };
+
+        // 트랜잭션을 날짜별로 그룹핑
+        const transByDate = new Map();
+        (allTrans || []).forEach(t => {
+            const date = normalizeDate(t.transaction_date);
+            if (!transByDate.has(date)) transByDate.set(date, []);
+            transByDate.get(date).push(t);
+        });
+
+        // 3. 기준일 다음날부터 오늘까지 순방향 계산
+        let currentDate = new Date(nextDateStr + 'T12:00:00');
+        const endDate = new Date(today + 'T12:00:00');
+        let totalDays = 0;
+        let totalUpserts = 0;
+
+        while (currentDate <= endDate) {
+            const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+            const dayTrans = transByDate.get(dateStr) || [];
+
+            // 당일 트랜잭션으로 재고 변동 적용
+            dayTrans.forEach(t => {
+                const partNum = t.part_number;
+                if (!stockMap.has(partNum)) stockMap.set(partNum, 0);
+                const prev = stockMap.get(partNum);
+
+                if (t.transaction_type === 'INBOUND') {
+                    stockMap.set(partNum, prev + (t.quantity || 0));
+                } else if (t.transaction_type === 'OUTBOUND') {
+                    stockMap.set(partNum, prev - (t.quantity || 0));
+                }
+            });
+
+            // 해당 날짜의 스냅샷 upsert (배치)
+            const snapshotRecords = [];
+            stockMap.forEach((closingStock, partNumber) => {
+                snapshotRecords.push({
+                    snapshot_date: dateStr,
+                    part_number: partNumber,
+                    closing_stock: closingStock
+                });
+            });
+
+            // 배치 upsert (50개씩)
+            for (let i = 0; i < snapshotRecords.length; i += 50) {
+                const batch = snapshotRecords.slice(i, i + 50);
+                const { error: upsertErr } = await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .upsert(batch, { onConflict: 'snapshot_date,part_number' });
+
+                if (upsertErr) {
+                    console.error(`${dateStr} 스냅샷 upsert 오류:`, upsertErr);
+                } else {
+                    totalUpserts += batch.length;
+                }
+            }
+
+            totalDays++;
+            console.log(`${dateStr}: ${dayTrans.length}건 트랜잭션 → ${snapshotRecords.length}개 파트 스냅샷 저장`);
+
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        console.log(`=== 스냅샷 전파 완료: ${totalDays}일, ${totalUpserts}건 ===`);
+
+        // 캐시 클리어 후 데이터 리로드
+        this.cache.clear();
+        this.lastDataUpdate = 0;
+        await this.loadData();
+    }
+
+    // ==================== 전체 트랜잭션 + 스냅샷 완전 재구축 ====================
     async rebuildAllSnapshots() {
         try {
             this.showLoading(true);
-            console.log('=== 전체 스냅샷 재계산 시작 ===');
+            console.log('=== 전체 트랜잭션 + 스냅샷 완전 재구축 시작 ===');
 
-            // 0. 먼저 누락된 입고 트랜잭션 동기화
-            await this.syncMissingInboundTransactions(true);
+            // ========== STEP 1: 기존 inventory_transactions 전체 삭제 ==========
+            console.log('STEP 1: 기존 inventory_transactions 삭제...');
+            // Supabase는 전체 삭제시 필터 필요 - id > 0 으로 전체 대상
+            const { error: delErr } = await this.supabase
+                .from('inventory_transactions')
+                .delete()
+                .gte('id', 0);
 
-            // 1. 가장 이른 스냅샷 날짜 찾기 (기준일)
+            if (delErr) {
+                console.error('inventory_transactions 삭제 오류:', delErr);
+                throw delErr;
+            }
+            console.log('inventory_transactions 전체 삭제 완료');
+
+            // ========== STEP 2: INBOUND 트랜잭션 재생성 (arn_containers + arn_parts) ==========
+            console.log('STEP 2: INBOUND 트랜잭션 재생성...');
+            const { data: completedContainers, error: cErr } = await this.supabase
+                .from('arn_containers')
+                .select('arn_number, container_number, inbound_date, status')
+                .eq('status', 'COMPLETED');
+
+            if (cErr) throw cErr;
+
+            let totalInbound = 0;
+            if (completedContainers && completedContainers.length > 0) {
+                console.log(`완료된 입고 컨테이너: ${completedContainers.length}개`);
+
+                for (const container of completedContainers) {
+                    const { data: parts, error: pErr } = await this.supabase
+                        .from('arn_parts')
+                        .select('part_number, quantity')
+                        .eq('arn_number', container.arn_number);
+
+                    if (pErr || !parts || parts.length === 0) continue;
+
+                    const transactionDate = container.inbound_date
+                        ? (container.inbound_date.includes('T') ? container.inbound_date.split('T')[0] : container.inbound_date)
+                        : null;
+
+                    if (!transactionDate) {
+                        console.warn(`ARN ${container.arn_number}: inbound_date 없음, 건너뜀`);
+                        continue;
+                    }
+
+                    const transRecords = parts
+                        .filter(p => p.quantity > 0)
+                        .map(p => ({
+                            transaction_date: transactionDate,
+                            part_number: p.part_number,
+                            transaction_type: 'INBOUND',
+                            quantity: p.quantity,
+                            reference_id: container.arn_number,
+                            notes: `입고 - ARN: ${container.arn_number}, 컨테이너: ${container.container_number}`
+                        }));
+
+                    if (transRecords.length === 0) continue;
+
+                    const { error: insertErr } = await this.supabase
+                        .from('inventory_transactions')
+                        .insert(transRecords);
+
+                    if (insertErr) {
+                        console.error(`ARN ${container.arn_number} 입고 삽입 오류:`, insertErr);
+                    } else {
+                        totalInbound += transRecords.length;
+                    }
+                }
+            }
+            console.log(`INBOUND 완료: ${totalInbound}건 생성`);
+
+            // ========== STEP 3: OUTBOUND 트랜잭션 재생성 (outbound_sequences + outbound_parts) ==========
+            console.log('STEP 3: OUTBOUND 트랜잭션 재생성...');
+            const { data: completedSequences, error: sErr } = await this.supabase
+                .from('outbound_sequences')
+                .select('id, sequence_number, outbound_date, status')
+                .eq('status', 'COMPLETED');
+
+            if (sErr) throw sErr;
+
+            let totalOutbound = 0;
+            if (completedSequences && completedSequences.length > 0) {
+                console.log(`완료된 출고 차수: ${completedSequences.length}개`);
+
+                const seqMap = new Map();
+                completedSequences.forEach(s => seqMap.set(s.id, s));
+
+                const sequenceIds = completedSequences.map(s => s.id);
+                let allOutboundParts = [];
+                for (let i = 0; i < sequenceIds.length; i += 50) {
+                    const batch = sequenceIds.slice(i, i + 50);
+                    const { data, error } = await this.supabase
+                        .from('outbound_parts')
+                        .select('sequence_id, part_number, actual_qty, scanned_qty')
+                        .in('sequence_id', batch);
+                    if (error) throw error;
+                    if (data) allOutboundParts = allOutboundParts.concat(data);
+                }
+
+                // 같은 차수+날짜+파트넘버를 합산 (중복 방지)
+                const outboundMap = new Map();
+                for (const part of allOutboundParts) {
+                    const seq = seqMap.get(part.sequence_id);
+                    if (!seq) continue;
+
+                    const qty = part.actual_qty || part.scanned_qty || 0;
+                    if (qty <= 0) continue;
+
+                    const transactionDate = seq.outbound_date
+                        ? (seq.outbound_date.includes('T') ? seq.outbound_date.split('T')[0] : seq.outbound_date)
+                        : null;
+
+                    if (!transactionDate) {
+                        console.warn(`차수 ${seq.sequence_number}: outbound_date 없음, 건너뜀`);
+                        continue;
+                    }
+
+                    const key = `${seq.sequence_number}__${part.part_number}`;
+                    if (outboundMap.has(key)) {
+                        outboundMap.get(key).quantity += qty;
+                    } else {
+                        outboundMap.set(key, {
+                            transaction_date: transactionDate,
+                            part_number: part.part_number,
+                            transaction_type: 'OUTBOUND',
+                            quantity: qty,
+                            reference_id: seq.sequence_number,
+                            notes: `출고 - 차수: ${seq.sequence_number}`
+                        });
+                    }
+                }
+
+                const outboundRecords = [...outboundMap.values()];
+                for (let i = 0; i < outboundRecords.length; i += 50) {
+                    const batch = outboundRecords.slice(i, i + 50);
+                    const { error: insertErr } = await this.supabase
+                        .from('inventory_transactions')
+                        .insert(batch);
+
+                    if (insertErr) {
+                        console.error('출고 삽입 오류:', insertErr);
+                    } else {
+                        totalOutbound += batch.length;
+                    }
+                }
+            }
+            console.log(`OUTBOUND 완료: ${totalOutbound}건 생성`);
+
+            // ========== STEP 4: 스냅샷 재계산 ==========
+            console.log('STEP 4: 스냅샷 재계산...');
             const { data: earliestSnap } = await this.supabase
                 .from('daily_inventory_snapshot')
                 .select('snapshot_date')
@@ -2468,127 +2847,28 @@ class InventoryStatus {
                 .limit(1);
 
             if (!earliestSnap || earliestSnap.length === 0) {
-                this.showNotification('기준 스냅샷이 없습니다. 먼저 엑셀로 기준일 마감재고를 업로드해주세요.', 'warning');
+                this.showNotification(
+                    `트랜잭션 재구축 완료 (입고: ${totalInbound}건, 출고: ${totalOutbound}건)\n` +
+                    '기준 스냅샷이 없어 스냅샷 재계산은 건너뜁니다. 엑셀로 기준일 마감재고를 먼저 업로드해주세요.',
+                    'warning'
+                );
                 this.showLoading(false);
                 return;
             }
 
-            const baseDate = earliestSnap[0].snapshot_date;
-            // 로컬 날짜 사용 (UTC가 아닌 사용자 시간대 기준)
+            const baseDate = earliestSnap[0].snapshot_date.split('T')[0];
+            await this.cascadeSnapshotsFromDate(baseDate);
+
             const now = new Date();
             const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            console.log(`기준일: ${baseDate}, 오늘: ${today}`);
-
-            // 2. 기준일의 스냅샷 데이터 (base closing stock)
-            const { data: baseSnapshots } = await this.supabase
-                .from('daily_inventory_snapshot')
-                .select('part_number, closing_stock')
-                .eq('snapshot_date', baseDate);
-
-            if (!baseSnapshots || baseSnapshots.length === 0) {
-                this.showNotification('기준일 스냅샷 데이터가 비어있습니다.', 'error');
-                this.showLoading(false);
-                return;
-            }
-
-            // 기준일 재고 맵
-            const stockMap = new Map();
-            baseSnapshots.forEach(s => stockMap.set(s.part_number, s.closing_stock || 0));
-            console.log(`기준일 ${baseDate}: ${stockMap.size}개 파트`);
-
-            // 3. 기준일 다음날 ~ 오늘까지 모든 트랜잭션 가져오기
-            const nextDate = new Date(baseDate);
-            nextDate.setDate(nextDate.getDate() + 1);
-            const nextDateStr = nextDate.toISOString().split('T')[0];
-
-            const { data: allTrans, error: transErr } = await this.supabase
-                .from('inventory_transactions')
-                .select('part_number, transaction_type, quantity, transaction_date')
-                .gte('transaction_date', nextDateStr)
-                .lte('transaction_date', today)
-                .in('transaction_type', ['INBOUND', 'OUTBOUND'])
-                .order('transaction_date', { ascending: true });
-
-            if (transErr) throw transErr;
-
-            // 날짜 정규화 헬퍼
-            const normalizeDate = (d) => {
-                if (!d) return '';
-                return typeof d === 'string' ? d.split('T')[0] : new Date(d).toISOString().split('T')[0];
-            };
-
-            // 트랜잭션을 날짜별로 그룹핑
-            const transByDate = new Map();
-            (allTrans || []).forEach(t => {
-                const date = normalizeDate(t.transaction_date);
-                if (!transByDate.has(date)) transByDate.set(date, []);
-                transByDate.get(date).push(t);
-            });
-
-            // 4. 기준일 다음날부터 오늘까지 순방향 계산
-            let currentDate = new Date(nextDateStr);
-            const endDate = new Date(today);
-            let totalDays = 0;
-            let totalUpserts = 0;
-
-            while (currentDate <= endDate) {
-                const dateStr = currentDate.toISOString().split('T')[0];
-                const dayTrans = transByDate.get(dateStr) || [];
-
-                // 당일 트랜잭션으로 재고 변동 적용
-                dayTrans.forEach(t => {
-                    const partNum = t.part_number;
-                    if (!stockMap.has(partNum)) stockMap.set(partNum, 0);
-                    const prev = stockMap.get(partNum);
-
-                    if (t.transaction_type === 'INBOUND') {
-                        stockMap.set(partNum, prev + (t.quantity || 0));
-                    } else if (t.transaction_type === 'OUTBOUND') {
-                        stockMap.set(partNum, prev - (t.quantity || 0));
-                    }
-                });
-
-                // 해당 날짜의 스냅샷 upsert (배치)
-                const snapshotRecords = [];
-                stockMap.forEach((closingStock, partNumber) => {
-                    snapshotRecords.push({
-                        snapshot_date: dateStr,
-                        part_number: partNumber,
-                        closing_stock: closingStock
-                    });
-                });
-
-                // 배치 upsert (50개씩)
-                for (let i = 0; i < snapshotRecords.length; i += 50) {
-                    const batch = snapshotRecords.slice(i, i + 50);
-                    const { error: upsertErr } = await this.supabase
-                        .from('daily_inventory_snapshot')
-                        .upsert(batch, { onConflict: 'snapshot_date,part_number' });
-
-                    if (upsertErr) {
-                        console.error(`${dateStr} 스냅샷 upsert 오류:`, upsertErr);
-                    } else {
-                        totalUpserts += batch.length;
-                    }
-                }
-
-                totalDays++;
-                console.log(`${dateStr}: ${dayTrans.length}건 트랜잭션 → ${snapshotRecords.length}개 파트 스냅샷 저장`);
-
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-
-            this.showNotification(`스냅샷 재계산 완료: ${baseDate} → ${today} (${totalDays}일, ${totalUpserts}건 저장)`, 'success');
-            console.log(`=== 전체 스냅샷 재계산 완료: ${totalDays}일, ${totalUpserts}건 ===`);
-
-            // 캐시 클리어 후 데이터 리로드
-            this.cache.clear();
-            this.lastDataUpdate = 0;
-            await this.loadData();
+            this.showNotification(
+                `완전 재구축 완료!\n입고: ${totalInbound}건, 출고: ${totalOutbound}건\n스냅샷: ${baseDate} → ${today}`,
+                'success'
+            );
 
         } catch (error) {
-            console.error('스냅샷 재계산 오류:', error);
-            this.showNotification('스냅샷 재계산 중 오류가 발생했습니다: ' + error.message, 'error');
+            console.error('전체 재구축 오류:', error);
+            this.showNotification('전체 재구축 중 오류: ' + error.message, 'error');
         } finally {
             this.showLoading(false);
         }
@@ -2707,15 +2987,31 @@ class InventoryStatus {
             const dates = [...new Set(records.map(r => r.snapshot_date))].sort();
             const parts = [...new Set(records.map(r => r.part_number))];
 
-            this.closeSnapshotUploadModal();
-            this.showNotification(
-                `업로드 완료! ${dates.length}일 × ${parts.length}파트 = ${uploaded}건 저장` +
-                (errors > 0 ? ` (${errors}건 오류)` : ''),
-                errors > 0 ? 'warning' : 'success'
-            );
-
             console.log(`업로드 완료: ${dates[0]} ~ ${dates[dates.length - 1]}`);
             console.log('파트:', parts);
+
+            // === 자동 전파: 가장 이른 업로드 날짜부터 오늘까지 스냅샷 자동 계산 ===
+            const baseDate = dates[0]; // 가장 이른 날짜
+            this.showNotification(
+                `업로드 완료! ${dates.length}일 × ${parts.length}파트 = ${uploaded}건 저장. 스냅샷 자동 전파 중...`,
+                'info'
+            );
+
+            try {
+                await this.cascadeSnapshotsFromDate(baseDate);
+                this.closeSnapshotUploadModal();
+                this.showNotification(
+                    `업로드 및 자동 전파 완료! 기준일(${baseDate})부터 오늘까지 스냅샷이 자동 계산되었습니다.`,
+                    'success'
+                );
+            } catch (cascadeErr) {
+                console.error('자동 전파 오류:', cascadeErr);
+                this.closeSnapshotUploadModal();
+                this.showNotification(
+                    `업로드는 완료되었으나 자동 전파 중 오류: ${cascadeErr.message}`,
+                    'warning'
+                );
+            }
 
         } catch (error) {
             console.error('엑셀 업로드 오류:', error);
@@ -2789,7 +3085,7 @@ class InventoryStatus {
         reader.readAsArrayBuffer(file);
     }
 
-    // 일자별 입출고 현황 데이터 로드
+    // 일자별 입출고 현황 데이터 로드 (스냅샷 기반)
     async loadDailyInOutData() {
         const startDate = document.getElementById('dailyInOutStartDate').value;
         const endDate = document.getElementById('dailyInOutEndDate').value;
@@ -2804,10 +3100,9 @@ class InventoryStatus {
             return;
         }
 
-        // 날짜 범위가 너무 크면 경고
         const daysDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24));
-        if (daysDiff > 31) {
-            if (!confirm(`선택한 날짜 범위가 ${daysDiff}일입니다. 많은 데이터를 조회하므로 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) {
+        if (daysDiff > 62) {
+            if (!confirm(`선택한 날짜 범위가 ${daysDiff}일입니다. 계속하시겠습니까?`)) {
                 return;
             }
         }
@@ -2815,13 +3110,12 @@ class InventoryStatus {
         this.showLoading(true);
 
         try {
-            // 날짜 목록 생성 (로컬 시간 기준, 오늘 날짜 포함)
+            // 날짜 목록 생성
             const dateList = [];
-            const currentDate = new Date(startDate + 'T00:00:00'); // 로컬 시간으로 명시적 설정
-            const endDateObj = new Date(endDate + 'T23:59:59'); // 종료일 포함을 위해 시간 추가
+            const currentDate = new Date(startDate + 'T12:00:00');
+            const endDateObj = new Date(endDate + 'T12:00:00');
 
             while (currentDate <= endDateObj) {
-                // 로컬 시간 기준으로 날짜 추출 (YYYY-MM-DD)
                 const year = currentDate.getFullYear();
                 const month = String(currentDate.getMonth() + 1).padStart(2, '0');
                 const day = String(currentDate.getDate()).padStart(2, '0');
@@ -2834,167 +3128,46 @@ class InventoryStatus {
             // AS 체크박스 상태 확인
             const includeAS = document.getElementById('includeASCheckboxDailyInOut')?.checked || false;
 
-            // 1. 모든 파트 목록 가져오기
-            let query = this.supabase
+            // 1. 파트 목록
+            let partsQuery = this.supabase
                 .from('parts')
                 .select('part_number')
                 .eq('status', 'ACTIVE');
-
-            // AS를 포함하지 않으면 양산 제품만
             if (!includeAS) {
-                query = query.eq('product_type', 'PRODUCTION');
+                partsQuery = partsQuery.eq('product_type', 'PRODUCTION');
             }
-
-            const { data: allParts, error: partsError } = await query.order('part_number');
-
+            const { data: allParts, error: partsError } = await partsQuery.order('part_number');
             if (partsError) throw partsError;
 
-            // 2. 날짜 범위의 모든 거래 내역 가져오기
-            // 먼저 모든 거래 내역을 가져와서 날짜 필터링을 클라이언트에서 수행
-            // (Supabase의 날짜 필터링이 정확하지 않을 수 있음)
-            const { data: allTransactions, error: transError } = await this.supabase
-                .from('inventory_transactions')
-                .select('part_number, transaction_type, quantity, transaction_date')
-                .order('transaction_date', { ascending: true });
+            // 2. 스냅샷 데이터 (마감 재고) — 핵심 데이터 소스
+            const { data: snapshots, error: snapError } = await this.supabase
+                .from('daily_inventory_snapshot')
+                .select('snapshot_date, part_number, closing_stock')
+                .gte('snapshot_date', startDate)
+                .lte('snapshot_date', endDate);
+            if (snapError) console.warn('스냅샷 조회 오류:', snapError);
 
-            if (transError) {
-                console.error('거래 내역 조회 오류:', transError);
-                throw transError;
-            }
-
-            // 클라이언트에서 날짜 범위 필터링
-            const transactions = (allTransactions || []).filter(t => {
-                if (!t.transaction_date) return false;
-
-                // 날짜 형식 정규화
-                let transDate;
-                if (typeof t.transaction_date === 'string') {
-                    transDate = t.transaction_date.split('T')[0];
-                } else if (t.transaction_date instanceof Date) {
-                    transDate = t.transaction_date.toISOString().split('T')[0];
-                } else {
-                    transDate = new Date(t.transaction_date).toISOString().split('T')[0];
-                }
-
-                return transDate >= startDate && transDate <= endDate;
+            // 스냅샷을 Map으로 변환: key = "date|part_number"
+            const snapshotMap = new Map();
+            (snapshots || []).forEach(s => {
+                const date = typeof s.snapshot_date === 'string'
+                    ? s.snapshot_date.split('T')[0]
+                    : s.snapshot_date;
+                snapshotMap.set(`${date}|${s.part_number}`, s.closing_stock || 0);
             });
 
-            console.log(`원본 거래 내역: ${allTransactions?.length || 0}건, 필터링 후: ${transactions.length}건`);
+            // 3. 거래 내역 (입고/출고 상세) — 서버사이드 필터링
+            const { data: transactions, error: transError } = await this.supabase
+                .from('inventory_transactions')
+                .select('part_number, transaction_type, quantity, transaction_date')
+                .gte('transaction_date', startDate)
+                .lte('transaction_date', endDate)
+                .order('transaction_date', { ascending: true });
+            if (transError) throw transError;
 
-            // 디버깅: 거래 내역 확인
-            console.log(`=== 거래 내역 조회 결과 ===`);
-            console.log(`총 거래 내역: ${transactions?.length || 0}건`);
-            console.log(`조회 기간: ${startDate} ~ ${endDate}`);
+            console.log(`거래 내역: ${transactions?.length || 0}건, 스냅샷: ${snapshots?.length || 0}건`);
 
-            // 원본 데이터에서 모든 transaction_type 확인
-            if (allTransactions && allTransactions.length > 0) {
-                const allTypes = {};
-                allTransactions.forEach(t => {
-                    const type = (t.transaction_type || 'NULL').toUpperCase();
-                    allTypes[type] = (allTypes[type] || 0) + 1;
-                });
-                console.log('원본 데이터의 모든 transaction_type:', allTypes);
-            }
-
-            if (transactions && transactions.length > 0) {
-                console.log('거래 내역 샘플 (최대 10건):', transactions.slice(0, 10).map(t => ({
-                    part: t.part_number,
-                    type: t.transaction_type,
-                    typeUpper: (t.transaction_type || '').toUpperCase(),
-                    qty: t.quantity,
-                    date: t.transaction_date,
-                    dateType: typeof t.transaction_date,
-                    dateNormalized: typeof t.transaction_date === 'string'
-                        ? t.transaction_date.split('T')[0]
-                        : new Date(t.transaction_date).toISOString().split('T')[0]
-                })));
-
-                const inboundCount = transactions.filter(t => {
-                    const type = (t.transaction_type || '').toUpperCase();
-                    return type === 'INBOUND';
-                }).length;
-                const outboundCount = transactions.filter(t => {
-                    const type = (t.transaction_type || '').toUpperCase();
-                    return type === 'OUTBOUND';
-                }).length;
-
-                console.log(`입고(INBOUND) 건수: ${inboundCount}건`);
-                console.log(`출고(OUTBOUND) 건수: ${outboundCount}건`);
-                console.log(`기타 타입: ${transactions.length - inboundCount - outboundCount}건`);
-
-                // OUTBOUND가 없는 경우 원본 데이터에서 확인
-                if (outboundCount === 0 && allTransactions) {
-                    const allOutbound = allTransactions.filter(t => {
-                        const type = (t.transaction_type || '').toUpperCase();
-                        return type === 'OUTBOUND';
-                    });
-                    console.warn(`⚠️ 필터링된 데이터에 OUTBOUND가 없지만, 원본 데이터에는 ${allOutbound.length}건의 OUTBOUND가 있습니다!`);
-                    if (allOutbound.length > 0) {
-                        console.log('원본 OUTBOUND 샘플 (최대 5건):', allOutbound.slice(0, 5).map(t => ({
-                            part: t.part_number,
-                            type: t.transaction_type,
-                            qty: t.quantity,
-                            date: t.transaction_date,
-                            dateNormalized: typeof t.transaction_date === 'string'
-                                ? t.transaction_date.split('T')[0]
-                                : new Date(t.transaction_date).toISOString().split('T')[0],
-                            inRange: (() => {
-                                const date = typeof t.transaction_date === 'string'
-                                    ? t.transaction_date.split('T')[0]
-                                    : new Date(t.transaction_date).toISOString().split('T')[0];
-                                return date >= startDate && date <= endDate;
-                            })()
-                        })));
-                    }
-                }
-
-                // 날짜별 분포 확인
-                const dateDistribution = {};
-                transactions.forEach(t => {
-                    if (!t.transaction_date) return;
-                    const date = typeof t.transaction_date === 'string'
-                        ? t.transaction_date.split('T')[0]
-                        : new Date(t.transaction_date).toISOString().split('T')[0];
-                    dateDistribution[date] = (dateDistribution[date] || 0) + 1;
-                });
-                console.log('날짜별 거래 내역 분포:', dateDistribution);
-            } else {
-                console.warn('⚠️ 거래 내역이 없습니다!');
-                if (allTransactions && allTransactions.length > 0) {
-                    console.log(`원본 데이터에는 ${allTransactions.length}건이 있지만, 날짜 필터링 후 0건입니다.`);
-                    console.log('원본 데이터 날짜 범위 확인 필요');
-                } else {
-                    console.log('데이터베이스에서 직접 확인이 필요합니다.');
-                }
-            }
-
-            // 3. 날짜 범위의 실사 재고 정보 가져오기
-            const { data: sessions, error: sessionsError } = await this.supabase
-                .from('physical_inventory_sessions')
-                .select('id, session_date')
-                .gte('session_date', startDate)
-                .lte('session_date', endDate)
-                .in('status', ['PENDING', 'COMPLETED']);
-
-            let physicalInventoryItems = [];
-            if (!sessionsError && sessions && sessions.length > 0) {
-                const sessionIds = sessions.map(s => s.id);
-                const { data: items, error: itemsError } = await this.supabase
-                    .from('physical_inventory_items')
-                    .select('part_number, physical_stock, system_stock, created_at, session_id')
-                    .in('session_id', sessionIds);
-
-                if (!itemsError && items) {
-                    // 세션 날짜 정보 추가
-                    const sessionMap = new Map(sessions.map(s => [s.id, s.session_date]));
-                    physicalInventoryItems = items.map(item => ({
-                        ...item,
-                        session_date: sessionMap.get(item.session_id)
-                    }));
-                }
-            }
-
-            // 4. 각 날짜별로 입고/출고/재고 계산
+            // 4. 파트별 날짜별 데이터 구성
             const partDataMap = new Map();
 
             // 모든 파트 초기화
@@ -3005,51 +3178,21 @@ class InventoryStatus {
                 });
             });
 
-            // 각 날짜별로 데이터 계산
-            dateList.forEach((date, dateIndex) => {
-                // 해당 날짜의 거래 내역 필터링 (날짜 형식 정규화)
-                const dateTransactions = transactions.filter(t => {
-                    if (!t.transaction_date) return false;
-                    // transaction_date가 날짜만 있는지, 시간이 포함되어 있는지 확인
-                    const transDate = typeof t.transaction_date === 'string'
-                        ? t.transaction_date.split('T')[0]
-                        : new Date(t.transaction_date).toISOString().split('T')[0];
+            // 날짜별 거래 내역 집계
+            dateList.forEach(date => {
+                const dateTransactions = (transactions || []).filter(trans => {
+                    if (!trans.transaction_date) return false;
+                    const transDate = typeof trans.transaction_date === 'string'
+                        ? trans.transaction_date.split('T')[0]
+                        : new Date(trans.transaction_date).toISOString().split('T')[0];
                     return transDate === date;
                 });
 
-                // 디버깅: 첫 번째 날짜와 마지막 날짜만 상세 로그
-                if (dateIndex === 0 || dateIndex === dateList.length - 1) {
-                    console.log(`날짜 ${date} 필터링 결과:`, {
-                        totalTransactions: transactions.length,
-                        filteredCount: dateTransactions.length,
-                        sample: dateTransactions.slice(0, 3).map(t => ({
-                            part: t.part_number,
-                            type: t.transaction_type,
-                            qty: t.quantity,
-                            date: t.transaction_date
-                        }))
-                    });
-                }
-
-                // 해당 날짜의 실사 재고 필터링 (날짜 형식 정규화)
-                const datePhysicalItems = physicalInventoryItems.filter(item => {
-                    if (!item.session_date) return false;
-                    const sessionDate = typeof item.session_date === 'string'
-                        ? item.session_date.split('T')[0]
-                        : new Date(item.session_date).toISOString().split('T')[0];
-                    return sessionDate === date;
-                });
-
-                // 파트별로 입고/출고 집계
                 const dateInbound = {};
                 const dateOutbound = {};
-                const dateAdjustment = {};
 
                 dateTransactions.forEach(trans => {
-                    if (!trans.part_number) {
-                        console.warn('part_number가 없는 거래 내역:', trans);
-                        return; // part_number가 없으면 스킵
-                    }
+                    if (!trans.part_number) return;
 
                     if (!partDataMap.has(trans.part_number)) {
                         partDataMap.set(trans.part_number, {
@@ -3059,226 +3202,58 @@ class InventoryStatus {
                     }
 
                     const quantity = Number(trans.quantity) || 0;
-
-                    // transaction_type 대소문자 무시하고 비교
                     const transType = (trans.transaction_type || '').toUpperCase();
-
-                    // 디버깅: OUTBOUND 데이터 확인
-                    if (dateIndex === 0 && transType === 'OUTBOUND') {
-                        console.log('OUTBOUND 거래 내역 발견:', {
-                            part: trans.part_number,
-                            type: trans.transaction_type,
-                            originalQty: trans.quantity,
-                            parsedQty: quantity,
-                            absQty: Math.abs(quantity)
-                        });
-                    }
 
                     if (transType === 'INBOUND') {
                         dateInbound[trans.part_number] = (dateInbound[trans.part_number] || 0) + quantity;
                     } else if (transType === 'OUTBOUND') {
-                        // OUTBOUND는 양수로 저장되어 있지만, 혹시 음수일 수도 있으므로 절댓값 사용
                         const outboundQty = quantity < 0 ? Math.abs(quantity) : quantity;
                         dateOutbound[trans.part_number] = (dateOutbound[trans.part_number] || 0) + outboundQty;
-
-                        // 디버깅: 첫 번째 날짜의 OUTBOUND 집계 확인
-                        if (dateIndex === 0) {
-                            console.log(`OUTBOUND 집계: 파트 ${trans.part_number}, 수량 ${outboundQty}, 누적: ${dateOutbound[trans.part_number]}`);
-                        }
-                    } else if (transType === 'ADJUSTMENT') {
-                        dateAdjustment[trans.part_number] = (dateAdjustment[trans.part_number] || 0) + quantity;
-                    } else {
-                        // 알 수 없는 타입 로그
-                        if (dateIndex === 0) {
-                            console.warn(`알 수 없는 transaction_type: ${trans.transaction_type}`, trans);
-                        }
                     }
                 });
 
-                // 디버깅: 첫 번째 날짜의 집계 결과 확인
-                if (dateIndex === 0) {
-                    const inboundTotal = Object.values(dateInbound).reduce((a, b) => a + b, 0);
-                    const outboundTotal = Object.values(dateOutbound).reduce((a, b) => a + b, 0);
-
-                    console.log(`=== 날짜 ${date} 집계 결과 ===`);
-                    console.log(`입고 파트 수: ${Object.keys(dateInbound).length}개`);
-                    console.log(`출고 파트 수: ${Object.keys(dateOutbound).length}개`);
-                    console.log(`입고 총합: ${inboundTotal}`);
-                    console.log(`출고 총합: ${outboundTotal}`);
-                    console.log('입고 샘플:', Object.entries(dateInbound).slice(0, 5));
-                    console.log('출고 샘플:', Object.entries(dateOutbound).slice(0, 5));
-
-                    // OUTBOUND가 0인 경우 상세 디버깅
-                    if (outboundTotal === 0 && dateTransactions.some(t => {
-                        const type = (t.transaction_type || '').toUpperCase();
-                        return type === 'OUTBOUND';
-                    })) {
-                        console.warn('⚠️ OUTBOUND 거래 내역이 있지만 집계가 0입니다!');
-                        const outboundTrans = dateTransactions.filter(t => {
-                            const type = (t.transaction_type || '').toUpperCase();
-                            return type === 'OUTBOUND';
-                        });
-                        console.log('OUTBOUND 거래 내역 상세:', outboundTrans.map(t => ({
-                            part: t.part_number,
-                            type: t.transaction_type,
-                            qty: t.quantity,
-                            qtyType: typeof t.quantity
-                        })));
-                    }
-                }
-
-                // 실사 재고 조정
-                datePhysicalItems.forEach(item => {
-                    if (!item.part_number) return; // part_number가 없으면 스킵
-
-                    const physicalStock = Number(item.physical_stock) || 0;
-                    const systemStock = Number(item.system_stock) || 0;
-                    const difference = physicalStock - systemStock;
-                    dateAdjustment[item.part_number] = (dateAdjustment[item.part_number] || 0) + difference;
-                });
-
-                // 각 파트별로 날짜별 데이터 저장
+                // 각 파트에 날짜별 데이터 저장 + 스냅샷 재고
                 partDataMap.forEach((partData, partNumber) => {
+                    const snapshotStock = snapshotMap.get(`${date}|${partNumber}`);
                     partData.dates[date] = {
                         inbound: dateInbound[partNumber] || 0,
                         outbound: dateOutbound[partNumber] || 0,
-                        adjustment: dateAdjustment[partNumber] || 0
+                        stock: snapshotStock !== undefined ? snapshotStock : null
                     };
                 });
             });
 
-            // 5. 각 날짜별 재고 계산 (전날 재고 + 입고 - 출고 + 조정)
-            // 현재 재고를 기준으로 역산하여 시작일 전날 재고 계산
-            const dayBeforeStart = new Date(startDate + 'T00:00:00');
-            dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
-            const dayBeforeStartStr = `${dayBeforeStart.getFullYear()}-${String(dayBeforeStart.getMonth() + 1).padStart(2, '0')}-${String(dayBeforeStart.getDate()).padStart(2, '0')}`;
-
-            // 전날 재고 계산: 현재 재고에서 시작일 이후 거래 내역을 역산
-            const previousStockMap = new Map();
-            try {
-                // 1. 현재 재고 가져오기
-                const { data: currentInventory, error: invError } = await this.supabase
-                    .from('inventory')
-                    .select('part_number, current_stock');
-
-                if (!invError && currentInventory) {
-                    const inventoryMap = new Map(currentInventory.map(inv => [inv.part_number, inv.current_stock || 0]));
-
-                    // 2. 시작일 이후의 모든 거래 내역 가져오기 (역산용)
-                    const { data: futureTransactions } = await this.supabase
-                        .from('inventory_transactions')
-                        .select('part_number, transaction_type, quantity')
-                        .gte('transaction_date', startDate);
-
-                    // 3. 각 파트별로 현재 재고에서 역산하여 시작일 전날 재고 계산
-                    allParts.forEach(part => {
-                        const currentStock = inventoryMap.get(part.part_number) || 0;
-                        let previousStock = currentStock;
-
-                        // 시작일 이후 거래 내역을 역산
-                        if (futureTransactions) {
-                            futureTransactions
-                                .filter(t => t.part_number === part.part_number)
-                                .forEach(trans => {
-                                    if (trans.transaction_type === 'INBOUND') {
-                                        previousStock -= trans.quantity; // 입고를 빼서 역산
-                                    } else if (trans.transaction_type === 'OUTBOUND') {
-                                        previousStock += Math.abs(trans.quantity); // 출고를 더해서 역산
-                                    } else if (trans.transaction_type === 'ADJUSTMENT') {
-                                        previousStock -= trans.quantity; // 조정을 빼서 역산
-                                    }
-                                });
-                        }
-
-                        previousStockMap.set(part.part_number, previousStock);
-                    });
-                } else {
-                    // inventory 테이블이 없거나 오류가 있으면 기존 방식 사용
-                    console.warn('inventory 테이블 조회 실패, 기존 방식으로 전날 재고 계산');
-                    const { data: prevTransactions } = await this.supabase
-                        .from('inventory_transactions')
-                        .select('part_number, transaction_type, quantity')
-                        .lte('transaction_date', dayBeforeStartStr);
-
-                    if (prevTransactions) {
-                        allParts.forEach(part => {
-                            let stock = 0;
-                            prevTransactions
-                                .filter(t => t.part_number === part.part_number)
-                                .forEach(trans => {
-                                    if (trans.transaction_type === 'INBOUND') {
-                                        stock += trans.quantity;
-                                    } else if (trans.transaction_type === 'OUTBOUND') {
-                                        stock -= Math.abs(trans.quantity);
-                                    } else if (trans.transaction_type === 'ADJUSTMENT') {
-                                        stock += trans.quantity;
-                                    }
-                                });
-                            previousStockMap.set(part.part_number, stock);
-                        });
-                    }
-                }
-            } catch (error) {
-                console.warn('전날 재고 계산 오류:', error);
-            }
-
-            // 각 날짜별로 재고 계산
-            dateList.forEach((date, index) => {
-                partDataMap.forEach((partData, partNumber) => {
-                    // dateData가 없으면 기본값으로 초기화
-                    if (!partData.dates[date]) {
-                        partData.dates[date] = {
-                            inbound: 0,
-                            outbound: 0,
-                            adjustment: 0
-                        };
-                    }
-
+            // 5. 스냅샷이 없는 날짜에 대해 fallback: 이전 날짜 재고 + 입고 - 출고
+            partDataMap.forEach((partData, partNumber) => {
+                let lastKnownStock = null;
+                dateList.forEach(date => {
                     const dateData = partData.dates[date];
-                    let currentStock;
+                    if (!dateData) return;
 
-                    if (index === 0) {
-                        // 첫 날: 전날 재고 + 입고 - 출고 + 조정
-                        currentStock = (previousStockMap.get(partNumber) || 0) + (dateData.inbound || 0) - (dateData.outbound || 0) + (dateData.adjustment || 0);
+                    if (dateData.stock !== null) {
+                        lastKnownStock = dateData.stock;
+                    } else if (lastKnownStock !== null) {
+                        // 스냅샷이 없으면 이전 재고 + 입고 - 출고로 추정
+                        dateData.stock = lastKnownStock + (dateData.inbound || 0) - (dateData.outbound || 0);
+                        lastKnownStock = dateData.stock;
                     } else {
-                        // 이후 날: 전날 재고 + 입고 - 출고 + 조정
-                        const prevDate = dateList[index - 1];
-                        const prevDateData = partData.dates[prevDate];
-                        if (!prevDateData) {
-                            console.warn(`이전 날짜(${prevDate}) 데이터가 없습니다. 파트: ${partNumber}`);
-                            // 이전 날짜 데이터가 없으면 기본값 사용
-                            partData.dates[prevDate] = {
-                                inbound: 0,
-                                outbound: 0,
-                                adjustment: 0,
-                                stock: previousStockMap.get(partNumber) || 0
-                            };
-                        }
-                        const prevStock = (prevDateData?.stock || previousStockMap.get(partNumber) || 0);
-                        currentStock = prevStock + (dateData.inbound || 0) - (dateData.outbound || 0) + (dateData.adjustment || 0);
+                        dateData.stock = 0;
                     }
-
-                    dateData.stock = currentStock;
                 });
             });
 
             // 6. 데이터 저장 및 렌더링
             this.dailyInOutData = Array.from(partDataMap.values());
-            this.dailyInOutDateList = dateList; // 엑셀 다운로드용 날짜 목록 저장
+            this.dailyInOutDateList = dateList;
 
-            // 디버깅: 데이터 확인
             console.log('일자별 입출고 데이터:', {
                 totalParts: this.dailyInOutData.length,
                 dateRange: `${startDate} ~ ${endDate}`,
-                sampleData: this.dailyInOutData.slice(0, 3).map(p => ({
-                    part: p.part_number,
-                    firstDate: Object.keys(p.dates)[0],
-                    firstDateData: p.dates[Object.keys(p.dates)[0]]
-                }))
+                snapshotCoverage: snapshots?.length || 0
             });
 
-            this.renderDailyStockTable(dateList); // 재고 현황만 표시하는 표 (상단)
-            this.renderDailyInOutTable(dateList); // 입출고 상세 표 (하단)
+            this.renderDailyStockTable(dateList);
+            this.renderDailyInOutTable(dateList);
 
             // 엑셀 다운로드 버튼 표시
             const exportBtn = document.getElementById('exportDailyInOutExcelBtn');
@@ -3325,9 +3300,8 @@ class InventoryStatus {
         dateList.forEach(date => {
             const dateHeader = document.createElement('th');
             dateHeader.className = 'px-3 py-3 text-center text-xs font-medium text-gray-800/80 uppercase tracking-wider';
-            // 날짜에 +1일 추가 (시간대 차이 보정)
-            const dateObj = new Date(date);
-            dateObj.setDate(dateObj.getDate() + 1);
+            // 날짜를 정오 기준으로 파싱하여 UTC 오프셋에 의한 날짜 밀림 방지
+            const dateObj = new Date(date + 'T12:00:00');
             dateHeader.innerHTML = `
                 <div>${dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
                 <div class="text-xs text-gray-600 mt-1 text-blue-600">재고</div>
@@ -3402,9 +3376,8 @@ class InventoryStatus {
             const dateHeader = document.createElement('th');
             dateHeader.className = 'px-2 py-3 text-center text-xs font-medium text-gray-800/80 uppercase tracking-wider';
             dateHeader.colSpan = 3;
-            // 날짜에 +1일 추가 (시간대 차이 보정)
-            const dateObj = new Date(date);
-            dateObj.setDate(dateObj.getDate() + 1);
+            // 날짜를 정오 기준으로 파싱하여 UTC 오프셋에 의한 날짜 밀림 방지
+            const dateObj = new Date(date + 'T12:00:00');
             dateHeader.innerHTML = `
                 <div>${dateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</div>
                 <div class="text-xs text-gray-600 mt-1">
@@ -3513,10 +3486,9 @@ class InventoryStatus {
             // 워크북 생성
             const workbook = new ExcelJS.Workbook();
 
-            // 날짜 형식 변환 함수 (mm/dd) - +1일 추가 (시간대 차이 보정)
+            // 날짜 형식 변환 함수 (mm/dd) — 정오 기준 파싱으로 UTC 오프셋 밀림 방지
             const formatDate = (dateStr) => {
-                const date = new Date(dateStr);
-                date.setDate(date.getDate() + 1); // +1일 추가
+                const date = new Date(dateStr + 'T12:00:00');
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
                 return `${month}/${day}`;

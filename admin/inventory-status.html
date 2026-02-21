@@ -68,8 +68,6 @@
                         현황</span></a>
                 <a href="physical-inventory.html" class="ds-nav-item nav-special"><i
                         class="fas fa-clipboard-check"></i><span>실사 관리</span></a>
-                <a href="quick-inventory-edit.html" class="ds-nav-item nav-purple"><i class="fas fa-table"></i><span>빠른
-                        재고 수정</span></a>
                 <a href="daily-inventory-enhanced.html" class="ds-nav-item"><i class="fas fa-calendar-day"></i><span>일일
                         재고</span></a>
             </nav>
@@ -97,7 +95,19 @@
                     <h1 class="ds-header-title">재고 현황</h1>
                     <p class="ds-header-subtitle">실시간 재고 현황 및 입고 관리</p>
                 </div>
-                <div class="ds-header-actions">
+                <div class="ds-header-actions" style="gap: 8px; flex-wrap: wrap;">
+                    <button id="syncInboundBtn"
+                        class="bg-orange-500 text-white px-3 py-2 rounded-md hover:bg-orange-600 transition-all duration-200 text-sm">
+                        <i class="fas fa-sync mr-1"></i>입고 동기화
+                    </button>
+                    <button id="syncOutboundBtn"
+                        class="bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600 transition-all duration-200 text-sm">
+                        <i class="fas fa-sync mr-1"></i>출고 동기화
+                    </button>
+                    <button id="rebuildSnapshotsBtn"
+                        class="bg-purple-600 text-white px-3 py-2 rounded-md hover:bg-purple-700 transition-all duration-200 text-sm">
+                        <i class="fas fa-calculator mr-1"></i>스냅샷 재계산
+                    </button>
                     <button id="csvUploadBtn" class="ds-btn ds-btn-success">
                         <i class="fas fa-upload"></i> CSV 업로드
                     </button>
@@ -235,10 +245,6 @@
                                 class="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-800/60 hover:text-gray-800 hover:border-white/40">
                                 일간 내역
                             </button>
-                            <button id="dateStockTab"
-                                class="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-800 hover:text-blue-600 hover:border-blue-300 transition-colors">
-                                날짜별 재고 계산
-                            </button>
                             <button id="dailyInOutTab"
                                 class="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-800 hover:text-blue-600 hover:border-blue-300 transition-colors">
                                 일자별 입출고 현황
@@ -321,89 +327,6 @@
                     </div>
                 </div>
 
-                <!-- Date-based Stock Calculation -->
-                <div id="dateStockTable" class="hidden glass-effect rounded-xl">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-800">날짜별 재고 계산</h3>
-                            <div class="flex items-center space-x-4">
-                                <label for="stockCalculationDate"
-                                    class="text-sm font-medium text-gray-800/80">기준일:</label>
-                                <input type="date" id="stockCalculationDate"
-                                    class="px-3 py-2 bg-white/10 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800">
-                                <label class="flex items-center space-x-2 cursor-pointer">
-                                    <input type="checkbox" id="includeASCheckboxDateStock"
-                                        class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                    <span class="text-sm font-medium text-gray-800/80">AS 제품 포함</span>
-                                </label>
-                                <button id="calculateStockBtn"
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all duration-200">
-                                    <i class="fas fa-calculator mr-2"></i>계산
-                                </button>
-                                <button id="snapshotUploadBtn"
-                                    class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-all duration-200">
-                                    <i class="fas fa-file-excel mr-2"></i>엑셀 업로드
-                                </button>
-                                <button id="syncInboundBtn"
-                                    class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition-all duration-200">
-                                    <i class="fas fa-sync mr-2"></i>입고 동기화
-                                </button>
-                                <button id="rebuildSnapshotsBtn"
-                                    class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-all duration-200">
-                                    <i class="fas fa-calculator mr-2"></i>스냅샷 재계산
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-white/20">
-                            <thead class="bg-white/10">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
-                                        onclick="inventoryStatus.sortDateStockTable('part_number')">
-                                        파트 번호
-                                        <i class="fas fa-sort ml-1 text-gray-400" id="dateSortIcon_part_number"></i>
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
-                                        onclick="inventoryStatus.sortDateStockTable('previous_stock')">
-                                        전날 재고
-                                        <i class="fas fa-sort ml-1 text-gray-400" id="dateSortIcon_previous_stock"></i>
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
-                                        onclick="inventoryStatus.sortDateStockTable('daily_inbound')">
-                                        해당일 입고 합계
-                                        <i class="fas fa-sort ml-1 text-gray-400" id="dateSortIcon_daily_inbound"></i>
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
-                                        onclick="inventoryStatus.sortDateStockTable('daily_outbound')">
-                                        해당일 출고 합계
-                                        <i class="fas fa-sort ml-1 text-gray-400" id="dateSortIcon_daily_outbound"></i>
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
-                                        onclick="inventoryStatus.sortDateStockTable('daily_adjustment')">
-                                        실사 조정
-                                        <i class="fas fa-sort ml-1 text-gray-400"
-                                            id="dateSortIcon_daily_adjustment"></i>
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
-                                        onclick="inventoryStatus.sortDateStockTable('calculated_stock')">
-                                        금일 재고
-                                        <i class="fas fa-sort ml-1 text-gray-400"
-                                            id="dateSortIcon_calculated_stock"></i>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white/5 divide-y divide-white/20" id="dateStockTableBody">
-                                <tr>
-                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                                        기준일을 선택하고 계산 버튼을 클릭하세요.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
                 <!-- Daily Inbound/Outbound Status -->
                 <div id="dailyInOutTable" class="hidden">
                     <div class="glass-effect rounded-xl mb-6">
@@ -438,6 +361,14 @@
                                         <i class="fas fa-file-excel mr-2"></i>Excel 다운로드
                                     </button>
                                 </div>
+                            </div>
+                            <!-- 스냅샷 관리 버튼 -->
+                            <div class="flex items-center space-x-3 mt-3 pt-3 border-t border-gray-200">
+                                <span class="text-sm text-gray-500">스냅샷 관리:</span>
+                                <button id="snapshotUploadBtn"
+                                    class="bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-all duration-200 text-sm">
+                                    <i class="fas fa-file-excel mr-1"></i>엑셀 업로드
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -612,6 +543,13 @@
                     </p>
                 </div>
 
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <p class="text-sm text-green-800">
+                        <i class="fas fa-magic mr-1"></i>
+                        <strong>자동 전파:</strong> 업로드 후, 기준일부터 오늘까지의 마감재고가 입출고 내역을 반영하여 자동 계산됩니다.
+                    </p>
+                </div>
+
                 <div
                     class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-400 transition-colors mb-4">
                     <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
@@ -658,12 +596,12 @@
     <script src="../js/config.js?v=20260218"></script>
     <script src="../js/supabase-client.js?v=20260218"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="../js/inventory-status.js?v=20260220b"></script>
+    <script src="../js/inventory-status.js?v=20260221"></script>
     <script>
         // Tab switching functionality
         function switchTab(activeTab) {
             // 모든 탭 초기화
-            ['inventoryTab', 'transactionTab', 'dateStockTab', 'dailyInOutTab'].forEach(tabId => {
+            ['inventoryTab', 'transactionTab', 'dailyInOutTab'].forEach(tabId => {
                 const tab = document.getElementById(tabId);
                 if (tab) {
                     tab.classList.remove('border-blue-500', 'text-blue-300');
@@ -672,7 +610,7 @@
             });
 
             // 모든 테이블 숨기기
-            ['inventoryTable', 'transactionTable', 'dateStockTable', 'dailyInOutTable'].forEach(tableId => {
+            ['inventoryTable', 'transactionTable', 'dailyInOutTable'].forEach(tableId => {
                 const table = document.getElementById(tableId);
                 if (table) {
                     table.classList.add('hidden');
@@ -691,8 +629,6 @@
                 document.getElementById('inventoryTable').classList.remove('hidden');
             } else if (activeTab === 'transactionTab') {
                 document.getElementById('transactionTable').classList.remove('hidden');
-            } else if (activeTab === 'dateStockTab') {
-                document.getElementById('dateStockTable').classList.remove('hidden');
             } else if (activeTab === 'dailyInOutTab') {
                 document.getElementById('dailyInOutTable').classList.remove('hidden');
             }
@@ -700,8 +636,22 @@
 
         document.getElementById('inventoryTab').addEventListener('click', () => switchTab('inventoryTab'));
         document.getElementById('transactionTab').addEventListener('click', () => switchTab('transactionTab'));
-        document.getElementById('dateStockTab').addEventListener('click', () => switchTab('dateStockTab'));
-        document.getElementById('dailyInOutTab').addEventListener('click', () => switchTab('dailyInOutTab'));
+        document.getElementById('dailyInOutTab').addEventListener('click', () => {
+            switchTab('dailyInOutTab');
+            // 이번 달 1일 ~ 오늘로 기본 설정 후 자동 조회
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const startEl = document.getElementById('dailyInOutStartDate');
+            const endEl = document.getElementById('dailyInOutEndDate');
+            if (startEl && !startEl.value) startEl.value = `${year}-${month}-01`;
+            if (endEl && !endEl.value) endEl.value = `${year}-${month}-${day}`;
+            // 데이터가 아직 없으면 자동 조회
+            if (!inventoryStatus.dailyInOutData || inventoryStatus.dailyInOutData.length === 0) {
+                inventoryStatus.loadDailyInOutData();
+            }
+        });
 
         // 일자별 입출고 조회 버튼
         document.getElementById('loadDailyInOutBtn').addEventListener('click', () => {
@@ -711,11 +661,6 @@
         // 일자별 입출고 엑셀 다운로드 버튼
         document.getElementById('exportDailyInOutExcelBtn').addEventListener('click', () => {
             inventoryStatus.exportDailyInOutExcel();
-        });
-
-        // 날짜별 재고 계산 버튼
-        document.getElementById('calculateStockBtn').addEventListener('click', () => {
-            inventoryStatus.calculateDateStock();
         });
 
         // 스냅샷 엑셀 업로드 버튼
@@ -730,9 +675,19 @@
             }
         });
 
+        // 출고 동기화 버튼
+        const syncOutboundBtn = document.getElementById('syncOutboundBtn');
+        if (syncOutboundBtn) {
+            syncOutboundBtn.addEventListener('click', () => {
+                if (confirm('완료된 출고 차수 중 누락된 트랜잭션을 동기화합니다.\n계속하시겠습니까?')) {
+                    inventoryStatus.syncMissingOutboundTransactions();
+                }
+            });
+        }
+
         // 스냅샷 재계산 버튼
         document.getElementById('rebuildSnapshotsBtn').addEventListener('click', () => {
-            if (confirm('기준일부터 오늘까지 전체 스냅샷을 재계산합니다.\n기존 스냅샷이 덮어쓰기 됩니다.\n계속하시겠습니까?')) {
+            if (confirm('⚠️ 전체 트랜잭션 + 스냅샷 완전 재구축\n\n1. 기존 inventory_transactions 전체 삭제\n2. ARN 데이터에서 입고 트랜잭션 재생성\n3. 출고 데이터에서 출고 트랜잭션 재생성\n4. 기준일부터 오늘까지 스냅샷 재계산\n\n계속하시겠습니까?')) {
                 inventoryStatus.rebuildAllSnapshots();
             }
         });
