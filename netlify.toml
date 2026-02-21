@@ -2,6 +2,20 @@
   publish = "."
   command = "echo 'No build needed - static site'"
 
+[build.processing]
+  skip_processing = false
+
+[build.processing.html]
+  pretty_urls = false
+
+[build.processing.css]
+  bundle = false
+  minify = false
+
+[build.processing.js]
+  bundle = false
+  minify = false
+
 # 루트 경로 (/) 처리 - 가장 먼저 매칭
 [[headers]]
   for = "/"
