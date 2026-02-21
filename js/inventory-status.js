@@ -2360,17 +2360,24 @@ class InventoryStatus {
 
             console.log(`완료된 컨테이너: ${completedContainers.length}개`);
 
-            // 2. 기존 inventory_transactions에서 이미 기록된 ARN 번호 확인
+            // 2. 기존 inventory_transactions에서 이미 기록된 ARN+파트 조합 확인 (중복 방지)
             const arnNumbers = completedContainers.map(c => c.arn_number);
-            const { data: existingTrans, error: tErr } = await this.supabase
-                .from('inventory_transactions')
-                .select('reference_id')
-                .eq('transaction_type', 'INBOUND')
-                .in('reference_id', arnNumbers);
+            // 배치 처리: in() 필터 제한 회피 (50개씩)
+            let existingTrans = [];
+            for (let i = 0; i < arnNumbers.length; i += 50) {
+                const batch = arnNumbers.slice(i, i + 50);
+                const { data, error: tErr } = await this.supabase
+                    .from('inventory_transactions')
+                    .select('reference_id, part_number')
+                    .eq('transaction_type', 'INBOUND')
+                    .in('reference_id', batch);
+                if (tErr) throw tErr;
+                if (data) existingTrans = existingTrans.concat(data);
+            }
 
-            if (tErr) throw tErr;
-
-            const existingArnSet = new Set((existingTrans || []).map(t => t.reference_id));
+            // reference_id + part_number 조합으로 중복 체크 (더 정확)
+            const existingKeySet = new Set(existingTrans.map(t => `${t.reference_id}__${t.part_number}`));
+            const existingArnSet = new Set(existingTrans.map(t => t.reference_id));
             const missingContainers = completedContainers.filter(c => !existingArnSet.has(c.arn_number));
 
             if (missingContainers.length === 0) {
@@ -2404,8 +2411,12 @@ class InventoryStatus {
                     ? (container.inbound_date.includes('T') ? container.inbound_date.split('T')[0] : container.inbound_date)
                     : new Date().toISOString().split('T')[0];
 
+                // 이미 존재하는 파트는 제외 (reference_id + part_number 중복 방지)
+                const newParts = parts.filter(p => !existingKeySet.has(`${container.arn_number}__${p.part_number}`));
+                if (newParts.length === 0) continue;
+
                 // 트랜잭션 레코드 생성
-                const transRecords = parts.map(p => ({
+                const transRecords = newParts.map(p => ({
                     transaction_date: transactionDate,
                     part_number: p.part_number,
                     transaction_type: 'INBOUND',
@@ -2441,6 +2452,150 @@ class InventoryStatus {
             if (!silent) this.showNotification('동기화 중 오류가 발생했습니다: ' + error.message, 'error');
         } finally {
             if (!silent) this.showLoading(false);
+        }
+    }
+
+    // ==================== 전체 스냅샷 재계산 (기준일 → 오늘) ====================
+    async rebuildAllSnapshots() {
+        try {
+            this.showLoading(true);
+            console.log('=== 전체 스냅샷 재계산 시작 ===');
+
+            // 0. 먼저 누락된 입고 트랜잭션 동기화
+            await this.syncMissingInboundTransactions(true);
+
+            // 1. 가장 이른 스냅샷 날짜 찾기 (기준일)
+            const { data: earliestSnap } = await this.supabase
+                .from('daily_inventory_snapshot')
+                .select('snapshot_date')
+                .order('snapshot_date', { ascending: true })
+                .limit(1);
+
+            if (!earliestSnap || earliestSnap.length === 0) {
+                this.showNotification('기준 스냅샷이 없습니다. 먼저 엑셀로 기준일 마감재고를 업로드해주세요.', 'warning');
+                this.showLoading(false);
+                return;
+            }
+
+            const baseDate = earliestSnap[0].snapshot_date;
+            // 로컬 날짜 사용 (UTC가 아닌 사용자 시간대 기준)
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            console.log(`기준일: ${baseDate}, 오늘: ${today}`);
+
+            // 2. 기준일의 스냅샷 데이터 (base closing stock)
+            const { data: baseSnapshots } = await this.supabase
+                .from('daily_inventory_snapshot')
+                .select('part_number, closing_stock')
+                .eq('snapshot_date', baseDate);
+
+            if (!baseSnapshots || baseSnapshots.length === 0) {
+                this.showNotification('기준일 스냅샷 데이터가 비어있습니다.', 'error');
+                this.showLoading(false);
+                return;
+            }
+
+            // 기준일 재고 맵
+            const stockMap = new Map();
+            baseSnapshots.forEach(s => stockMap.set(s.part_number, s.closing_stock || 0));
+            console.log(`기준일 ${baseDate}: ${stockMap.size}개 파트`);
+
+            // 3. 기준일 다음날 ~ 오늘까지 모든 트랜잭션 가져오기
+            const nextDate = new Date(baseDate);
+            nextDate.setDate(nextDate.getDate() + 1);
+            const nextDateStr = nextDate.toISOString().split('T')[0];
+
+            const { data: allTrans, error: transErr } = await this.supabase
+                .from('inventory_transactions')
+                .select('part_number, transaction_type, quantity, transaction_date')
+                .gte('transaction_date', nextDateStr)
+                .lte('transaction_date', today)
+                .order('transaction_date', { ascending: true });
+
+            if (transErr) throw transErr;
+
+            // 날짜 정규화 헬퍼
+            const normalizeDate = (d) => {
+                if (!d) return '';
+                return typeof d === 'string' ? d.split('T')[0] : new Date(d).toISOString().split('T')[0];
+            };
+
+            // 트랜잭션을 날짜별로 그룹핑
+            const transByDate = new Map();
+            (allTrans || []).forEach(t => {
+                const date = normalizeDate(t.transaction_date);
+                if (!transByDate.has(date)) transByDate.set(date, []);
+                transByDate.get(date).push(t);
+            });
+
+            // 4. 기준일 다음날부터 오늘까지 순방향 계산
+            let currentDate = new Date(nextDateStr);
+            const endDate = new Date(today);
+            let totalDays = 0;
+            let totalUpserts = 0;
+
+            while (currentDate <= endDate) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const dayTrans = transByDate.get(dateStr) || [];
+
+                // 당일 트랜잭션으로 재고 변동 적용
+                dayTrans.forEach(t => {
+                    const partNum = t.part_number;
+                    if (!stockMap.has(partNum)) stockMap.set(partNum, 0);
+                    const prev = stockMap.get(partNum);
+
+                    if (t.transaction_type === 'INBOUND') {
+                        stockMap.set(partNum, prev + (t.quantity || 0));
+                    } else if (t.transaction_type === 'OUTBOUND') {
+                        stockMap.set(partNum, prev - (t.quantity || 0));
+                    } else if (t.transaction_type === 'ADJUSTMENT' || t.transaction_type === 'PHYSICAL_INVENTORY') {
+                        stockMap.set(partNum, prev + (t.quantity || 0));
+                    }
+                });
+
+                // 해당 날짜의 스냅샷 upsert (배치)
+                const snapshotRecords = [];
+                stockMap.forEach((closingStock, partNumber) => {
+                    snapshotRecords.push({
+                        snapshot_date: dateStr,
+                        part_number: partNumber,
+                        closing_stock: closingStock
+                    });
+                });
+
+                // 배치 upsert (50개씩)
+                for (let i = 0; i < snapshotRecords.length; i += 50) {
+                    const batch = snapshotRecords.slice(i, i + 50);
+                    const { error: upsertErr } = await this.supabase
+                        .from('daily_inventory_snapshot')
+                        .upsert(batch, { onConflict: 'snapshot_date,part_number' });
+
+                    if (upsertErr) {
+                        console.error(`${dateStr} 스냅샷 upsert 오류:`, upsertErr);
+                    } else {
+                        totalUpserts += batch.length;
+                    }
+                }
+
+                totalDays++;
+                console.log(`${dateStr}: ${dayTrans.length}건 트랜잭션 → ${snapshotRecords.length}개 파트 스냅샷 저장`);
+
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            this.showNotification(`스냅샷 재계산 완료: ${baseDate} → ${today} (${totalDays}일, ${totalUpserts}건 저장)`, 'success');
+            console.log(`=== 전체 스냅샷 재계산 완료: ${totalDays}일, ${totalUpserts}건 ===`);
+
+            // 캐시 클리어 후 데이터 리로드
+            this.cache.clear();
+            this.lastDataUpdate = 0;
+            await this.loadData();
+
+        } catch (error) {
+            console.error('스냅샷 재계산 오류:', error);
+            this.showNotification('스냅샷 재계산 중 오류가 발생했습니다: ' + error.message, 'error');
+        } finally {
+            this.showLoading(false);
         }
     }
 
