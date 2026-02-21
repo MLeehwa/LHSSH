@@ -1383,8 +1383,13 @@ class OutboundSummary {
             const link = document.createElement('a');
             link.href = url;
             link.download = fileName;
+            document.body.appendChild(link);
             link.click();
-            URL.revokeObjectURL(url);
+            // 브라우저가 다운로드를 시작한 후 정리
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 500);
 
             console.log('=== 파일 저장 완료 ===');
             this.showNotification('출하 현황 데이터가 Excel로 내보내기되었습니다.', 'success');
@@ -1643,8 +1648,12 @@ class OutboundSummary {
             const link = document.createElement('a');
             link.href = url;
             link.download = fileName;
+            document.body.appendChild(link);
             link.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 500);
 
             console.log('ExcelJS 스타일링 테스트 완료');
         } catch (error) {
