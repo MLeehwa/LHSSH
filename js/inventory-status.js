@@ -2298,8 +2298,6 @@ class InventoryStatus {
                                 stock.previous_stock += t.quantity || 0;
                             } else if (t.transaction_type === 'OUTBOUND') {
                                 stock.previous_stock -= t.quantity || 0;
-                            } else if (t.transaction_type === 'ADJUSTMENT' || t.transaction_type === 'PHYSICAL_INVENTORY') {
-                                stock.previous_stock += t.quantity || 0;
                             }
                         }
                     });
@@ -2312,8 +2310,6 @@ class InventoryStatus {
                                 stock.daily_inbound += t.quantity || 0;
                             } else if (t.transaction_type === 'OUTBOUND') {
                                 stock.daily_outbound += t.quantity || 0;
-                            } else if (t.transaction_type === 'ADJUSTMENT' || t.transaction_type === 'PHYSICAL_INVENTORY') {
-                                stock.daily_adjustment += t.quantity || 0;
                             }
                         }
                     });
@@ -2510,6 +2506,7 @@ class InventoryStatus {
                 .select('part_number, transaction_type, quantity, transaction_date')
                 .gte('transaction_date', nextDateStr)
                 .lte('transaction_date', today)
+                .in('transaction_type', ['INBOUND', 'OUTBOUND'])
                 .order('transaction_date', { ascending: true });
 
             if (transErr) throw transErr;
@@ -2548,8 +2545,6 @@ class InventoryStatus {
                         stockMap.set(partNum, prev + (t.quantity || 0));
                     } else if (t.transaction_type === 'OUTBOUND') {
                         stockMap.set(partNum, prev - (t.quantity || 0));
-                    } else if (t.transaction_type === 'ADJUSTMENT' || t.transaction_type === 'PHYSICAL_INVENTORY') {
-                        stockMap.set(partNum, prev + (t.quantity || 0));
                     }
                 });
 
