@@ -1792,9 +1792,13 @@ class OutboundSummary {
 
 }
 
-// Initialize when DOM is loaded
+// Initialize when DOM is loaded (guard against double init from HTML inline script)
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        if (window.outboundSummary) {
+            console.log('OutboundSummary 이미 초기화됨, 중복 초기화 방지');
+            return;
+        }
         console.log('OutboundSummary DOM 초기화 시작...');
         window.outboundSummary = new OutboundSummary();
         console.log('OutboundSummary 인스턴스 생성 완료');
