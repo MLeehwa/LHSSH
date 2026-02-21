@@ -17,7 +17,12 @@
     function getCurrentPage() {
         const path = window.location.pathname;
         const filename = path.split('/').pop() || 'index.html';
-        return filename;
+        return filename.split('?')[0]; // 쿼리 파라미터 제거
+    }
+
+    // 캐시 버스팅: 페이지 이동 시 타임스탬프 추가하여 브라우저 캐시 우회
+    function cacheBustUrl(href) {
+        return `${href}?_t=${Date.now()}`;
     }
 
     function renderSidebar() {
@@ -32,7 +37,7 @@
             if (isActive) classes.push('active');
             if (item.special) classes.push('nav-special');
 
-            return `<a href="${item.href}" class="${classes.join(' ')}">
+            return `<a href="${cacheBustUrl(item.href)}" class="${classes.join(' ')}">
                 <i class="${item.icon}"></i>
                 <span>${item.label}</span>
             </a>`;
