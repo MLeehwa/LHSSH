@@ -43,49 +43,9 @@
 
 <body>
     <div class="app-layout">
-        <!-- Sidebar -->
-        <aside class="ds-sidebar">
-            <div class="ds-sidebar-header">
-                <div class="ds-sidebar-logo">
-                    <div class="ds-sidebar-logo-icon"><i class="fas fa-barcode"></i></div>
-                    <div>
-                        <div class="ds-sidebar-logo-text">이화 - 서한</div>
-                        <div class="ds-sidebar-logo-sub">관리자 패널</div>
-                    </div>
-                </div>
-            </div>
-            <nav class="ds-sidebar-nav">
-                <div class="ds-nav-section-title">메뉴</div>
-                <a href="index.html" class="ds-nav-item"><i class="fas fa-tachometer-alt"></i><span>대시보드</span></a>
-                <a href="part-registration.html" class="ds-nav-item"><i class="fas fa-plus-circle"></i><span>파트
-                        등록</span></a>
-                <a href="inbound-status.html" class="ds-nav-item"><i class="fas fa-arrow-down"></i><span>입고
-                        현황</span></a>
-                <a href="outbound-status.html" class="ds-nav-item"><i class="fas fa-arrow-up"></i><span>출고 현황</span></a>
-                <a href="inventory-status.html" class="ds-nav-item active"><i class="fas fa-boxes"></i><span>재고
-                        현황</span></a>
-                <a href="outbound-summary.html" class="ds-nav-item"><i class="fas fa-chart-bar"></i><span>출하
-                        현황</span></a>
-                <a href="physical-inventory.html" class="ds-nav-item nav-special"><i
-                        class="fas fa-clipboard-check"></i><span>실사 관리</span></a>
-                <a href="daily-inventory-enhanced.html" class="ds-nav-item"><i class="fas fa-calendar-day"></i><span>일일
-                        재고</span></a>
-            </nav>
-            <div class="ds-sidebar-footer">
-                <div class="ds-sidebar-user">
-                    <div class="ds-sidebar-avatar"><i class="fas fa-user"></i></div>
-                    <div class="ds-sidebar-user-info">
-                        <div class="ds-sidebar-user-name">관리자</div>
-                        <button onclick="logout()" class="ds-sidebar-logout"><i
-                                class="fas fa-sign-out-alt mr-1"></i>로그아웃</button>
-                    </div>
-                </div>
-                <div class="ds-sidebar-time">
-                    <div class="ds-sidebar-time-label">현재 시간</div>
-                    <div id="currentTime" class="ds-sidebar-time-value"></div>
-                </div>
-            </div>
-        </aside>
+        <!-- Sidebar (공통 컴포넌트) -->
+        <aside id="shared-sidebar" class="ds-sidebar"></aside>
+        <script src="../js/sidebar.js?v=20260221"></script>
 
         <!-- Main Content -->
         <div class="app-content">
