@@ -3362,59 +3362,23 @@ class OutboundStatus {
     }
 
     async createNewSequence(date, seq) {
-        const dateStr = date.replace(/-/g, '');
-        let sequenceNumber;
+        // 0. 동일한 차수 번호의 중복 확인 (취소된 건은 제외)
+        const sequenceNumber = `${date.replace(/-/g, '')}-${seq}`;
+        const { data: existingSequence, error: checkError } = await this.supabase
+            .from('outbound_sequences')
+            .select('id, sequence_number, outbound_date, status')
+            .eq('sequence_number', sequenceNumber)
+            .neq('status', 'CANCELLED')
+            .maybeSingle();
 
-        if (seq === 'AS') {
-            // AS는 여러 건 등록 가능 → 자동 번호 부여 (AS-1, AS-2, ...)
-            const { data: existingASSequences, error: asCheckError } = await this.supabase
-                .from('outbound_sequences')
-                .select('sequence_number')
-                .like('sequence_number', `${dateStr}-AS%`);
+        if (checkError) {
+            console.error('중복 확인 오류:', checkError);
+            throw checkError;
+        }
 
-            if (asCheckError) {
-                console.error('AS 중복 확인 오류:', asCheckError);
-                throw asCheckError;
-            }
-
-            // 기존 AS 번호들에서 최대 번호 찾기
-            let maxNum = 0;
-            if (existingASSequences && existingASSequences.length > 0) {
-                existingASSequences.forEach(s => {
-                    // 20260223-AS-3 형태에서 숫자 추출
-                    const match = s.sequence_number.match(/-AS-(\d+)$/);
-                    if (match) {
-                        const num = parseInt(match[1]);
-                        if (num > maxNum) maxNum = num;
-                    }
-                    // 기존 20260223-AS 형태 (번호 없는 레거시)도 1로 취급
-                    if (s.sequence_number.match(/-AS$/)) {
-                        if (1 > maxNum) maxNum = 1;
-                    }
-                });
-            }
-
-            const nextNum = maxNum + 1;
-            sequenceNumber = `${dateStr}-AS-${nextNum}`;
-            console.log(`AS 자동 번호 부여: ${sequenceNumber} (기존 ${existingASSequences?.length || 0}건)`);
-        } else {
-            // 일반 차수 (1, 2, 3)는 중복 불가
-            sequenceNumber = `${dateStr}-${seq}`;
-            const { data: existingSequence, error: checkError } = await this.supabase
-                .from('outbound_sequences')
-                .select('id, sequence_number, outbound_date, status')
-                .eq('sequence_number', sequenceNumber)
-                .maybeSingle();
-
-            if (checkError) {
-                console.error('중복 확인 오류:', checkError);
-                throw checkError;
-            }
-
-            if (existingSequence) {
-                this.showNotification(`이미 등록된 차수입니다: ${existingSequence.sequence_number}`, 'error');
-                return;
-            }
+        if (existingSequence) {
+            this.showNotification(`이미 등록된 차수입니다: ${existingSequence.sequence_number} (상태: ${this.getStatusText(existingSequence.status)})`, 'error');
+            return;
         }
 
         try {
@@ -3469,16 +3433,8 @@ class OutboundStatus {
                 throw partsError;
             }
 
-            // 3. 로컬 데이터 업데이트
-            this.outboundSequences.push(newSequence);
-            this.outboundParts.push(...partsData.map((part, index) => ({
-                ...part,
-                id: newSequence.id * 1000 + index // 임시 ID
-            })));
-
-            // 4. UI 업데이트
-            this.applyFilters();
-            this.updateStats();
+            // 3. DB에서 데이터를 다시 로드하여 정확한 데이터 표시
+            await this.forceRefreshData();
             this.closeRegistrationModal();
 
             this.showNotification('출고가 성공적으로 등록되었습니다.', 'success');
