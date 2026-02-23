@@ -3455,7 +3455,7 @@ class OutboundStatus {
             const partsData = this.registrationParts.map(part => ({
                 sequence_id: newSequence.id,
                 part_number: part.partNumber,
-                planned_qty: seq === 'AS' ? 0 : part.quantity,  // AS는 계획 수량 0
+                planned_qty: part.quantity,  // AS도 실제 수량과 동일하게 설정 (DB CHECK 제약조건 준수)
                 scanned_qty: part.quantity,  // 수동 등록 시 입력한 수량을 스캔 수량으로 설정
                 actual_qty: part.quantity,   // 수동 등록 시 입력한 수량을 실제 출고 수량으로 설정
                 status: 'PENDING'
