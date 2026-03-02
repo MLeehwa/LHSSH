@@ -233,6 +233,16 @@
                                         <i class="fas fa-sort ml-1 text-gray-400" id="sortIcon_current_stock"></i>
                                     </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
+                                        onclick="inventoryStatus.sortTable('today_inbound')">
+                                        당일 입고
+                                        <i class="fas fa-sort ml-1 text-gray-400" id="sortIcon_today_inbound"></i>
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
+                                        onclick="inventoryStatus.sortTable('today_outbound')">
+                                        당일 출고
+                                        <i class="fas fa-sort ml-1 text-gray-400" id="sortIcon_today_outbound"></i>
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-800/80 uppercase tracking-wider cursor-pointer hover:bg-white/20"
                                         onclick="inventoryStatus.sortTable('status')">
                                         재고 상태
                                         <i class="fas fa-sort ml-1 text-gray-400" id="sortIcon_status"></i>
@@ -651,8 +661,20 @@
 
         // 스냅샷 재계산 버튼
         document.getElementById('rebuildSnapshotsBtn').addEventListener('click', () => {
-            if (confirm('⚠️ 전체 트랜잭션 + 스냅샷 완전 재구축\n\n1. 기존 inventory_transactions 전체 삭제\n2. ARN 데이터에서 입고 트랜잭션 재생성\n3. 출고 데이터에서 출고 트랜잭션 재생성\n4. 기준일부터 오늘까지 스냅샷 재계산\n\n계속하시겠습니까?')) {
-                inventoryStatus.rebuildAllSnapshots();
+            const baseDate = prompt(
+                '⚠️ 전체 트랜잭션 + 스냅샷 완전 재구축\n\n' +
+                '1. 기존 inventory_transactions 전체 삭제\n' +
+                '2. ARN 데이터에서 입고 트랜잭션 재생성\n' +
+                '3. 출고 데이터에서 출고 트랜잭션 재생성\n' +
+                '4. 기준일부터 오늘까지 스냅샷 재계산\n' +
+                '5. inventory.current_stock 동기화\n\n' +
+                '기준일을 입력하세요 (YYYY-MM-DD):',
+                '2026-02-01'
+            );
+            if (baseDate && /^\d{4}-\d{2}-\d{2}$/.test(baseDate.trim())) {
+                inventoryStatus.rebuildAllSnapshots(baseDate.trim());
+            } else if (baseDate !== null) {
+                alert('날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력하세요.');
             }
         });
 

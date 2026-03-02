@@ -420,6 +420,46 @@ class InventoryStatus {
         // 파트번호순 정렬
         result.sort((a, b) => (a.part_number || '').localeCompare(b.part_number || ''));
 
+        // ★ 당일 입고/출고 수량 조회 (inventory_transactions 기반)
+        try {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            const { data: todayTrans } = await this.supabase
+                .from('inventory_transactions')
+                .select('part_number, transaction_type, quantity')
+                .eq('transaction_date', todayStr)
+                .in('transaction_type', ['INBOUND', 'OUTBOUND']);
+
+            // 파트별 입고/출고 합산 (중복 reference_id 제거)
+            const inboundMap = new Map();
+            const outboundMap = new Map();
+            if (todayTrans) {
+                todayTrans.forEach(t => {
+                    if (t.transaction_type === 'INBOUND') {
+                        inboundMap.set(t.part_number, (inboundMap.get(t.part_number) || 0) + (t.quantity || 0));
+                    } else if (t.transaction_type === 'OUTBOUND') {
+                        outboundMap.set(t.part_number, (outboundMap.get(t.part_number) || 0) + (t.quantity || 0));
+                    }
+                });
+            }
+
+            // 결과에 today_inbound, today_outbound 추가
+            result.forEach(item => {
+                item.today_inbound = inboundMap.get(item.part_number) || 0;
+                item.today_outbound = outboundMap.get(item.part_number) || 0;
+            });
+
+            console.log(`당일(${todayStr}) 입출고 데이터 병합 완료: 입고 ${inboundMap.size}개 파트, 출고 ${outboundMap.size}개 파트`);
+        } catch (todayErr) {
+            console.warn('당일 입출고 데이터 조회 오류 (무시 가능):', todayErr);
+            // 오류 시 0으로 초기화
+            result.forEach(item => {
+                item.today_inbound = item.today_inbound || 0;
+                item.today_outbound = item.today_outbound || 0;
+            });
+        }
+
         console.log('필터링된 재고 데이터 개수:', result.length, '(AS 포함:', includeAS, ')');
 
         this.cache.set(cacheKey, result);
@@ -881,7 +921,7 @@ class InventoryStatus {
         if (this.filteredInventory.length === 0) {
             const noDataRow = document.createElement('tr');
             noDataRow.innerHTML = `
-                <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
                     조건에 맞는 재고가 없습니다.
                 </td>
             `;
@@ -907,6 +947,8 @@ class InventoryStatus {
 
                 const partNumber = item.part_number || 'N/A';
                 const currentStock = item.current_stock !== undefined ? item.current_stock : 0;
+                const todayInbound = item.today_inbound || 0;
+                const todayOutbound = item.today_outbound || 0;
                 const lastUpdated = item.last_updated || 'N/A';
 
                 // 날짜만 표시 (YYYY-MM-DD 형식)
@@ -926,6 +968,8 @@ class InventoryStatus {
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">${partNumber}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${currentStock}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${todayInbound > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'}">${todayInbound > 0 ? '+' + todayInbound : '0'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${todayOutbound > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}">${todayOutbound > 0 ? '-' + todayOutbound : '0'}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColor}">
                             ${statusText}
@@ -2356,9 +2400,10 @@ class InventoryStatus {
 
             console.log(`완료된 컨테이너: ${completedContainers.length}개`);
 
-            // 2. 기존 inventory_transactions에서 이미 기록된 ARN+파트 조합 확인 (중복 방지)
+            // 2. 기존 INBOUND 트랜잭션에서 이미 기록된 ARN+파트 조합 확인 (포괄적 중복 방지)
             const arnNumbers = completedContainers.map(c => c.arn_number);
-            // 배치 처리: in() 필터 제한 회피 (50개씩)
+
+            // ARN 번호 기반 + 전체 INBOUND 기반 양쪽 모두 검색 (중복 경로 완전 차단)
             let existingTrans = [];
             for (let i = 0; i < arnNumbers.length; i += 50) {
                 const batch = arnNumbers.slice(i, i + 50);
@@ -2374,21 +2419,28 @@ class InventoryStatus {
             // reference_id + part_number 조합으로 중복 체크 (더 정확)
             const existingKeySet = new Set(existingTrans.map(t => `${t.reference_id}__${t.part_number}`));
             const existingArnSet = new Set(existingTrans.map(t => t.reference_id));
-            const missingContainers = completedContainers.filter(c => !existingArnSet.has(c.arn_number));
 
-            if (missingContainers.length === 0) {
+            // 컨테이너 단위 필터 + 파트 단위 필터 모두 적용
+            // 1차: ARN이 아예 없는 컨테이너만 1차 후보
+            // 2차: ARN이 있어도 일부 파트가 누락된 경우 포함 (existingKeySet로 필터)
+            const missingContainers = completedContainers.filter(c => !existingArnSet.has(c.arn_number));
+            const partialContainers = completedContainers.filter(c => existingArnSet.has(c.arn_number));
+            // 부분 누락 컨테이너도 포함 (아래에서 existingKeySet로 파트 단위 필터 적용)
+            const allCandidates = [...missingContainers, ...partialContainers];
+
+            if (allCandidates.length === 0) {
                 console.log('누락된 입고 트랜잭션 없음 - 동기화 완료');
                 if (!silent) this.showNotification('누락된 입고 트랜잭션이 없습니다. 모든 데이터가 동기화 되어 있습니다.', 'success');
                 if (!silent) this.showLoading(false);
                 return;
             }
 
-            console.log(`누락된 컨테이너: ${missingContainers.length}개`);
+            console.log(`동기화 대상 컨테이너: 완전 누락 ${missingContainers.length}개, 부분 확인 ${partialContainers.length}개`);
             let totalInserted = 0;
             let totalErrors = 0;
 
-            // 3. 누락된 컨테이너별로 파트 조회 후 트랜잭션 생성
-            for (const container of missingContainers) {
+            // 3. 대상 컨테이너별로 파트 조회 후 누락된 트랜잭션만 생성
+            for (const container of allCandidates) {
                 const { data: parts, error: pErr } = await this.supabase
                     .from('arn_parts')
                     .select('part_number, quantity')
@@ -2686,10 +2738,10 @@ class InventoryStatus {
     }
 
     // ==================== 전체 트랜잭션 + 스냅샷 완전 재구축 ====================
-    async rebuildAllSnapshots() {
+    async rebuildAllSnapshots(customBaseDate) {
         try {
             this.showLoading(true);
-            console.log('=== 전체 트랜잭션 + 스냅샷 완전 재구축 시작 ===');
+            console.log(`=== 전체 트랜잭션 + 스냅샷 완전 재구축 시작 (기준일: ${customBaseDate}) ===`);
 
             // ========== STEP 1: 기존 inventory_transactions 전체 삭제 ==========
             console.log('STEP 1: 기존 inventory_transactions 삭제...');
@@ -2838,31 +2890,59 @@ class InventoryStatus {
             }
             console.log(`OUTBOUND 완료: ${totalOutbound}건 생성`);
 
-            // ========== STEP 4: 스냅샷 재계산 ==========
-            console.log('STEP 4: 스냅샷 재계산...');
-            const { data: earliestSnap } = await this.supabase
-                .from('daily_inventory_snapshot')
-                .select('snapshot_date')
-                .order('snapshot_date', { ascending: true })
-                .limit(1);
+            // ========== STEP 4: 스냅샷 재계산 (사용자 지정 기준일) ==========
+            console.log(`STEP 4: 스냅샷 재계산 (기준일: ${customBaseDate})...`);
 
-            if (!earliestSnap || earliestSnap.length === 0) {
+            // 기준일 스냅샷 존재 여부 확인
+            const { data: baseSnap } = await this.supabase
+                .from('daily_inventory_snapshot')
+                .select('snapshot_date, part_number, closing_stock')
+                .eq('snapshot_date', customBaseDate);
+
+            if (!baseSnap || baseSnap.length === 0) {
                 this.showNotification(
                     `트랜잭션 재구축 완료 (입고: ${totalInbound}건, 출고: ${totalOutbound}건)\n` +
-                    '기준 스냅샷이 없어 스냅샷 재계산은 건너뜁니다. 엑셀로 기준일 마감재고를 먼저 업로드해주세요.',
+                    `기준일(${customBaseDate}) 스냅샷이 없습니다. 엑셀로 기준일 마감재고를 먼저 업로드해주세요.`,
                     'warning'
                 );
                 this.showLoading(false);
                 return;
             }
 
-            const baseDate = earliestSnap[0].snapshot_date.split('T')[0];
-            await this.cascadeSnapshotsFromDate(baseDate);
+            console.log(`기준일 ${customBaseDate}: ${baseSnap.length}개 파트 스냅샷 확인됨`);
+            await this.cascadeSnapshotsFromDate(customBaseDate);
+
+            // ========== STEP 5: inventory.current_stock 동기화 (스냅샷 기준) ==========
+            console.log('STEP 5: inventory.current_stock 동기화...');
+            try {
+                const now2 = new Date();
+                const todayForSync = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(now2.getDate()).padStart(2, '0')}`;
+                const { data: latestSnapshots } = await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .select('part_number, closing_stock')
+                    .eq('snapshot_date', todayForSync);
+
+                if (latestSnapshots && latestSnapshots.length > 0) {
+                    for (const snap of latestSnapshots) {
+                        await this.supabase
+                            .from('inventory')
+                            .upsert({
+                                part_number: snap.part_number,
+                                current_stock: snap.closing_stock,
+                                status: snap.closing_stock > 0 ? 'in_stock' : 'out_of_stock',
+                                last_updated: new Date().toISOString()
+                            }, { onConflict: 'part_number' });
+                    }
+                    console.log(`inventory.current_stock ${latestSnapshots.length}개 파트 동기화 완료`);
+                }
+            } catch (syncErr) {
+                console.warn('inventory.current_stock 동기화 오류 (무시 가능):', syncErr);
+            }
 
             const now = new Date();
             const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             this.showNotification(
-                `완전 재구축 완료!\n입고: ${totalInbound}건, 출고: ${totalOutbound}건\n스냅샷: ${baseDate} → ${today}`,
+                `완전 재구축 완료!\n입고: ${totalInbound}건, 출고: ${totalOutbound}건\n스냅샷: ${customBaseDate} → ${today}`,
                 'success'
             );
 
