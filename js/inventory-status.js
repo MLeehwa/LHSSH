@@ -3257,30 +3257,61 @@ class InventoryStatus {
             const { data: allParts, error: partsError } = await partsQuery.order('part_number');
             if (partsError) throw partsError;
 
-            // 2. 현재 재고 데이터 (inventory 테이블 기준 - 정확한 현재 재고)
-            const { data: inventoryData, error: invError } = await this.supabase
-                .from('inventory')
-                .select('part_number, current_stock');
-            if (invError) console.warn('현재 재고 조회 오류:', invError);
+            // 2. ★ 기준 스냅샷 조회 (2/1 마감 등 가장 이른 스냅샷을 기준점으로 사용)
+            // startDate 이전의 가장 가까운 스냅샷을 찾아서 기준 재고로 사용
+            const { data: baseSnapshotInfo } = await this.supabase
+                .from('daily_inventory_snapshot')
+                .select('snapshot_date')
+                .lte('snapshot_date', startDate)
+                .order('snapshot_date', { ascending: false })
+                .limit(1);
 
-            const currentStockMap = new Map();
-            (inventoryData || []).forEach(inv => {
-                currentStockMap.set(inv.part_number, inv.current_stock || 0);
-            });
+            let baseDate = null;
+            const baseStockMap = new Map();
 
-            // 오늘 날짜 (역산 기준점)
-            const todayStr = window.getLocalDateString ? window.getLocalDateString() : (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+            if (baseSnapshotInfo && baseSnapshotInfo.length > 0) {
+                baseDate = baseSnapshotInfo[0].snapshot_date;
+            } else {
+                // startDate 이전 스냅샷이 없으면 가장 이른 스냅샷 사용
+                const { data: earliestSnap } = await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .select('snapshot_date')
+                    .order('snapshot_date', { ascending: true })
+                    .limit(1);
+                if (earliestSnap && earliestSnap.length > 0) {
+                    baseDate = earliestSnap[0].snapshot_date;
+                }
+            }
 
-            // 역산을 위해 startDate ~ 오늘까지의 입고/출고 데이터 필요
-            const extendedEndDate = todayStr > endDate ? todayStr : endDate;
+            if (baseDate) {
+                const { data: baseSnapData } = await this.supabase
+                    .from('daily_inventory_snapshot')
+                    .select('part_number, closing_stock')
+                    .eq('snapshot_date', baseDate);
+                if (baseSnapData) {
+                    baseSnapData.forEach(s => {
+                        baseStockMap.set(s.part_number, s.closing_stock || 0);
+                    });
+                }
+                console.log(`기준 스냅샷: ${baseDate} (${baseStockMap.size}개 파트)`);
+            } else {
+                console.warn('스냅샷 데이터 없음 - 재고 0으로 시작');
+            }
 
-            // 3. 입고 데이터: arn_containers + arn_parts 기준 (입고 현황과 동일)
+            // 기준 스냅샷 다음날부터 조회해야 정확한 전진 계산 가능
+            // 기준날짜 다음날 = 입고/출고 시작점
+            const calcStartDate = baseDate || startDate;
+            const calcStartNext = new Date(calcStartDate + 'T12:00:00');
+            calcStartNext.setDate(calcStartNext.getDate() + 1);
+            const calcStartNextStr = `${calcStartNext.getFullYear()}-${String(calcStartNext.getMonth()+1).padStart(2,'0')}-${String(calcStartNext.getDate()).padStart(2,'0')}`;
+
+            // 3. 입고 데이터: arn_containers + arn_parts 기준 (기준일 다음날 ~ endDate)
             const { data: inboundContainers, error: icError } = await this.supabase
                 .from('arn_containers')
                 .select('arn_number, inbound_date')
                 .eq('status', 'COMPLETED')
-                .gte('inbound_date', startDate)
-                .lte('inbound_date', extendedEndDate);
+                .gte('inbound_date', calcStartNextStr)
+                .lte('inbound_date', endDate);
             if (icError) console.warn('입고 컨테이너 조회 오류:', icError);
 
             // 컨테이너별 파트 수량 조회
@@ -3302,13 +3333,13 @@ class InventoryStatus {
                 arnDateMap.set(c.arn_number, d);
             });
 
-            // 4. 출고 데이터: outbound_sequences + outbound_parts 기준 (출고 현황과 동일)
+            // 4. 출고 데이터: outbound_sequences + outbound_parts 기준 (기준일 다음날 ~ endDate)
             const { data: outboundSeqs, error: osError } = await this.supabase
                 .from('outbound_sequences')
                 .select('id, outbound_date')
                 .in('status', ['COMPLETED', 'CONFIRMED'])
-                .gte('outbound_date', startDate)
-                .lte('outbound_date', extendedEndDate);
+                .gte('outbound_date', calcStartNextStr)
+                .lte('outbound_date', endDate);
             if (osError) console.warn('출고 시퀀스 조회 오류:', osError);
 
             let outboundPartsData = [];
@@ -3329,8 +3360,7 @@ class InventoryStatus {
                 seqDateMap.set(s.id, d);
             });
 
-            console.log(`입고 컨테이너: ${inboundContainers?.length || 0}건, 입고 파트: ${inboundPartsData.length}건`);
-            console.log(`출고 시퀀스: ${outboundSeqs?.length || 0}건, 출고 파트: ${outboundPartsData.length}건`);
+            console.log(`기준 스냅샷: ${baseDate}, 입고 파트: ${inboundPartsData.length}건, 출고 파트: ${outboundPartsData.length}건`);
 
             // 5. 파트별 날짜별 데이터 구성
             const partDataMap = new Map();
@@ -3344,7 +3374,7 @@ class InventoryStatus {
             });
 
             // 날짜별 입고 집계
-            const dateInboundMap = new Map(); // key: "date|part_number", value: quantity
+            const dateInboundMap = new Map();
             inboundPartsData.forEach(p => {
                 const inboundDate = arnDateMap.get(p.arn_number);
                 if (!inboundDate) return;
@@ -3353,7 +3383,7 @@ class InventoryStatus {
             });
 
             // 날짜별 출고 집계
-            const dateOutboundMap = new Map(); // key: "date|part_number", value: quantity
+            const dateOutboundMap = new Map();
             outboundPartsData.forEach(p => {
                 const outboundDate = seqDateMap.get(p.sequence_id);
                 if (!outboundDate) return;
@@ -3362,15 +3392,15 @@ class InventoryStatus {
                 dateOutboundMap.set(key, (dateOutboundMap.get(key) || 0) + qty);
             });
 
-            // startDate ~ 오늘까지의 전체 날짜 리스트 생성 (역산용)
+            // 기준일 다음날 ~ endDate 까지의 전체 날짜 리스트 (전진 계산용)
             const fullDateList = [];
-            const fullCurDate = new Date(startDate + 'T12:00:00');
-            const fullEndDateObj = new Date(todayStr + 'T12:00:00');
+            const fullCurDate = new Date(calcStartNextStr + 'T12:00:00');
+            const fullEndDateObj = new Date(endDate + 'T12:00:00');
             while (fullCurDate <= fullEndDateObj) {
                 const y = fullCurDate.getFullYear();
                 const m = String(fullCurDate.getMonth() + 1).padStart(2, '0');
-                const d = String(fullCurDate.getDate()).padStart(2, '0');
-                fullDateList.push(`${y}-${m}-${d}`);
+                const dd = String(fullCurDate.getDate()).padStart(2, '0');
+                fullDateList.push(`${y}-${m}-${dd}`);
                 fullCurDate.setDate(fullCurDate.getDate() + 1);
             }
 
@@ -3388,20 +3418,16 @@ class InventoryStatus {
                 });
             });
 
-            // ★ 현재 재고에서 역산하여 일자별 마감 재고 계산
-            // 오늘 마감재고 = current_stock, 이전날 마감재고 = 다음날 마감재고 - 다음날 입고 + 다음날 출고
+            // ★ 스냅샷 기준 전진 계산: 기준일 마감재고에서 시작하여 앞으로 계산
+            // 당일 마감재고 = 전날 마감재고 + 당일 입고 - 당일 출고
             partDataMap.forEach((partData, partNumber) => {
-                let stock = currentStockMap.get(partNumber) || 0;
-                // 오늘부터 역순으로 계산
-                for (let i = fullDateList.length - 1; i >= 0; i--) {
-                    const date = fullDateList[i];
+                let stock = baseStockMap.get(partNumber) || 0;
+                fullDateList.forEach(date => {
                     const dateData = partData.dates[date];
-                    if (!dateData) continue;
-
+                    if (!dateData) return;
+                    stock = stock + (dateData.inbound || 0) - (dateData.outbound || 0);
                     dateData.stock = stock;
-                    // 이전날 마감재고 = 오늘 마감재고 - 오늘 입고 + 오늘 출고
-                    stock = stock - (dateData.inbound || 0) + (dateData.outbound || 0);
-                }
+                });
             });
 
             // 6. 데이터 저장 및 렌더링
