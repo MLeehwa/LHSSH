@@ -3411,7 +3411,8 @@ class InventoryStatus {
             console.log('일자별 입출고 데이터:', {
                 totalParts: this.dailyInOutData.length,
                 dateRange: `${startDate} ~ ${endDate}`,
-                snapshotCoverage: snapshots?.length || 0
+                inboundParts: inboundPartsData.length,
+                outboundParts: outboundPartsData.length
             });
 
             this.renderDailyStockTable(dateList);
