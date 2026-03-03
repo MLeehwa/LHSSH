@@ -272,7 +272,7 @@ class InitialInventorySetup {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        const fileName = `initial_inventory_template_${new Date().toISOString().split('T')[0]}.csv`;
+        const fileName = `initial_inventory_template_${(window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0])}.csv`;
         link.setAttribute('download', fileName);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);

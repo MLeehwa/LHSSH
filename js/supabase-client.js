@@ -522,7 +522,7 @@ class InventoryService extends DatabaseService {
             if (updateError) throw updateError;
 
             // 3. 거래 내역 기록 (이력용, 트리거 무관)
-            const transactionDate = new Date().toISOString().split('T')[0];
+            const transactionDate = window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0];
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
                 .insert([{

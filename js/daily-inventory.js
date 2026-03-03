@@ -1,7 +1,7 @@
 class DailyInventoryTracker {
     constructor() {
         this.supabase = null;
-        this.currentDate = new Date().toISOString().split('T')[0];
+        this.currentDate = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
         this.dailyData = [];
         this.summaryData = null;
         this.errorData = [];

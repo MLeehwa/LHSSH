@@ -46,6 +46,21 @@
         IS_PRODUCTION: window.NODE_ENV === 'production'
     };
 
+    // ★ 로컬 날짜 유틸리티 함수 (UTC 대신 로컬 시간대 사용)
+    // new Date().toISOString().split('T')[0] 대신 이 함수를 사용하세요!
+    const getLocalDateString = (date = new Date()) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    // 로컬 ISO 타임스탬프 반환 (시간 포함)
+    const getLocalISOString = (date = new Date()) => {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    };
+
     // 전역 객체로 내보내기 (이미 존재하면 덮어쓰지 않음)
     if (!window.SUPABASE_CONFIG || !window.SUPABASE_CONFIG._initialized) {
         window.SUPABASE_CONFIG = SUPABASE_CONFIG;
@@ -54,5 +69,7 @@
         window.SUPABASE_URL = SUPABASE_URL;
         window.SUPABASE_ANON_KEY = SUPABASE_ANON_KEY;
         window.ENV = ENV;
+        window.getLocalDateString = getLocalDateString;
+        window.getLocalISOString = getLocalISOString;
     }
 })();

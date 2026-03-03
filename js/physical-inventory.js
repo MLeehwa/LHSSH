@@ -757,7 +757,7 @@ class PhysicalInventoryManager {
         const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `실사재고_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `실사재고_${(window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0])}.csv`;
         link.click();
     }
 
@@ -794,7 +794,7 @@ class PhysicalInventoryManager {
         XLSX.utils.book_append_sheet(workbook, historyWorksheet, '조정이력');
 
         // 파일 다운로드
-        XLSX.writeFile(workbook, `실사재고_${new Date().toISOString().split('T')[0]}.xlsx`);
+        XLSX.writeFile(workbook, `실사재고_${(window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0])}.xlsx`);
     }
 
     // 알림 표시

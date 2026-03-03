@@ -532,7 +532,7 @@ class QuickInventoryEdit {
         document.getElementById('loadingIndicator').classList.remove('hidden');
 
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0];
             const globalMemo = document.getElementById('globalMemo')?.value?.trim() || '';
             let successCount = 0;
             let errorCount = 0;

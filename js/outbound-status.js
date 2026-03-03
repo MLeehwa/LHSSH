@@ -778,7 +778,7 @@ class OutboundStatus {
             // daily_inventory_summary 업데이트 (출고 날짜 기준)
             const outboundDate = sequence.outbound_date ?
                 (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
-                new Date().toISOString().split('T')[0];
+                (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             console.log('출고 확정 후 daily_inventory_summary 업데이트 시작...');
             console.log('출고 날짜:', outboundDate);
@@ -889,7 +889,7 @@ class OutboundStatus {
     async updateDailyInventorySummary(targetDate = null) {
         try {
             // targetDate가 없으면 오늘 날짜 사용
-            const date = targetDate || new Date().toISOString().split('T')[0];
+            const date = targetDate || (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
             console.log('=== daily_inventory_summary 업데이트 시작 ===');
             console.log('대상 날짜:', date);
 
@@ -1271,7 +1271,7 @@ class OutboundStatus {
                 const partNumbers = sequenceParts.map(p => p.part_number);
                 const outboundDate = sequence.outbound_date ?
                     (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
-                    new Date().toISOString().split('T')[0];
+                    (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
                 // reference_id에 sequence_number가 포함된 거래 내역 삭제
                 const { error: deleteError } = await this.supabase
@@ -1326,7 +1326,7 @@ class OutboundStatus {
             // daily_inventory_summary 업데이트 (출고 날짜 기준)
             const summaryDate = sequence.outbound_date ?
                 (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
-                new Date().toISOString().split('T')[0];
+                (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             console.log('출고 취소 후 daily_inventory_summary 업데이트 시작...');
             console.log('출고 날짜:', summaryDate);
@@ -1433,7 +1433,7 @@ class OutboundStatus {
 
             const transactionDate = sequenceDate ?
                 (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) :
-                new Date().toISOString().split('T')[0];
+                (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             // 1. inventory 직접 UPDATE (1회만)
             const newStock = currentStock - outboundQuantity;
@@ -1579,7 +1579,7 @@ class OutboundStatus {
             // 2. inventory_transactions에 거래 내역 기록
             const transactionDate = sequenceDate ? 
                 (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) : 
-                new Date().toISOString().split('T')[0];
+                (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
@@ -1654,7 +1654,7 @@ class OutboundStatus {
             // 2. inventory_transactions에 거래 내역 기록
             const transactionDate = inboundDate ?
                 (inboundDate.includes('T') ? inboundDate.split('T')[0] : inboundDate) :
-                new Date().toISOString().split('T')[0];
+                (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             const { error: transactionError } = await this.supabase
                 .from('inventory_transactions')
@@ -2175,7 +2175,7 @@ class OutboundStatus {
             // daily_inventory_summary 업데이트 (출고 날짜 기준)
             const outboundDate = selectedSequenceData.outbound_date ?
                 (selectedSequenceData.outbound_date.includes('T') ? selectedSequenceData.outbound_date.split('T')[0] : selectedSequenceData.outbound_date) :
-                new Date().toISOString().split('T')[0];
+                (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             console.log('출고 확정 후 daily_inventory_summary 업데이트 시작...');
             console.log('출고 날짜:', outboundDate);
@@ -2234,7 +2234,7 @@ class OutboundStatus {
                 // daily_inventory_summary 업데이트 (출고 날짜 기준)
                 const outboundDate = sequence.outbound_date ?
                     (sequence.outbound_date.includes('T') ? sequence.outbound_date.split('T')[0] : sequence.outbound_date) :
-                    new Date().toISOString().split('T')[0];
+                    (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
                 console.log('출고 확정 후 daily_inventory_summary 업데이트 시작...');
                 console.log('출고 날짜:', outboundDate);
@@ -2279,7 +2279,7 @@ class OutboundStatus {
 
         const transactionDate = sequenceDate ?
             (sequenceDate.includes('T') ? sequenceDate.split('T')[0] : sequenceDate) :
-            new Date().toISOString().split('T')[0];
+            (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
         try {
             // 1. 현재 재고 상태 조회 (한 번에)
@@ -2444,7 +2444,7 @@ class OutboundStatus {
             // 2. 재고 복구 업데이트
             console.log('재고 복구 배치 업데이트 시작...');
 
-            const today = new Date().toISOString().split('T')[0];
+            const today = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             for (const part of parts) {
                 const inventory = currentInventory.find(inv => inv.part_number === part.part_number);
@@ -2896,7 +2896,7 @@ class OutboundStatus {
                 // 수정 모드: 기존 데이터 사용
                 const today = this.editingSequence.outbound_date ?
                     (this.editingSequence.outbound_date.includes('T') ? this.editingSequence.outbound_date.split('T')[0] : this.editingSequence.outbound_date) :
-                    new Date().toISOString().split('T')[0];
+                    (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
                 document.getElementById('registrationDate').value = today;
                 document.getElementById('registrationSequence').value = this.editingSequence.sequence_number;
 
@@ -2912,7 +2912,7 @@ class OutboundStatus {
                 }
             } else {
                 // 등록 모드: 오늘 날짜로 초기화
-                const today = new Date().toISOString().split('T')[0];
+                const today = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
                 document.getElementById('registrationDate').value = today;
                 document.getElementById('registrationSequence').value = '';
 
@@ -2960,7 +2960,7 @@ class OutboundStatus {
 
     async loadExistingOutboundData() {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             // 오늘 날짜의 기존 출고 차수 확인 (로깅용)
             const { data: existingData, error } = await this.supabase

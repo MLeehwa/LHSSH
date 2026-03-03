@@ -940,7 +940,7 @@ class PhysicalInventoryAdmin {
         }
 
         // daily_inventory_snapshot 업데이트 (inbound/outbound와 동일 패턴)
-        const transactionDate = new Date().toISOString().split('T')[0];
+        const transactionDate = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
         for (const update of inventoryUpdates) {
             try {
                 await this.supabase

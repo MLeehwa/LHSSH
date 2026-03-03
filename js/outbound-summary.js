@@ -536,7 +536,7 @@ class OutboundSummary {
                 console.log(`파트 처리 중: ${part.part_number}, 수량: ${part.actual_qty}, 시퀀스 상태: ${sequence.status}`);
 
                 combinedData.push({
-                    date: this.formatDateOnly(sequence.outbound_date) || new Date().toISOString().split('T')[0],
+                    date: this.formatDateOnly(sequence.outbound_date) || (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]),
                     sequence: sequenceNumber,
                     partNumber: part.part_number,
                     scannedQty: part.scanned_qty || 0,
@@ -1471,7 +1471,7 @@ class OutboundSummary {
             }
 
             // 파일 저장
-            const fileName = `outbound_summary_${new Date().toISOString().split('T')[0]}.xlsx`;
+            const fileName = `outbound_summary_${(window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0])}.xlsx`;
             console.log('=== 파일 저장 시작 ===');
             console.log('파일명:', fileName);
 

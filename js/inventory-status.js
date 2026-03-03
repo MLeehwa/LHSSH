@@ -1125,7 +1125,7 @@ class InventoryStatus {
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `inventory_${new Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute('download', `inventory_${(window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0])}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -1206,7 +1206,7 @@ class InventoryStatus {
             }
 
             // 파일 다운로드
-            const fileName = `inventory_${new Date().toISOString().split('T')[0]}.xlsx`;
+            const fileName = `inventory_${(window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0])}.xlsx`;
             XLSX.writeFile(wb, fileName);
 
             this.showNotification('재고 데이터가 Excel로 내보내기되었습니다.', 'success');
@@ -1717,7 +1717,7 @@ class InventoryStatus {
     }
 
     async processUploadData(data) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
         for (const row of data) {
             const partNumber = this.extractPartNumber(row);
@@ -1938,7 +1938,7 @@ class InventoryStatus {
     // 수동 입고 관련 메서드들
     showManualInboundModal() {
         document.getElementById('manualInboundModal').classList.remove('hidden');
-        document.getElementById('inboundDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('inboundDate').value = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
         this.createInitialPartField();
         this.loadMasterParts();
     }
@@ -2457,7 +2457,7 @@ class InventoryStatus {
                 // inbound_date 정규화
                 const transactionDate = container.inbound_date
                     ? (container.inbound_date.includes('T') ? container.inbound_date.split('T')[0] : container.inbound_date)
-                    : new Date().toISOString().split('T')[0];
+                    : (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
                 // 이미 존재하는 파트는 제외 (reference_id + part_number 중복 방지)
                 const newParts = parts.filter(p => !existingKeySet.has(`${container.arn_number}__${p.part_number}`));
@@ -2574,7 +2574,7 @@ class InventoryStatus {
 
                 const transactionDate = seq.outbound_date
                     ? (seq.outbound_date.includes('T') ? seq.outbound_date.split('T')[0] : seq.outbound_date)
-                    : new Date().toISOString().split('T')[0];
+                    : (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
                 transRecords.push({
                     transaction_date: transactionDate,

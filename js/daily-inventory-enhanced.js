@@ -5,7 +5,7 @@
 
 class DailyInventoryEnhanced {
     constructor() {
-        this.currentDate = new Date().toISOString().split('T')[0];
+        this.currentDate = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
         this.dateRange = 7; // 기본 7일간 조회
         this.init();
     }
