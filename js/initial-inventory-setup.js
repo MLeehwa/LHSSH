@@ -28,7 +28,7 @@ class InitialInventorySetup {
         // 기본 날짜를 어제로 설정
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayString = yesterday.toISOString().split('T')[0];
+        const yesterdayString = window.getLocalDateString ? window.getLocalDateString(yesterday) : `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
         
         document.getElementById('referenceDate').value = yesterdayString;
         document.getElementById('manualReferenceDate').value = yesterdayString;

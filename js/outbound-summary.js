@@ -4,7 +4,7 @@ class OutboundSummary {
         this.outboundData = [];
         this.filteredData = [];
         this.currentView = 'monthly';
-        this.selectedMonth = new Date().toISOString().slice(0, 7);
+        this.selectedMonth = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]).slice(0, 7);
         this.supabase = null;
         this.filterTimeout = null;
         this.isCompactMode = false;
@@ -599,7 +599,7 @@ class OutboundSummary {
             (transactions || []).forEach(t => {
                 const date = typeof t.transaction_date === 'string'
                     ? t.transaction_date.split('T')[0]
-                    : new Date(t.transaction_date).toISOString().split('T')[0];
+                    : (() => { const d = new Date(t.transaction_date); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
                 const key = `${date}|${t.part_number}`;
                 transByDatePart.set(key, (transByDatePart.get(key) || 0) + Math.abs(t.quantity || 0));
             });

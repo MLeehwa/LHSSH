@@ -2677,7 +2677,7 @@ class OutboundStatus {
             // 1. 최근 출고 확정 데이터 조회 (최근 7일)
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+            const sevenDaysAgoStr = window.getLocalDateString ? window.getLocalDateString(sevenDaysAgo) : `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth()+1).padStart(2,'0')}-${String(sevenDaysAgo.getDate()).padStart(2,'0')}`;
 
             const { data: recentOutbound, error: outboundError } = await this.supabase
                 .from('outbound_sequences')
@@ -2774,7 +2774,7 @@ class OutboundStatus {
             // 최근 7일간의 출고 확정 데이터 재처리
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+            const sevenDaysAgoStr = window.getLocalDateString ? window.getLocalDateString(sevenDaysAgo) : `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth()+1).padStart(2,'0')}-${String(sevenDaysAgo.getDate()).padStart(2,'0')}`;
 
             const { data: recentOutbound, error: outboundError } = await this.supabase
                 .from('outbound_sequences')

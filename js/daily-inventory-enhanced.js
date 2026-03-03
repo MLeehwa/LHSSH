@@ -143,7 +143,7 @@ class DailyInventoryEnhanced {
         try {
             const startDate = new Date();
             startDate.setDate(startDate.getDate() - days);
-            const startDateStr = startDate.toISOString().split('T')[0];
+            const startDateStr = window.getLocalDateString ? window.getLocalDateString(startDate) : `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`;
 
             console.log(`파트 ${partNumber} 재고 이력 조회: ${startDateStr} ~ ${this.currentDate}`);
 
