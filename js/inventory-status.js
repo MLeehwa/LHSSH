@@ -449,11 +449,11 @@ class InventoryStatus {
                 }
             }
 
-            // ★ 출고: outbound_sequences의 outbound_date 기준
+            // ★ 출고: outbound_sequences의 outbound_date 기준 (status: COMPLETED)
             const { data: todaySequences } = await this.supabase
                 .from('outbound_sequences')
                 .select('id, outbound_date')
-                .eq('status', 'CONFIRMED');
+                .eq('status', 'COMPLETED');
 
             if (todaySequences && todaySequences.length > 0) {
                 // outbound_date에서 날짜만 추출하여 오늘과 비교
@@ -467,12 +467,12 @@ class InventoryStatus {
                 if (todaySeqIds.length > 0) {
                     const { data: todayOutParts } = await this.supabase
                         .from('outbound_parts')
-                        .select('part_number, quantity')
+                        .select('part_number, actual_qty')
                         .in('sequence_id', todaySeqIds);
 
                     if (todayOutParts) {
                         todayOutParts.forEach(p => {
-                            outboundMap.set(p.part_number, (outboundMap.get(p.part_number) || 0) + (p.quantity || 0));
+                            outboundMap.set(p.part_number, (outboundMap.get(p.part_number) || 0) + (p.actual_qty || 0));
                         });
                     }
                 }
