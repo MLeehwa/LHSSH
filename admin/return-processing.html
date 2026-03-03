@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>반품 처리 - 이화 - 서한 시스템</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Design System -->
+    <link rel="stylesheet" href="../css/design-system.css">
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0"></script>
+    <script src="../js/config.js?v=20260303"></script>
+    <script>
+        function configureTailwind() {
+            if (window.tailwind) {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#3B82F6',
+                                secondary: '#6B7280',
+                                success: '#10B981',
+                                warning: '#F59E0B',
+                                danger: '#EF4444'
+                            }
+                        }
+                    }
+                }
+            } else {
+                setTimeout(configureTailwind, 100);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', configureTailwind);
+        window.NODE_ENV = 'development';
+    </script>
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside id="shared-sidebar" class="ds-sidebar"></aside>
+        <script src="../js/sidebar.js?v=20260303"></script>
+
+        <!-- Main Content -->
+        <div class="app-content">
+            <!-- Header -->
+            <header class="ds-header">
+                <div>
+                    <h1 class="ds-header-title">반품 처리</h1>
+                    <p class="ds-header-subtitle">입고된 물품의 반품 관리</p>
+                </div>
+                <div class="ds-header-actions">
+                    <button id="newReturnBtn" class="ds-btn ds-btn-primary">
+                        <i class="fas fa-plus"></i> 반품 등록
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Statistics Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-red-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-undo-alt text-red-400 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800/80">총 반품 건수</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="totalReturns">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.1s;">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-orange-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-calendar-day text-orange-400 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800/80">오늘 반품</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="todayReturns">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.2s;">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-purple-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-cubes text-purple-400 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800/80">오늘 반품 수량</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="todayReturnQty">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-effect rounded-xl p-6 animate-slide-up" style="animation-delay: 0.3s;">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-blue-100/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-list text-blue-400 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800/80">반품 파트 종류</p>
+                                <p class="text-2xl font-semibold text-gray-800" id="uniqueParts">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="glass-effect rounded-xl mb-6 animate-slide-up" style="animation-delay: 0.4s;">
+                    <div class="p-6">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">필터</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-800/80 mb-2">반품 날짜</label>
+                                <input type="date" id="dateFilter"
+                                    class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-800/80 mb-2">파트 번호</label>
+                                <input type="text" id="partFilter" placeholder="파트 번호 검색"
+                                    class="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="flex items-end space-x-2">
+                                <button id="applyFilter" class="ds-btn ds-btn-primary">
+                                    <i class="fas fa-search"></i> 조회
+                                </button>
+                                <button id="resetFilter" class="ds-btn ds-btn-secondary">
+                                    <i class="fas fa-redo"></i> 초기화
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Return Records Table -->
+                <div class="glass-effect rounded-xl animate-slide-up" style="animation-delay: 0.5s;">
+                    <div class="p-6">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">반품 내역</h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">반품일</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">파트 번호</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">반품 수량</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사유</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">등록일시</th>
+                                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="returnTableBody" class="bg-white divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">데이터를 불러오는 중...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Return Registration Modal -->
+    <div id="returnModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800">반품 등록</h3>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">반품 날짜 <span class="text-red-500">*</span></label>
+                    <input type="date" id="returnDate"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">파트 번호 <span class="text-red-500">*</span></label>
+                    <select id="returnPartNumber"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">파트를 선택하세요</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">반품 수량 <span class="text-red-500">*</span></label>
+                    <input type="number" id="returnQuantity" min="1" placeholder="수량 입력"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">반품 사유</label>
+                    <textarea id="returnReason" rows="2" placeholder="반품 사유를 입력하세요 (선택)"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button id="cancelReturn" class="ds-btn ds-btn-secondary">취소</button>
+                <button id="saveReturn" class="ds-btn ds-btn-primary">
+                    <i class="fas fa-save mr-1"></i>반품 등록
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="fixed top-4 right-4 z-50 hidden"></div>
+
+    <script src="../js/supabase-client.js?v=20260303"></script>
+    <script src="../js/return-processing.js?v=20260303"></script>
+</body>
+
+</html>

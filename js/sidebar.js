@@ -7,6 +7,7 @@
         { href: 'index.html', icon: 'fas fa-tachometer-alt', label: '대시보드' },
         { href: 'part-registration.html', icon: 'fas fa-plus-circle', label: '파트 등록' },
         { href: 'inbound-status.html', icon: 'fas fa-arrow-down', label: '입고 현황' },
+        { href: 'return-processing.html', icon: 'fas fa-undo-alt', label: '반품 처리' },
         { href: 'outbound-status.html', icon: 'fas fa-arrow-up', label: '출고 현황' },
         { href: 'inventory-status.html', icon: 'fas fa-boxes', label: '재고 현황' },
         { href: 'outbound-summary.html', icon: 'fas fa-chart-bar', label: '출하 현황' },

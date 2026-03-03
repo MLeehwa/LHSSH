@@ -428,12 +428,30 @@ class InventoryStatus {
                 }
             }
 
-            // 2-4. 전진 계산: 기준재고 + 총입고 - 총출고 = 현재재고
+            // 반품 합계: return_records
+            const totalReturnMap = new Map();
+            try {
+                const { data: allReturns } = await this.supabase
+                    .from('return_records')
+                    .select('part_number, quantity')
+                    .gte('return_date', calcStartNextStr)
+                    .lte('return_date', todayForCalc);
+                if (allReturns) {
+                    allReturns.forEach(r => {
+                        totalReturnMap.set(r.part_number, (totalReturnMap.get(r.part_number) || 0) + (r.quantity || 0));
+                    });
+                }
+            } catch (retErr) {
+                console.warn('반품 합계 조회 오류:', retErr);
+            }
+
+            // 2-4. 전진 계산: 기준재고 + 총입고 - 총출고 - 총반품 = 현재재고
             result = [...allowedPartNumbers].map(partNumber => {
                 const baseStock = baseStockMap.get(partNumber) || 0;
                 const totalIn = totalInboundMap.get(partNumber) || 0;
                 const totalOut = totalOutboundMap.get(partNumber) || 0;
-                const calculatedStock = baseStock + totalIn - totalOut;
+                const totalRet = totalReturnMap.get(partNumber) || 0;
+                const calculatedStock = baseStock + totalIn - totalOut - totalRet;
 
                 return {
                     part_number: partNumber,
@@ -443,7 +461,7 @@ class InventoryStatus {
                 };
             });
 
-            console.log(`재고 현황 (스냅샷 전진계산): 기준일=${baseDate}, 파트=${result.length}개, 총입고파트=${totalInboundMap.size}, 총출고파트=${totalOutboundMap.size}`);
+            console.log(`재고 현황 (스냅샷 전진계산): 기준일=${baseDate}, 파트=${result.length}개, 입고=${totalInboundMap.size}, 출고=${totalOutboundMap.size}, 반품=${totalReturnMap.size}`);
         }
 
         // 3. 스냅샷이 없으면 기존 inventory 테이블 fallback
@@ -525,19 +543,38 @@ class InventoryStatus {
                 }
             }
 
-            // 결과에 today_inbound, today_outbound 추가
+            // ★ 반품: return_records의 return_date 기준
+            const returnMap = new Map();
+            try {
+                const { data: todayReturns } = await this.supabase
+                    .from('return_records')
+                    .select('part_number, quantity')
+                    .eq('return_date', todayStr);
+
+                if (todayReturns) {
+                    todayReturns.forEach(r => {
+                        returnMap.set(r.part_number, (returnMap.get(r.part_number) || 0) + (r.quantity || 0));
+                    });
+                }
+            } catch (retErr) {
+                console.warn('당일 반품 데이터 조회 오류 (무시 가능):', retErr);
+            }
+
+            // 결과에 today_inbound, today_outbound, today_return 추가
             result.forEach(item => {
                 item.today_inbound = inboundMap.get(item.part_number) || 0;
                 item.today_outbound = outboundMap.get(item.part_number) || 0;
+                item.today_return = returnMap.get(item.part_number) || 0;
             });
 
-            console.log(`당일(${todayStr}) 입출고 데이터 병합 완료: 입고 ${inboundMap.size}개 파트, 출고 ${outboundMap.size}개 파트`);
+            console.log(`당일(${todayStr}) 데이터 병합 완료: 입고 ${inboundMap.size}, 출고 ${outboundMap.size}, 반품 ${returnMap.size}개 파트`);
         } catch (todayErr) {
             console.warn('당일 입출고 데이터 조회 오류 (무시 가능):', todayErr);
             // 오류 시 0으로 초기화
             result.forEach(item => {
                 item.today_inbound = item.today_inbound || 0;
                 item.today_outbound = item.today_outbound || 0;
+                item.today_return = item.today_return || 0;
             });
         }
 
@@ -1030,6 +1067,7 @@ class InventoryStatus {
                 const currentStock = item.current_stock !== undefined ? item.current_stock : 0;
                 const todayInbound = item.today_inbound || 0;
                 const todayOutbound = item.today_outbound || 0;
+                const todayReturn = item.today_return || 0;
                 const lastUpdated = item.last_updated || 'N/A';
 
                 // 날짜만 표시 (YYYY-MM-DD 형식)
@@ -1051,6 +1089,7 @@ class InventoryStatus {
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${currentStock}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm ${todayInbound > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'}">${todayInbound > 0 ? '+' + todayInbound : '0'}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm ${todayOutbound > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}">${todayOutbound > 0 ? '-' + todayOutbound : '0'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${todayReturn > 0 ? 'text-orange-500 font-semibold' : 'text-gray-400'}">${todayReturn > 0 ? '-' + todayReturn : '0'}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColor}">
                             ${statusText}
@@ -3407,9 +3446,23 @@ class InventoryStatus {
                 seqDateMap.set(s.id, d);
             });
 
-            console.log(`기준 스냅샷: ${baseDate}, 입고 파트: ${inboundPartsData.length}건, 출고 파트: ${outboundPartsData.length}건`);
+            // 5. 반품 데이터: return_records 기준
+            let returnData = [];
+            try {
+                const { data: returns, error: retError } = await this.supabase
+                    .from('return_records')
+                    .select('part_number, quantity, return_date')
+                    .gte('return_date', calcStartNextStr)
+                    .lte('return_date', endDate);
+                if (retError) console.warn('반품 조회 오류:', retError);
+                returnData = returns || [];
+            } catch (retErr) {
+                console.warn('반품 데이터 조회 오류:', retErr);
+            }
 
-            // 5. 파트별 날짜별 데이터 구성
+            console.log(`기준 스냅샷: ${baseDate}, 입고: ${inboundPartsData.length}건, 출고: ${outboundPartsData.length}건, 반품: ${returnData.length}건`);
+
+            // 6. 파트별 날짜별 데이터 구성
             const partDataMap = new Map();
 
             // 모든 파트 초기화
@@ -3439,6 +3492,15 @@ class InventoryStatus {
                 dateOutboundMap.set(key, (dateOutboundMap.get(key) || 0) + qty);
             });
 
+            // 날짜별 반품 집계
+            const dateReturnMap = new Map();
+            returnData.forEach(r => {
+                const retDate = typeof r.return_date === 'string' ? r.return_date.split('T')[0] : r.return_date;
+                if (!retDate) return;
+                const key = `${retDate}|${r.part_number}`;
+                dateReturnMap.set(key, (dateReturnMap.get(key) || 0) + (Number(r.quantity) || 0));
+            });
+
             // 기준일 다음날 ~ endDate 까지의 전체 날짜 리스트 (전진 계산용)
             const fullDateList = [];
             const fullCurDate = new Date(calcStartNextStr + 'T12:00:00');
@@ -3451,28 +3513,30 @@ class InventoryStatus {
                 fullCurDate.setDate(fullCurDate.getDate() + 1);
             }
 
-            // 각 파트에 날짜별 입고/출고 데이터 저장
+            // 각 파트에 날짜별 입고/출고/반품 데이터 저장
             fullDateList.forEach(date => {
                 partDataMap.forEach((partData, partNumber) => {
                     const inboundQty = dateInboundMap.get(`${date}|${partNumber}`) || 0;
                     const outboundQty = dateOutboundMap.get(`${date}|${partNumber}`) || 0;
+                    const returnQty = dateReturnMap.get(`${date}|${partNumber}`) || 0;
 
                     partData.dates[date] = {
                         inbound: inboundQty,
                         outbound: outboundQty,
+                        returnQty: returnQty,
                         stock: null
                     };
                 });
             });
 
             // ★ 스냅샷 기준 전진 계산: 기준일 마감재고에서 시작하여 앞으로 계산
-            // 당일 마감재고 = 전날 마감재고 + 당일 입고 - 당일 출고
+            // 당일 마감재고 = 전날 마감재고 + 당일 입고 - 당일 출고 - 당일 반품
             partDataMap.forEach((partData, partNumber) => {
                 let stock = baseStockMap.get(partNumber) || 0;
                 fullDateList.forEach(date => {
                     const dateData = partData.dates[date];
                     if (!dateData) return;
-                    stock = stock + (dateData.inbound || 0) - (dateData.outbound || 0);
+                    stock = stock + (dateData.inbound || 0) - (dateData.outbound || 0) - (dateData.returnQty || 0);
                     dateData.stock = stock;
                 });
             });
@@ -3607,11 +3671,11 @@ class InventoryStatus {
         partHeader.textContent = '파트 번호';
         headerRow.appendChild(partHeader);
 
-        // 각 날짜별 헤더 (입고, 출고, 재고)
+        // 각 날짜별 헤더 (입고, 출고, 반품, 재고)
         dateList.forEach(date => {
             const dateHeader = document.createElement('th');
             dateHeader.className = 'px-2 py-3 text-center text-xs font-medium text-gray-800/80 uppercase tracking-wider';
-            dateHeader.colSpan = 3;
+            dateHeader.colSpan = 4;
             // 날짜를 정오 기준으로 파싱하여 UTC 오프셋에 의한 날짜 밀림 방지
             const dateObj = new Date(date + 'T12:00:00');
             dateHeader.innerHTML = `
@@ -3619,6 +3683,7 @@ class InventoryStatus {
                 <div class="text-xs text-gray-600 mt-1">
                     <span class="text-green-600">입고</span> | 
                     <span class="text-red-600">출고</span> | 
+                    <span class="text-orange-500">반품</span> | 
                     <span class="text-blue-600">재고</span>
                 </div>
             `;
@@ -3638,11 +3703,12 @@ class InventoryStatus {
 
         // 각 날짜별 서브 헤더
         dateList.forEach(() => {
-            ['입고', '출고', '재고'].forEach((label, idx) => {
+            ['입고', '출고', '반품', '재고'].forEach((label, idx) => {
                 const subHeader = document.createElement('th');
                 subHeader.className = 'px-2 py-2 text-center text-xs font-medium text-gray-700';
                 if (idx === 0) subHeader.classList.add('text-green-600');
                 else if (idx === 1) subHeader.classList.add('text-red-600');
+                else if (idx === 2) subHeader.classList.add('text-orange-500');
                 else subHeader.classList.add('text-blue-600');
                 subHeader.textContent = label;
                 subHeaderRow.appendChild(subHeader);
@@ -3668,7 +3734,7 @@ class InventoryStatus {
 
             // 각 날짜별 데이터
             dateList.forEach(date => {
-                const dateData = partData.dates[date] || { inbound: 0, outbound: 0, stock: 0, adjustment: 0 };
+                const dateData = partData.dates[date] || { inbound: 0, outbound: 0, returnQty: 0, stock: 0 };
 
                 // 입고
                 const inboundCell = document.createElement('td');
@@ -3681,6 +3747,12 @@ class InventoryStatus {
                 outboundCell.className = 'px-2 py-3 text-sm text-center text-red-600';
                 outboundCell.textContent = dateData.outbound || 0;
                 row.appendChild(outboundCell);
+
+                // 반품
+                const returnCell = document.createElement('td');
+                returnCell.className = 'px-2 py-3 text-sm text-center text-orange-500';
+                returnCell.textContent = dateData.returnQty || 0;
+                row.appendChild(returnCell);
 
                 // 재고
                 const stockCell = document.createElement('td');
@@ -3959,6 +4031,92 @@ class InventoryStatus {
                     };
                     cell.font = {
                         color: { argb: 'FFC00000' },
+                        size: 10
+                    };
+                    cell.alignment = {
+                        horizontal: colNumber === 1 ? 'left' : 'center',
+                        vertical: 'middle'
+                    };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+                currentRow++;
+            });
+
+            // 빈 행 2개
+            worksheetInOut.addRow([]);
+            worksheetInOut.addRow([]);
+            currentRow += 2;
+
+            // 반품 구역
+            const returnTitleRow = worksheetInOut.addRow(['반품 현황', ...Array(this.dailyInOutDateList.length).fill('')]);
+            returnTitleRow.getCell(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFFFC000' }
+            };
+            returnTitleRow.getCell(1).font = {
+                bold: true,
+                size: 12
+            };
+            returnTitleRow.getCell(1).border = {
+                top: { style: 'medium' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            currentRow++;
+
+            // 반품 헤더
+            const returnHeader = ['파트 번호'];
+            this.dailyInOutDateList.forEach(date => {
+                returnHeader.push(formatDate(date));
+            });
+            const returnHeaderRow = worksheetInOut.addRow(returnHeader);
+            returnHeaderRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFED7D31' }
+                };
+                cell.font = {
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true,
+                    size: 11
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle'
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            currentRow++;
+
+            // 반품 데이터
+            this.dailyInOutData.forEach((partData, rowIndex) => {
+                const row = [partData.part_number];
+                this.dailyInOutDateList.forEach(date => {
+                    const dateData = partData.dates[date] || { returnQty: 0 };
+                    row.push(dateData.returnQty || 0);
+                });
+                const dataRow = worksheetInOut.addRow(row);
+                dataRow.eachCell((cell, colNumber) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: rowIndex % 2 === 0 ? 'FFFCE4D6' : 'FFFFFFFF' }
+                    };
+                    cell.font = {
+                        color: { argb: 'FFED7D31' },
                         size: 10
                     };
                     cell.alignment = {
