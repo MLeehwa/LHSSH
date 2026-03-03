@@ -420,28 +420,62 @@ class InventoryStatus {
         // 파트번호순 정렬
         result.sort((a, b) => (a.part_number || '').localeCompare(b.part_number || ''));
 
-        // ★ 당일 입고/출고 수량 조회 (inventory_transactions 기반)
+        // ★ 당일 입고/출고 수량 조회 (arn_containers/outbound_sequences 기반)
         try {
             const now = new Date();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-            const { data: todayTrans } = await this.supabase
-                .from('inventory_transactions')
-                .select('part_number, transaction_type, quantity')
-                .eq('transaction_date', todayStr)
-                .in('transaction_type', ['INBOUND', 'OUTBOUND']);
-
-            // 파트별 입고/출고 합산 (중복 reference_id 제거)
             const inboundMap = new Map();
             const outboundMap = new Map();
-            if (todayTrans) {
-                todayTrans.forEach(t => {
-                    if (t.transaction_type === 'INBOUND') {
-                        inboundMap.set(t.part_number, (inboundMap.get(t.part_number) || 0) + (t.quantity || 0));
-                    } else if (t.transaction_type === 'OUTBOUND') {
-                        outboundMap.set(t.part_number, (outboundMap.get(t.part_number) || 0) + (t.quantity || 0));
+
+            // ★ 입고: arn_containers의 inbound_date 기준
+            const { data: todayContainers } = await this.supabase
+                .from('arn_containers')
+                .select('arn_number')
+                .eq('inbound_date', todayStr)
+                .eq('status', 'COMPLETED');
+
+            if (todayContainers && todayContainers.length > 0) {
+                const arnNumbers = todayContainers.map(c => c.arn_number);
+                const { data: todayParts } = await this.supabase
+                    .from('arn_parts')
+                    .select('part_number, quantity')
+                    .in('arn_number', arnNumbers);
+
+                if (todayParts) {
+                    todayParts.forEach(p => {
+                        inboundMap.set(p.part_number, (inboundMap.get(p.part_number) || 0) + (p.quantity || 0));
+                    });
+                }
+            }
+
+            // ★ 출고: outbound_sequences의 outbound_date 기준
+            const { data: todaySequences } = await this.supabase
+                .from('outbound_sequences')
+                .select('id, outbound_date')
+                .eq('status', 'CONFIRMED');
+
+            if (todaySequences && todaySequences.length > 0) {
+                // outbound_date에서 날짜만 추출하여 오늘과 비교
+                const todaySeqIds = todaySequences
+                    .filter(s => {
+                        const seqDate = s.outbound_date ? (s.outbound_date.includes('T') ? s.outbound_date.split('T')[0] : s.outbound_date) : '';
+                        return seqDate === todayStr;
+                    })
+                    .map(s => s.id);
+
+                if (todaySeqIds.length > 0) {
+                    const { data: todayOutParts } = await this.supabase
+                        .from('outbound_parts')
+                        .select('part_number, quantity')
+                        .in('sequence_id', todaySeqIds);
+
+                    if (todayOutParts) {
+                        todayOutParts.forEach(p => {
+                            outboundMap.set(p.part_number, (outboundMap.get(p.part_number) || 0) + (p.quantity || 0));
+                        });
                     }
-                });
+                }
             }
 
             // 결과에 today_inbound, today_outbound 추가
