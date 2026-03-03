@@ -348,55 +348,102 @@ class InventoryStatus {
 
         const allowedPartNumbers = new Set(filteredParts.map(p => p.part_number));
 
-        // 2. 마감재고 기준: daily_inventory_snapshot에서 가장 최근 스냅샷의 closing_stock 사용
-        // (inventory.current_stock 대신 마감기준 재고를 보여주기 위함)
+        // 2. ★ 기준 스냅샷(2/1 마감 등) + 전진 계산으로 현재 재고 산출
+        // (일자별 입출고 현황과 동일한 계산 방식)
         let result = [];
 
-        // 2-1. 가장 최근 스냅샷 날짜 조회
-        const { data: latestSnapshot } = await this.supabase
+        // 2-1. 가장 이른 스냅샷 조회 (기준점 = 2/1 마감 등)
+        const { data: baseSnapshotInfo } = await this.supabase
             .from('daily_inventory_snapshot')
             .select('snapshot_date')
-            .order('snapshot_date', { ascending: false })
+            .order('snapshot_date', { ascending: true })
             .limit(1);
 
-        if (latestSnapshot && latestSnapshot.length > 0) {
-            const latestDate = latestSnapshot[0].snapshot_date;
-            console.log(`마감재고 기준일: ${latestDate}`);
+        if (baseSnapshotInfo && baseSnapshotInfo.length > 0) {
+            const baseDate = baseSnapshotInfo[0].snapshot_date;
+            console.log(`기준 스냅샷 날짜: ${baseDate}`);
 
-            // 2-2. 해당 날짜의 모든 스냅샷 데이터 조회
-            const { data: snapshotData, error: snapError } = await this.supabase
+            // 2-2. 기준 스냅샷 재고 조회
+            const { data: baseSnapData } = await this.supabase
                 .from('daily_inventory_snapshot')
-                .select('part_number, closing_stock, snapshot_date')
-                .eq('snapshot_date', latestDate);
+                .select('part_number, closing_stock')
+                .eq('snapshot_date', baseDate);
 
-            if (!snapError && snapshotData && snapshotData.length > 0) {
-                // 스냅샷 기준 재고 데이터 구성
-                result = snapshotData
-                    .filter(item => allowedPartNumbers.has(item.part_number))
-                    .map(item => ({
-                        part_number: item.part_number,
-                        current_stock: item.closing_stock,
-                        status: item.closing_stock > 0 ? 'in_stock' : 'out_of_stock',
-                        last_updated: item.snapshot_date
-                    }));
-
-                // 스냅샷에 없는 파트는 inventory 테이블에서 가져오기
-                const snapshotPartSet = new Set(snapshotData.map(s => s.part_number));
-                const missingParts = [...allowedPartNumbers].filter(p => !snapshotPartSet.has(p));
-
-                if (missingParts.length > 0) {
-                    const { data: inventoryFallback } = await this.supabase
-                        .from('inventory')
-                        .select('*')
-                        .in('part_number', missingParts);
-
-                    if (inventoryFallback) {
-                        result = result.concat(inventoryFallback.filter(item => allowedPartNumbers.has(item.part_number)));
-                    }
-                }
-
-                console.log(`마감재고 데이터: ${result.length}개 (스냅샷 기준일: ${latestDate})`);
+            const baseStockMap = new Map();
+            if (baseSnapData) {
+                baseSnapData.forEach(s => {
+                    baseStockMap.set(s.part_number, s.closing_stock || 0);
+                });
             }
+
+            // 2-3. 기준 스냅샷 이후 ~ 오늘까지의 모든 입고/출고 조회
+            const now = new Date();
+            const todayForCalc = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            const calcStartNext = new Date(baseDate + 'T12:00:00');
+            calcStartNext.setDate(calcStartNext.getDate() + 1);
+            const calcStartNextStr = `${calcStartNext.getFullYear()}-${String(calcStartNext.getMonth()+1).padStart(2,'0')}-${String(calcStartNext.getDate()).padStart(2,'0')}`;
+
+            // 입고 합계: arn_containers + arn_parts
+            const totalInboundMap = new Map();
+            const { data: allContainers } = await this.supabase
+                .from('arn_containers')
+                .select('arn_number')
+                .eq('status', 'COMPLETED')
+                .gte('inbound_date', calcStartNextStr)
+                .lte('inbound_date', todayForCalc);
+
+            if (allContainers && allContainers.length > 0) {
+                const arnNums = allContainers.map(c => c.arn_number);
+                const { data: allInParts } = await this.supabase
+                    .from('arn_parts')
+                    .select('part_number, quantity')
+                    .in('arn_number', arnNums);
+                if (allInParts) {
+                    allInParts.forEach(p => {
+                        totalInboundMap.set(p.part_number, (totalInboundMap.get(p.part_number) || 0) + (p.quantity || 0));
+                    });
+                }
+            }
+
+            // 출고 합계: outbound_sequences + outbound_parts
+            const totalOutboundMap = new Map();
+            const { data: allSeqs } = await this.supabase
+                .from('outbound_sequences')
+                .select('id')
+                .in('status', ['COMPLETED', 'CONFIRMED'])
+                .gte('outbound_date', calcStartNextStr)
+                .lte('outbound_date', todayForCalc);
+
+            if (allSeqs && allSeqs.length > 0) {
+                const seqIds = allSeqs.map(s => s.id);
+                const { data: allOutParts } = await this.supabase
+                    .from('outbound_parts')
+                    .select('part_number, actual_qty')
+                    .in('sequence_id', seqIds);
+                if (allOutParts) {
+                    allOutParts.forEach(p => {
+                        totalOutboundMap.set(p.part_number, (totalOutboundMap.get(p.part_number) || 0) + (p.actual_qty || 0));
+                    });
+                }
+            }
+
+            // 2-4. 전진 계산: 기준재고 + 총입고 - 총출고 = 현재재고
+            result = [...allowedPartNumbers].map(partNumber => {
+                const baseStock = baseStockMap.get(partNumber) || 0;
+                const totalIn = totalInboundMap.get(partNumber) || 0;
+                const totalOut = totalOutboundMap.get(partNumber) || 0;
+                const calculatedStock = baseStock + totalIn - totalOut;
+
+                return {
+                    part_number: partNumber,
+                    current_stock: calculatedStock,
+                    status: calculatedStock > 0 ? 'in_stock' : 'out_of_stock',
+                    last_updated: todayForCalc
+                };
+            });
+
+            console.log(`재고 현황 (스냅샷 전진계산): 기준일=${baseDate}, 파트=${result.length}개, 총입고파트=${totalInboundMap.size}, 총출고파트=${totalOutboundMap.size}`);
         }
 
         // 3. 스냅샷이 없으면 기존 inventory 테이블 fallback
