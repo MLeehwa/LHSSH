@@ -46,19 +46,29 @@
         IS_PRODUCTION: window.NODE_ENV === 'production'
     };
 
-    // ★ 로컬 날짜 유틸리티 함수 (UTC 대신 로컬 시간대 사용)
+    // ★ 알라바마 어번(America/Chicago) 기준 날짜 유틸리티
     // new Date().toISOString().split('T')[0] 대신 이 함수를 사용하세요!
+    const SITE_TIMEZONE = 'America/Chicago';
+
     const getLocalDateString = (date = new Date()) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: SITE_TIMEZONE,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(date);
     };
 
-    // 로컬 ISO 타임스탬프 반환 (시간 포함)
+    // 어번 기준 ISO 타임스탬프 반환 (시간 포함)
     const getLocalISOString = (date = new Date()) => {
-        const pad = (n) => String(n).padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: SITE_TIMEZONE,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        }).formatToParts(date);
+        const get = (type) => (parts.find(p => p.type === type) || {}).value || '00';
+        return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`;
     };
 
     // 전역 객체로 내보내기 (이미 존재하면 덮어쓰지 않음)

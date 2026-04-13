@@ -1,4 +1,44 @@
 // Inventory Status JavaScript - Performance Optimized
+
+/**
+ * daily_inventory_snapshot.snapshot_date 가 DATE / timestamptz 혼용일 때
+ * 로컬(America/Chicago — 알라바마 어번) 캘린더 기준 YYYY-MM-DD 키로 통일합니다.
+ * timestamptz를 split('T')[0]만 쓰면 UTC 날짜가 되어 .eq() 조회가 빗나가 재고·입출고가 전부 0으로 보일 수 있습니다.
+ */
+const LOCAL_TIMEZONE = 'America/Chicago';
+
+function snapshotDateToKey(value) {
+    if (value == null || value === '') return null;
+    if (typeof value === 'string') {
+        const s = value.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+            return s;
+        }
+    }
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) {
+        if (typeof value === 'string') {
+            const m = value.match(/^(\d{4}-\d{2}-\d{2})/);
+            return m ? m[1] : null;
+        }
+        return null;
+    }
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: LOCAL_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(d);
+}
+
+/** 어번 기준 오늘 날짜 YYYY-MM-DD */
+function getTodayLocal() {
+    return snapshotDateToKey(new Date());
+}
+
+/** 재고·일자별 출고 집계에 포함할 차수 상태. PDA 등록 직후는 PENDING이라 COMPLETED만 보면 출고가 0으로 보임. */
+const OUTBOUND_SEQ_STATUSES_FOR_DISPLAY = ['PENDING', 'COMPLETED', 'CONFIRMED'];
+
 class InventoryStatus {
     constructor() {
         console.log('[LHSSH] 재고현황 v20260218');
@@ -360,15 +400,12 @@ class InventoryStatus {
             .limit(1);
 
         if (baseSnapshotInfo && baseSnapshotInfo.length > 0) {
-            let baseDate = baseSnapshotInfo[0].snapshot_date;
-            if (typeof baseDate === 'string') {
-                baseDate = baseDate.split('T')[0];
-            } else if (baseDate != null) {
-                const bd = new Date(baseDate);
-                baseDate = `${bd.getFullYear()}-${String(bd.getMonth() + 1).padStart(2, '0')}-${String(bd.getDate()).padStart(2, '0')}`;
-            }
+            const baseDate = snapshotDateToKey(baseSnapshotInfo[0].snapshot_date);
             console.log(`기준 스냅샷 날짜: ${baseDate}`);
 
+            if (!baseDate) {
+                console.warn('기준 스냅샷 날짜를 파싱할 수 없습니다. inventory 테이블 fallback으로 진행합니다.');
+            } else {
             // 2-2. 기준 스냅샷 재고 조회
             const { data: baseSnapData } = await this.supabase
                 .from('daily_inventory_snapshot')
@@ -382,9 +419,13 @@ class InventoryStatus {
                 });
             }
 
-            // 2-3. 기준 스냅샷 이후 ~ 오늘까지의 모든 입고/출고 조회
-            const now = new Date();
-            const todayForCalc = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            console.log(`[DEBUG] 기준 스냅샷(${baseDate}): .eq() 결과 ${baseSnapData ? baseSnapData.length : 0}건, baseStockMap ${baseStockMap.size}개 파트`);
+            if (baseStockMap.size === 0) {
+                console.warn(`[DEBUG] ⚠️ baseSnapData가 비어 있습니다! snapshot_date 원본값:`, baseSnapshotInfo[0].snapshot_date, '→ 파싱 결과:', baseDate);
+            }
+
+            // 2-3. 기준 스냅샷 이후 ~ 오늘까지의 모든 입고/출고 조회 (어번 기준)
+            const todayForCalc = getTodayLocal();
 
             const calcStartNext = new Date(baseDate + 'T12:00:00');
             calcStartNext.setDate(calcStartNext.getDate() + 1);
@@ -401,37 +442,43 @@ class InventoryStatus {
 
             if (allContainers && allContainers.length > 0) {
                 const arnNums = allContainers.map(c => c.arn_number);
-                const { data: allInParts } = await this.supabase
-                    .from('arn_parts')
-                    .select('part_number, quantity')
-                    .in('arn_number', arnNums);
-                if (allInParts) {
-                    allInParts.forEach(p => {
-                        totalInboundMap.set(p.part_number, (totalInboundMap.get(p.part_number) || 0) + (p.quantity || 0));
-                    });
+                for (let i = 0; i < arnNums.length; i += 30) {
+                    const batch = arnNums.slice(i, i + 30);
+                    const { data: batchParts } = await this.supabase
+                        .from('arn_parts')
+                        .select('part_number, quantity')
+                        .in('arn_number', batch);
+                    if (batchParts) {
+                        batchParts.forEach(p => {
+                            totalInboundMap.set(p.part_number, (totalInboundMap.get(p.part_number) || 0) + (p.quantity || 0));
+                        });
+                    }
                 }
             }
 
-            // 출고 합계: outbound_sequences + outbound_parts
+            // 출고 합계: outbound_sequences + outbound_parts (배치 처리 — Supabase 1000행 제한 회피)
             const totalOutboundMap = new Map();
             const { data: allSeqs } = await this.supabase
                 .from('outbound_sequences')
                 .select('id')
-                .in('status', ['COMPLETED', 'CONFIRMED'])
+                .in('status', OUTBOUND_SEQ_STATUSES_FOR_DISPLAY)
                 .gte('outbound_date', calcStartNextStr)
                 .lte('outbound_date', todayForCalc);
 
             if (allSeqs && allSeqs.length > 0) {
                 const seqIds = allSeqs.map(s => s.id);
-                const { data: allOutParts } = await this.supabase
-                    .from('outbound_parts')
-                    .select('part_number, actual_qty, scanned_qty')
-                    .in('sequence_id', seqIds);
-                if (allOutParts) {
-                    allOutParts.forEach(p => {
-                        const q = Number(p.actual_qty) || Number(p.scanned_qty) || 0;
-                        totalOutboundMap.set(p.part_number, (totalOutboundMap.get(p.part_number) || 0) + q);
-                    });
+                for (let i = 0; i < seqIds.length; i += 30) {
+                    const batch = seqIds.slice(i, i + 30);
+                    const { data: batchParts } = await this.supabase
+                        .from('outbound_parts')
+                        .select('part_number, actual_qty, scanned_qty')
+                        .in('sequence_id', batch);
+                    if (batchParts) {
+                        batchParts.forEach(p => {
+                            const q = Number(p.actual_qty) || Number(p.scanned_qty) || 0;
+                            totalOutboundMap.set(p.part_number, (totalOutboundMap.get(p.part_number) || 0) + q);
+                        });
+                    }
                 }
             }
 
@@ -469,6 +516,7 @@ class InventoryStatus {
             });
 
             console.log(`재고 현황 (스냅샷 전진계산): 기준일=${baseDate}, 파트=${result.length}개, 입고=${totalInboundMap.size}, 출고=${totalOutboundMap.size}, 반품=${totalReturnMap.size}`);
+            }
         }
 
         // 3. 스냅샷이 없으면 기존 inventory 테이블 fallback
@@ -494,8 +542,7 @@ class InventoryStatus {
 
         // ★ 당일 입고/출고 수량 조회 (arn_containers/outbound_sequences 기반)
         try {
-            const now = new Date();
-            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const todayStr = getTodayLocal();
 
             const inboundMap = new Map();
             const outboundMap = new Map();
@@ -521,20 +568,15 @@ class InventoryStatus {
                 }
             }
 
-            // ★ 출고: outbound_sequences의 outbound_date 기준 (확정·완료 차수만)
+            // ★ 출고: outbound_sequences의 outbound_date 기준 (오늘만 서버사이드 필터)
             const { data: todaySequences } = await this.supabase
                 .from('outbound_sequences')
                 .select('id, outbound_date')
-                .in('status', ['COMPLETED', 'CONFIRMED']);
+                .in('status', OUTBOUND_SEQ_STATUSES_FOR_DISPLAY)
+                .eq('outbound_date', todayStr);
 
             if (todaySequences && todaySequences.length > 0) {
-                // outbound_date에서 날짜만 추출하여 오늘과 비교
-                const todaySeqIds = todaySequences
-                    .filter(s => {
-                        const seqDate = s.outbound_date ? (s.outbound_date.includes('T') ? s.outbound_date.split('T')[0] : s.outbound_date) : '';
-                        return seqDate === todayStr;
-                    })
-                    .map(s => s.id);
+                const todaySeqIds = todaySequences.map(s => s.id);
 
                 if (todaySeqIds.length > 0) {
                     const { data: todayOutParts } = await this.supabase
@@ -1848,7 +1890,7 @@ class InventoryStatus {
     }
 
     async processUploadData(data) {
-        const today = (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
+        const today = getTodayLocal();
 
         for (const row of data) {
             const partNumber = this.extractPartNumber(row);
@@ -2425,7 +2467,14 @@ class InventoryStatus {
                 }
 
                 // 2단계: 해당 날짜의 모든 파트 스냅샷 조회 (limit 없이)
-                const baseDate = latestSnap[0].snapshot_date;
+                const baseDate = snapshotDateToKey(latestSnap[0].snapshot_date);
+                if (!baseDate) {
+                    this.showNotification('이전 스냅샷 날짜를 해석할 수 없습니다. Supabase snapshot_date 형식을 확인해주세요.', 'error');
+                    this.dateStockData = [];
+                    this.renderDateStockTable();
+                    this.showLoading(false);
+                    return;
+                }
                 const { data: prevSnapshots } = await this.supabase
                     .from('daily_inventory_snapshot')
                     .select('part_number, closing_stock')
@@ -2649,23 +2698,23 @@ class InventoryStatus {
             if (!silent) this.showLoading(true);
             console.log('=== 누락된 출고 트랜잭션 동기화 시작 ===');
 
-            // 1. 완료·확정 출고 차수 (재고 집계와 동일 기준)
-            const { data: completedSequences, error: sErr } = await this.supabase
+            // 1. PENDING·COMPLETED·CONFIRMED 모두 포함 (PDA 등록 직후는 PENDING)
+            const { data: targetSequences, error: sErr } = await this.supabase
                 .from('outbound_sequences')
                 .select('id, sequence_number, outbound_date, status')
-                .in('status', ['COMPLETED', 'CONFIRMED']);
+                .in('status', OUTBOUND_SEQ_STATUSES_FOR_DISPLAY);
 
             if (sErr) throw sErr;
-            if (!completedSequences || completedSequences.length === 0) {
-                if (!silent) this.showNotification('완료·확정 상태의 출고 차수가 없습니다.', 'info');
+            if (!targetSequences || targetSequences.length === 0) {
+                if (!silent) this.showNotification('출고 차수가 없습니다.', 'info');
                 if (!silent) this.showLoading(false);
                 return;
             }
 
-            console.log(`완료된 출고 차수: ${completedSequences.length}개`);
+            console.log(`대상 출고 차수: ${targetSequences.length}개 (PENDING/COMPLETED/CONFIRMED)`);
 
             // 2. 해당 차수들의 outbound_parts 조회
-            const sequenceIds = completedSequences.map(s => s.id);
+            const sequenceIds = targetSequences.map(s => s.id);
             let allOutboundParts = [];
             for (let i = 0; i < sequenceIds.length; i += 50) {
                 const batch = sequenceIds.slice(i, i + 50);
@@ -2679,10 +2728,10 @@ class InventoryStatus {
 
             // sequence_id → sequence 매핑
             const seqMap = new Map();
-            completedSequences.forEach(s => seqMap.set(s.id, s));
+            targetSequences.forEach(s => seqMap.set(s.id, s));
 
             // 3. 기존 OUTBOUND 트랜잭션에서 이미 기록된 것 확인
-            const sequenceNumbers = completedSequences.map(s => s.sequence_number);
+            const sequenceNumbers = targetSequences.map(s => s.sequence_number);
             let existingTrans = [];
             for (let i = 0; i < sequenceNumbers.length; i += 50) {
                 const batch = sequenceNumbers.slice(i, i + 50);
@@ -2706,15 +2755,14 @@ class InventoryStatus {
                 const seq = seqMap.get(part.sequence_id);
                 if (!seq) continue;
 
-                const qty = part.actual_qty || part.scanned_qty || 0;
+                const qty = Number(part.actual_qty) || Number(part.scanned_qty) || 0;
                 if (qty <= 0) continue;
 
                 const key = `${seq.sequence_number}__${part.part_number}`;
                 if (existingKeySet.has(key)) continue;
 
-                const transactionDate = seq.outbound_date
-                    ? (seq.outbound_date.includes('T') ? seq.outbound_date.split('T')[0] : seq.outbound_date)
-                    : (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
+                const transactionDate = snapshotDateToKey(seq.outbound_date)
+                    || (window.getLocalDateString ? window.getLocalDateString() : new Date().toISOString().split('T')[0]);
 
                 transRecords.push({
                     transaction_date: transactionDate,
@@ -2753,6 +2801,12 @@ class InventoryStatus {
             console.log(message);
             if (!silent) this.showNotification(message, totalErrors > 0 ? 'warning' : 'success');
 
+            // 동기화 후 화면 데이터 갱신
+            this.cache.clear();
+            this.lastDataUpdate = 0;
+            await this.loadData();
+            this.updateStats();
+
         } catch (error) {
             console.error('출고 트랜잭션 동기화 오류:', error);
             if (!silent) this.showNotification('출고 동기화 오류: ' + error.message, 'error');
@@ -2763,8 +2817,7 @@ class InventoryStatus {
 
     // ==================== 스냅샷 자동 전파 (임의 기준일 → 오늘) ====================
     async cascadeSnapshotsFromDate(baseDate) {
-        const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const today = getTodayLocal();
         console.log(`=== 스냅샷 자동 전파: ${baseDate} → ${today} ===`);
 
         // 1. 기준일의 스냅샷 데이터
@@ -2802,18 +2855,10 @@ class InventoryStatus {
 
         if (transErr) throw transErr;
 
-        // 날짜 정규화 헬퍼
-        const normalizeDate = (d) => {
-            if (!d) return '';
-            if (typeof d === 'string') return d.split('T')[0];
-            const dt = new Date(d);
-            return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-        };
-
         // 트랜잭션을 날짜별로 그룹핑
         const transByDate = new Map();
         (allTrans || []).forEach(t => {
-            const date = normalizeDate(t.transaction_date);
+            const date = snapshotDateToKey(t.transaction_date) || '';
             if (!transByDate.has(date)) transByDate.set(date, []);
             transByDate.get(date).push(t);
         });
@@ -3057,8 +3102,7 @@ class InventoryStatus {
             // ========== STEP 5: inventory.current_stock 동기화 (스냅샷 기준) ==========
             console.log('STEP 5: inventory.current_stock 동기화...');
             try {
-                const now2 = new Date();
-                const todayForSync = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(now2.getDate()).padStart(2, '0')}`;
+                const todayForSync = getTodayLocal();
                 const { data: latestSnapshots } = await this.supabase
                     .from('daily_inventory_snapshot')
                     .select('part_number, closing_stock')
@@ -3081,10 +3125,8 @@ class InventoryStatus {
                 console.warn('inventory.current_stock 동기화 오류 (무시 가능):', syncErr);
             }
 
-            const now = new Date();
-            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             this.showNotification(
-                `완전 재구축 완료!\n입고: ${totalInbound}건, 출고: ${totalOutbound}건\n스냅샷: ${customBaseDate} → ${today}`,
+                `완전 재구축 완료!\n입고: ${totalInbound}건, 출고: ${totalOutbound}건\n스냅샷: ${customBaseDate} → ${getTodayLocal()}`,
                 'success'
             );
 
@@ -3378,16 +3420,10 @@ class InventoryStatus {
             const baseStockMap = new Map();
 
             if (minSnapRow && minSnapRow.length > 0) {
-                baseDate = minSnapRow[0].snapshot_date;
+                baseDate = snapshotDateToKey(minSnapRow[0].snapshot_date);
             }
 
             if (baseDate) {
-                if (typeof baseDate === 'string') {
-                    baseDate = baseDate.split('T')[0];
-                } else {
-                    const bd = new Date(baseDate);
-                    baseDate = `${bd.getFullYear()}-${String(bd.getMonth() + 1).padStart(2, '0')}-${String(bd.getDate()).padStart(2, '0')}`;
-                }
                 const { data: baseSnapData } = await this.supabase
                     .from('daily_inventory_snapshot')
                     .select('part_number, closing_stock')
@@ -3438,30 +3474,33 @@ class InventoryStatus {
                 .lte('inbound_date', endNorm);
             if (icError) console.warn('입고 컨테이너 조회 오류:', icError);
 
-            // 컨테이너별 파트 수량 조회
+            // 컨테이너별 파트 수량 조회 (배치 처리 — Supabase 1000행 제한 회피)
             let inboundPartsData = [];
             if (inboundContainers && inboundContainers.length > 0) {
                 const arnNumbers = inboundContainers.map(c => c.arn_number);
-                const { data: parts, error: ipError } = await this.supabase
-                    .from('arn_parts')
-                    .select('arn_number, part_number, quantity')
-                    .in('arn_number', arnNumbers);
-                if (ipError) console.warn('입고 파트 조회 오류:', ipError);
-                inboundPartsData = parts || [];
+                for (let i = 0; i < arnNumbers.length; i += 30) {
+                    const batch = arnNumbers.slice(i, i + 30);
+                    const { data: batchParts, error: ipError } = await this.supabase
+                        .from('arn_parts')
+                        .select('arn_number, part_number, quantity')
+                        .in('arn_number', batch);
+                    if (ipError) console.warn('입고 파트 조회 오류:', ipError);
+                    if (batchParts) inboundPartsData = inboundPartsData.concat(batchParts);
+                }
             }
 
             // arn_number → inbound_date 매핑
             const arnDateMap = new Map();
             (inboundContainers || []).forEach(c => {
-                const d = typeof c.inbound_date === 'string' ? c.inbound_date.split('T')[0] : c.inbound_date;
+                const d = snapshotDateToKey(c.inbound_date) || c.inbound_date;
                 arnDateMap.set(c.arn_number, d);
             });
 
-            // 4. 출고 데이터: outbound_sequences + outbound_parts 기준 (transStartStr ~ endNorm)
+            // 4. 출고 데이터: outbound_sequences + outbound_parts 기준 (배치 처리)
             const { data: outboundSeqs, error: osError } = await this.supabase
                 .from('outbound_sequences')
                 .select('id, outbound_date')
-                .in('status', ['COMPLETED', 'CONFIRMED'])
+                .in('status', OUTBOUND_SEQ_STATUSES_FOR_DISPLAY)
                 .gte('outbound_date', transStartStr)
                 .lte('outbound_date', endNorm);
             if (osError) console.warn('출고 시퀀스 조회 오류:', osError);
@@ -3469,19 +3508,22 @@ class InventoryStatus {
             let outboundPartsData = [];
             if (outboundSeqs && outboundSeqs.length > 0) {
                 const seqIds = outboundSeqs.map(s => s.id);
-                const { data: parts, error: opError } = await this.supabase
-                    .from('outbound_parts')
-                    .select('sequence_id, part_number, actual_qty, scanned_qty')
-                    .in('sequence_id', seqIds);
-                if (opError) console.warn('출고 파트 조회 오류:', opError);
-                outboundPartsData = parts || [];
+                for (let i = 0; i < seqIds.length; i += 30) {
+                    const batch = seqIds.slice(i, i + 30);
+                    const { data: batchParts, error: opError } = await this.supabase
+                        .from('outbound_parts')
+                        .select('sequence_id, part_number, actual_qty, scanned_qty')
+                        .in('sequence_id', batch);
+                    if (opError) console.warn('출고 파트 조회 오류:', opError);
+                    if (batchParts) outboundPartsData = outboundPartsData.concat(batchParts);
+                }
             }
 
             // sequence_id → outbound_date 매핑
             const seqDateMap = new Map();
             (outboundSeqs || []).forEach(s => {
-                const d = typeof s.outbound_date === 'string' ? s.outbound_date.split('T')[0] : s.outbound_date;
-                seqDateMap.set(s.id, d);
+                const d = snapshotDateToKey(s.outbound_date);
+                if (d) seqDateMap.set(s.id, d);
             });
 
             // 5. 반품 데이터: return_records 기준
